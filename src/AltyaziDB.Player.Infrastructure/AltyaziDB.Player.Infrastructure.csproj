@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>AltyaziDB.Player.Infrastructure</RootNamespace>
+    <AssemblyName>ADB.Player.Infrastructure</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\AltyaziDB.Player.Core\AltyaziDB.Player.Core.csproj" />
+  </ItemGroup>
+</Project>

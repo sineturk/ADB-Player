@@ -1,0 +1,14 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageVersion Include="Endpne.LibMPV.Windows" Version="0.41.0" />
+    <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.10" />
+    <PackageVersion Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.12" />
+    <PackageVersion Include="tdlib.native.win-x64" Version="1.8.66" />
+    <PackageVersion Include="MonoTorrent" Version="3.0.2" />
+    <PackageVersion Include="SharpCompress" Version="0.50.1" />
+  </ItemGroup>
+</Project>

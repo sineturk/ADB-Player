@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "version": "1.0.0.0",
+  "channel": "stable",
+  "publishedUtc": "2026-08-03T07:30:00Z",
+  "minimumWindowsBuild": 19041,
+  "installerUrl": "https://example.invalid/releases/ADB-Player-Setup-v1.0.0.0-x64.exe",
+  "installerSha256": "REPLACE_WITH_64_CHARACTER_SHA256",
+  "portableUrl": "https://example.invalid/releases/ADB-Player-Portable-v1.0.0.0-x64.zip",
+  "portableSha256": "REPLACE_WITH_64_CHARACTER_SHA256",
+  "releaseNotes": "ADB Player V1.0: initial public Windows release.",
+  "mandatory": false
+}

@@ -1,0 +1,102 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AltyaziDB.Player.Core", "src\AltyaziDB.Player.Core\AltyaziDB.Player.Core.csproj", "{8FAC823C-8813-4063-AA43-784E74627E7B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AltyaziDB.Player.Infrastructure", "src\AltyaziDB.Player.Infrastructure\AltyaziDB.Player.Infrastructure.csproj", "{6A82C1C6-FAAA-4224-B9EB-A82724EA340D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AltyaziDB.Player.Playback", "src\AltyaziDB.Player.Playback\AltyaziDB.Player.Playback.csproj", "{8541AE34-EA85-4683-B117-393F12B9435A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AltyaziDB.Player.Addons", "src\AltyaziDB.Player.Addons\AltyaziDB.Player.Addons.csproj", "{A67C0D7E-362C-4A69-B43D-1A7B0DAE532D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AltyaziDB.Player.Connections", "src\AltyaziDB.Player.Connections\AltyaziDB.Player.Connections.csproj", "{E5E7C07F-A55F-4A52-92B0-2E8DDF652D73}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AltyaziDB.Player.AudioSync", "src\AltyaziDB.Player.AudioSync\AltyaziDB.Player.AudioSync.csproj", "{F4F51E15-8A9D-4ED5-9C02-7D83D2B1A507}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AltyaziDB.Player.App", "src\AltyaziDB.Player.App\AltyaziDB.Player.App.csproj", "{1264C8CB-E75B-4C41-BB31-EC64E6F46CFF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AltyaziDB.Player.Library", "src\AltyaziDB.Player.Library\AltyaziDB.Player.Library.csproj", "{72B9236A-4A9B-4E78-B421-EDC97B7A343C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AltyaziDB.Player.Subtitles", "src\AltyaziDB.Player.Subtitles\AltyaziDB.Player.Subtitles.csproj", "{D57E4F39-C413-47B1-8C99-AD915B9ED67F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AltyaziDB.Player.SubtitleSync", "src\AltyaziDB.Player.SubtitleSync\AltyaziDB.Player.SubtitleSync.csproj", "{C573D096-66C5-49CE-8950-6E449EB7F0BA}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AltyaziDB.Player.Sources", "src\AltyaziDB.Player.Sources\AltyaziDB.Player.Sources.csproj", "{5CBCC7C5-1A4D-4637-AE31-6232E3F42C93}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AltyaziDB.Player.Telegram", "src\AltyaziDB.Player.Telegram\AltyaziDB.Player.Telegram.csproj", "{B13F4C82-C5F7-4BD4-8E73-9095C8755247}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AltyaziDB.Player.Torrent", "src\AltyaziDB.Player.Torrent\AltyaziDB.Player.Torrent.csproj", "{6D7D52D4-4EFC-4A23-8D54-B75D080D91B4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AltyaziDB.Player.Cloud", "src\AltyaziDB.Player.Cloud\AltyaziDB.Player.Cloud.csproj", "{E46D6B5A-BC0D-48D8-A106-CBDAA0BE4D6B}"
+EndProject
+Global
+    GlobalSection(SolutionConfigurationPlatforms) = preSolution
+        Debug|x64 = Debug|x64
+        Release|x64 = Release|x64
+    EndGlobalSection
+    GlobalSection(ProjectConfigurationPlatforms) = postSolution
+        {8FAC823C-8813-4063-AA43-784E74627E7B}.Debug|x64.ActiveCfg = Debug|Any CPU
+        {8FAC823C-8813-4063-AA43-784E74627E7B}.Debug|x64.Build.0 = Debug|Any CPU
+        {8FAC823C-8813-4063-AA43-784E74627E7B}.Release|x64.ActiveCfg = Release|Any CPU
+        {8FAC823C-8813-4063-AA43-784E74627E7B}.Release|x64.Build.0 = Release|Any CPU
+        {6A82C1C6-FAAA-4224-B9EB-A82724EA340D}.Debug|x64.ActiveCfg = Debug|Any CPU
+        {6A82C1C6-FAAA-4224-B9EB-A82724EA340D}.Debug|x64.Build.0 = Debug|Any CPU
+        {6A82C1C6-FAAA-4224-B9EB-A82724EA340D}.Release|x64.ActiveCfg = Release|Any CPU
+        {6A82C1C6-FAAA-4224-B9EB-A82724EA340D}.Release|x64.Build.0 = Release|Any CPU
+        {8541AE34-EA85-4683-B117-393F12B9435A}.Debug|x64.ActiveCfg = Debug|x64
+        {8541AE34-EA85-4683-B117-393F12B9435A}.Debug|x64.Build.0 = Debug|x64
+        {8541AE34-EA85-4683-B117-393F12B9435A}.Release|x64.ActiveCfg = Release|x64
+        {8541AE34-EA85-4683-B117-393F12B9435A}.Release|x64.Build.0 = Release|x64
+        {A67C0D7E-362C-4A69-B43D-1A7B0DAE532D}.Debug|x64.ActiveCfg = Debug|Any CPU
+        {A67C0D7E-362C-4A69-B43D-1A7B0DAE532D}.Debug|x64.Build.0 = Debug|Any CPU
+        {A67C0D7E-362C-4A69-B43D-1A7B0DAE532D}.Release|x64.ActiveCfg = Release|Any CPU
+        {A67C0D7E-362C-4A69-B43D-1A7B0DAE532D}.Release|x64.Build.0 = Release|Any CPU
+        {E5E7C07F-A55F-4A52-92B0-2E8DDF652D73}.Debug|x64.ActiveCfg = Debug|Any CPU
+        {E5E7C07F-A55F-4A52-92B0-2E8DDF652D73}.Debug|x64.Build.0 = Debug|Any CPU
+        {E5E7C07F-A55F-4A52-92B0-2E8DDF652D73}.Release|x64.ActiveCfg = Release|Any CPU
+        {E5E7C07F-A55F-4A52-92B0-2E8DDF652D73}.Release|x64.Build.0 = Release|Any CPU
+        {F4F51E15-8A9D-4ED5-9C02-7D83D2B1A507}.Debug|x64.ActiveCfg = Debug|Any CPU
+        {F4F51E15-8A9D-4ED5-9C02-7D83D2B1A507}.Debug|x64.Build.0 = Debug|Any CPU
+        {F4F51E15-8A9D-4ED5-9C02-7D83D2B1A507}.Release|x64.ActiveCfg = Release|Any CPU
+        {F4F51E15-8A9D-4ED5-9C02-7D83D2B1A507}.Release|x64.Build.0 = Release|Any CPU
+        {1264C8CB-E75B-4C41-BB31-EC64E6F46CFF}.Debug|x64.ActiveCfg = Debug|x64
+        {1264C8CB-E75B-4C41-BB31-EC64E6F46CFF}.Debug|x64.Build.0 = Debug|x64
+        {1264C8CB-E75B-4C41-BB31-EC64E6F46CFF}.Release|x64.ActiveCfg = Release|x64
+        {1264C8CB-E75B-4C41-BB31-EC64E6F46CFF}.Release|x64.Build.0 = Release|x64
+        {72B9236A-4A9B-4E78-B421-EDC97B7A343C}.Debug|x64.ActiveCfg = Debug|Any CPU
+        {72B9236A-4A9B-4E78-B421-EDC97B7A343C}.Debug|x64.Build.0 = Debug|Any CPU
+        {72B9236A-4A9B-4E78-B421-EDC97B7A343C}.Release|x64.ActiveCfg = Release|Any CPU
+        {72B9236A-4A9B-4E78-B421-EDC97B7A343C}.Release|x64.Build.0 = Release|Any CPU
+        {D57E4F39-C413-47B1-8C99-AD915B9ED67F}.Debug|x64.ActiveCfg = Debug|Any CPU
+        {D57E4F39-C413-47B1-8C99-AD915B9ED67F}.Debug|x64.Build.0 = Debug|Any CPU
+        {D57E4F39-C413-47B1-8C99-AD915B9ED67F}.Release|x64.ActiveCfg = Release|Any CPU
+        {D57E4F39-C413-47B1-8C99-AD915B9ED67F}.Release|x64.Build.0 = Release|Any CPU
+        {C573D096-66C5-49CE-8950-6E449EB7F0BA}.Debug|x64.ActiveCfg = Debug|Any CPU
+        {C573D096-66C5-49CE-8950-6E449EB7F0BA}.Debug|x64.Build.0 = Debug|Any CPU
+        {C573D096-66C5-49CE-8950-6E449EB7F0BA}.Release|x64.ActiveCfg = Release|Any CPU
+        {C573D096-66C5-49CE-8950-6E449EB7F0BA}.Release|x64.Build.0 = Release|Any CPU
+        {5CBCC7C5-1A4D-4637-AE31-6232E3F42C93}.Debug|x64.ActiveCfg = Debug|Any CPU
+        {5CBCC7C5-1A4D-4637-AE31-6232E3F42C93}.Debug|x64.Build.0 = Debug|Any CPU
+        {5CBCC7C5-1A4D-4637-AE31-6232E3F42C93}.Release|x64.ActiveCfg = Release|Any CPU
+        {5CBCC7C5-1A4D-4637-AE31-6232E3F42C93}.Release|x64.Build.0 = Release|Any CPU
+        {B13F4C82-C5F7-4BD4-8E73-9095C8755247}.Debug|x64.ActiveCfg = Debug|x64
+        {B13F4C82-C5F7-4BD4-8E73-9095C8755247}.Debug|x64.Build.0 = Debug|x64
+        {B13F4C82-C5F7-4BD4-8E73-9095C8755247}.Release|x64.ActiveCfg = Release|x64
+        {B13F4C82-C5F7-4BD4-8E73-9095C8755247}.Release|x64.Build.0 = Release|x64
+        {6D7D52D4-4EFC-4A23-8D54-B75D080D91B4}.Debug|x64.ActiveCfg = Debug|x64
+        {6D7D52D4-4EFC-4A23-8D54-B75D080D91B4}.Debug|x64.Build.0 = Debug|x64
+        {6D7D52D4-4EFC-4A23-8D54-B75D080D91B4}.Release|x64.ActiveCfg = Release|x64
+        {6D7D52D4-4EFC-4A23-8D54-B75D080D91B4}.Release|x64.Build.0 = Release|x64
+        {E46D6B5A-BC0D-48D8-A106-CBDAA0BE4D6B}.Debug|x64.ActiveCfg = Debug|x64
+        {E46D6B5A-BC0D-48D8-A106-CBDAA0BE4D6B}.Debug|x64.Build.0 = Debug|x64
+        {E46D6B5A-BC0D-48D8-A106-CBDAA0BE4D6B}.Release|x64.ActiveCfg = Release|x64
+        {E46D6B5A-BC0D-48D8-A106-CBDAA0BE4D6B}.Release|x64.Build.0 = Release|x64
+    EndGlobalSection
+    GlobalSection(SolutionProperties) = preSolution
+        HideSolutionNode = FALSE
+    EndGlobalSection
+    GlobalSection(ExtensibilityGlobals) = postSolution
+        SolutionGuid = {4243496D-16DD-4275-84B9-E991A781D230}
+    EndGlobalSection
+EndGlobal

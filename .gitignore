@@ -1,0 +1,64 @@
+# ADB Player local build outputs and machine-specific state
+# Tracked files are not removed by adding these ignore rules.
+**/bin/
+**/obj/
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Build, installer and diagnostics generated on the current machine
+/artifacts/
+/logs/
+/diagnostics/
+/data/
+*.log
+*.dmp
+*.crash
+
+# Local developer/application credentials - NEVER commit
+.env
+.env.*
+!.env.example
+**/*.secrets.json
+**/secrets.dat
+**/rclone.conf
+*.pfx
+*.p12
+*.pem
+*.key
+
+# Generated C# credentials baked into a local build
+**/Generated/*Credentials*.cs
+
+# Native executables/runtime materialized by vendor scripts
+/native/rclone/
+/native/ffmpeg/
+/native/telegram/
+/native/torrent/
+/native/subtitlesync/
+/native/audiosynctool/
+
+# Python byproducts from optional, isolated build tools
+**/__pycache__/
+*.py[cod]
+**/.pytest_cache/
+**/.venv/
+**/venv/
+
+# Temporary editor downloads/copies
+*.tmp
+*.bak
+*.orig
+*.swp
+Thumbs.db
+Desktop.ini
+
+
+# Neon / Node tooling for ADB Cloud backend
+**/node_modules/
+**/.neon
+**/.neon/

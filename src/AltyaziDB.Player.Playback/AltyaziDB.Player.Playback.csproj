@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <PlatformTarget>x64</PlatformTarget>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <RootNamespace>AltyaziDB.Player.Playback</RootNamespace>
+    <AssemblyName>ADB.Player.Playback</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\AltyaziDB.Player.Core\AltyaziDB.Player.Core.csproj" />
+  </ItemGroup>
+</Project>

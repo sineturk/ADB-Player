@@ -1,0 +1,5 @@
+Anime4K GLSL shaders
+Repository: bloc97/Anime4K
+Pinned commit: 7684e9586f8dcc738af08a1cdceb024cc184f426
+Integration: mpv glsl-shaders property
+The shader files are downloaded by tool/vendor-anime4k.ps1 and verified with their Git blob SHA-1 identifiers.

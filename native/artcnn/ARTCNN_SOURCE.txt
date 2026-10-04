@@ -1,0 +1,5 @@
+ArtCNN v1.6.2
+Upstream: https://github.com/Artoriuz/ArtCNN
+ArtCNN_C4F16.glsl git-blob: 4086dce92db6c1d9d81d3e396aa94d35a1e389a8
+ArtCNN_C4F32.glsl git-blob: 00a487233c1d77a35b7084d395efcbde21fbffef
+License: MIT

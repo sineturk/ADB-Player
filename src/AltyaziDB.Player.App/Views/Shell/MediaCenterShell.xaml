@@ -1,0 +1,132 @@
+<UserControl x:Class="AltyaziDB.Player.App.Views.Shell.MediaCenterShell"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:pages="clr-namespace:AltyaziDB.Player.App.Views.Pages"
+             Background="{StaticResource R23AppBrush}"
+             Foreground="{StaticResource R23TextBrush}"
+             FontFamily="Segoe UI Variable Text, Segoe UI"
+             FontSize="14"
+             Loaded="Shell_OnLoaded"
+             DataContextChanged="Shell_OnDataContextChanged"
+             Unloaded="Shell_OnUnloaded">
+  <UserControl.Resources>
+    <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource R23SlimScrollBar}"/>
+    <Style x:Key="R23Divider" TargetType="Border">
+      <Setter Property="Height" Value="1"/>
+      <Setter Property="Background" Value="{StaticResource R23StrokeBrush}"/>
+      <Setter Property="Margin" Value="16,14"/>
+      <Setter Property="Opacity" Value=".75"/>
+    </Style>
+  </UserControl.Resources>
+
+  <Grid Background="{StaticResource R23AppBrush}">
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition x:Name="NavigationColumn" Width="218"/>
+      <ColumnDefinition Width="*"/>
+    </Grid.ColumnDefinitions>
+    <Border Grid.Column="0" Background="{StaticResource R23SidebarBrush}"
+            BorderBrush="{StaticResource R23StrokeBrush}" BorderThickness="0,0,1,0">
+      <DockPanel LastChildFill="True">
+        <StackPanel DockPanel.Dock="Top" Margin="16,14,14,12">
+          <!-- Canonical ADB Player brand asset; tuned for the compact premium shell. -->
+          <Image Source="/ADB.Player;component/Assets/logo.png"
+                 Height="62" MaxWidth="180" Stretch="Uniform"
+                 HorizontalAlignment="Left"
+                 AutomationProperties.Name="ADB Player"/>
+        </StackPanel>
+        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      Focusable="False">
+          <StackPanel x:Name="NavigationButtons" Margin="10,0,10,16">
+            <Button x:Name="NavHome" Tag="0" Click="Navigate_Click" Style="{StaticResource R23NavButton}" AutomationProperties.Name="Home">
+              <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE10F;" FontFamily="Segoe MDL2 Assets" FontSize="18" Width="33"/><TextBlock Text="{DynamicResource Tab.Sources}" VerticalAlignment="Center"/></StackPanel>
+            </Button>
+            <Button x:Name="NavDiscover" Tag="1" Click="Navigate_Click" Style="{StaticResource R23NavButton}" AutomationProperties.Name="Discover">
+              <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE12B;" FontFamily="Segoe MDL2 Assets" FontSize="18" Width="33"/><TextBlock Text="{DynamicResource Tab.Discover}" VerticalAlignment="Center"/></StackPanel>
+            </Button>
+            <Button x:Name="NavLibrary" Tag="2" Click="Navigate_Click" Style="{StaticResource R23NavButton}" AutomationProperties.Name="Library">
+              <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE8F1;" FontFamily="Segoe MDL2 Assets" FontSize="18" Width="33"/><TextBlock Text="{DynamicResource Tab.Library}" VerticalAlignment="Center"/></StackPanel>
+            </Button>
+            <Button x:Name="NavPlaylist" Tag="3" Click="Navigate_Click" Style="{StaticResource R23NavButton}" AutomationProperties.Name="Playlist">
+              <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE93C;" FontFamily="Segoe MDL2 Assets" FontSize="18" Width="33"/><TextBlock Text="{DynamicResource Tab.Playlist}" VerticalAlignment="Center"/></StackPanel>
+            </Button>
+            <Button x:Name="NavHistory" Tag="4" Click="Navigate_Click" Style="{StaticResource R23NavButton}" AutomationProperties.Name="History">
+              <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE81C;" FontFamily="Segoe MDL2 Assets" FontSize="18" Width="33"/><TextBlock Text="{DynamicResource Tab.History}" VerticalAlignment="Center"/></StackPanel>
+            </Button>
+            <Border Style="{StaticResource R23Divider}"/>
+            <Button x:Name="NavTelegram" Tag="5" Click="Navigate_Click" Style="{StaticResource R23NavButton}" AutomationProperties.Name="Telegram">
+              <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE122;" FontFamily="Segoe MDL2 Assets" FontSize="18" Width="33"/><TextBlock Text="{DynamicResource Tab.Telegram}" VerticalAlignment="Center"/></StackPanel>
+            </Button>
+            <Button x:Name="NavConnections" Tag="6" Click="Navigate_Click" Style="{StaticResource R23NavButton}" AutomationProperties.Name="Connections">
+              <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE71B;" FontFamily="Segoe MDL2 Assets" FontSize="18" Width="33"/><TextBlock Text="{DynamicResource Tab.Connections}" VerticalAlignment="Center"/></StackPanel>
+            </Button>
+            <Button x:Name="NavAddons" Tag="7" Click="Navigate_Click" Style="{StaticResource R23NavButton}" AutomationProperties.Name="Add-ons">
+              <StackPanel Orientation="Horizontal"><TextBlock Text="&#xEA86;" FontFamily="Segoe MDL2 Assets" FontSize="18" Width="33"/><TextBlock Text="{DynamicResource Tab.Addons}" VerticalAlignment="Center"/></StackPanel>
+            </Button>
+            <Button x:Name="NavTorrent" Tag="8" Click="Navigate_Click" Style="{StaticResource R23NavButton}" AutomationProperties.Name="Torrent">
+              <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE896;" FontFamily="Segoe MDL2 Assets" FontSize="18" Width="33"/><TextBlock Text="{DynamicResource Tab.Torrent}" VerticalAlignment="Center"/></StackPanel>
+            </Button>
+            <Button x:Name="NavUpdate" Tag="9" Click="Navigate_Click" Style="{StaticResource R23NavButton}" AutomationProperties.Name="Updates">
+              <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE777;" FontFamily="Segoe MDL2 Assets" FontSize="18" Width="33"/><TextBlock Text="{DynamicResource Tab.Update}" VerticalAlignment="Center"/></StackPanel>
+            </Button>
+            <Button x:Name="NavSettings" Tag="10" Click="Navigate_Click" Style="{StaticResource R23NavButton}" AutomationProperties.Name="Settings">
+              <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="18" Width="33"/><TextBlock Text="{DynamicResource Tab.Settings}" VerticalAlignment="Center"/></StackPanel>
+            </Button>
+          </StackPanel>
+        </ScrollViewer>
+      </DockPanel>
+    </Border>
+
+    <Grid Grid.Column="1" MinWidth="0">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="60"/>
+        <RowDefinition Height="*"/>
+      </Grid.RowDefinitions>
+      <Border Grid.Row="0" Background="{StaticResource R23AppBrush}"
+              BorderBrush="{StaticResource R23StrokeBrush}" BorderThickness="0,0,0,1"
+              Padding="14,0">
+        <DockPanel LastChildFill="False">
+          <!-- R2.4: attached utility toolbar. Related commands read as one calm surface. -->
+          <Border DockPanel.Dock="Right" Style="{StaticResource R23Toolbar}" VerticalAlignment="Center">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+              <Button Margin="0,0,3,0" Style="{StaticResource R23ToolbarButton}"
+                      Command="{Binding ShowAccountCommand}"
+                      ToolTip="{DynamicResource Account.Page.Title}">
+                <StackPanel Orientation="Horizontal">
+                  <TextBlock Text="&#xE77B;" FontFamily="Segoe MDL2 Assets" FontSize="15" Margin="0,0,7,0"/>
+                  <TextBlock Text="{Binding Account.HeaderText}" VerticalAlignment="Center"/>
+                </StackPanel>
+              </Button>
+              <ComboBox Width="112" MinHeight="34" Margin="0,0,3,0"
+                        ItemsSource="{Binding LanguageOptions}"
+                        SelectedItem="{Binding SelectedLanguage, Mode=TwoWay}"
+                        DisplayMemberPath="DisplayName"
+                        AutomationProperties.Name="Language"/>
+              <Button Margin="0,0,3,0" Style="{StaticResource R23ToolbarButton}"
+                      Content="{DynamicResource Action.OpenFile}" Command="{Binding OpenFileCommand}"/>
+              <Button Style="{StaticResource R23ToolbarPrimaryButton}"
+                      Content="{DynamicResource Action.OpenUrl}" Command="{Binding OpenUrlCommand}"/>
+            </StackPanel>
+          </Border>
+        </DockPanel>
+      </Border>
+
+      <Grid Grid.Row="1" Margin="0" Background="{StaticResource R23AppBrush}">
+        <pages:HomeView x:Name="HomePage" Visibility="Collapsed"/>
+        <pages:DiscoverView x:Name="DiscoverPage" Visibility="Collapsed"/>
+        <pages:LibraryView x:Name="LibraryPage" Visibility="Collapsed"/>
+        <pages:PlaylistView x:Name="PlaylistPage" Visibility="Collapsed"/>
+        <pages:HistoryView x:Name="HistoryPage" Visibility="Collapsed"/>
+        <pages:TelegramView x:Name="TelegramPage" Visibility="Collapsed"/>
+        <pages:ConnectionsView x:Name="ConnectionsPage" Visibility="Collapsed"/>
+        <pages:AddonsView x:Name="AddonsPage" Visibility="Collapsed"/>
+        <pages:TorrentView x:Name="TorrentPage" Visibility="Collapsed"/>
+        <pages:UpdatesView x:Name="UpdatesPage" Visibility="Collapsed"/>
+        <pages:SettingsView x:Name="SettingsPage" Visibility="Collapsed"/>
+        <pages:AccountView x:Name="AccountPage" Visibility="Collapsed"/>
+        <pages:CloudListsView x:Name="CloudListsPage" Visibility="Collapsed"/>
+        <pages:SourcesView x:Name="SourcesPage" Visibility="Collapsed"/>
+      </Grid>
+    </Grid>
+  </Grid>
+</UserControl>

@@ -1,0 +1,323 @@
+<UserControl x:Class="AltyaziDB.Player.App.Views.Pages.CloudListsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{StaticResource R23AppBrush}"
+             Foreground="{StaticResource R23TextBrush}"
+             FontFamily="Segoe UI Variable Text, Segoe UI"
+             FontSize="14">
+  <Grid Margin="20,18,22,20">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="*"/>
+    </Grid.RowDefinitions>
+
+    <Grid Margin="0,0,0,16">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="Auto"/>
+      </Grid.ColumnDefinitions>
+      <StackPanel>
+        <TextBlock Text="{DynamicResource Account.CloudCollections.PageTitle}"
+                   Style="{StaticResource R23PageHeading}"/>
+        <TextBlock Text="{DynamicResource Account.CloudCollections.PageHelp}"
+                   Style="{StaticResource R23SecondaryText}"
+                   TextWrapping="Wrap" Margin="0,5,0,0"/>
+      </StackPanel>
+      <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
+        <Button Style="{StaticResource R23ToolbarButton}"
+                Content="{DynamicResource Action.Refresh}"
+                Command="{Binding Library.RefreshCloudListsCommand}"
+                Margin="0,0,6,0"/>
+        <Button Style="{StaticResource R23ToolbarButton}"
+                Content="{DynamicResource Account.CloudCollections.BackToProfile}"
+                Command="{Binding ShowAccountCommand}"/>
+      </StackPanel>
+    </Grid>
+
+    <Grid Grid.Row="1" DataContext="{Binding Library}">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="285"/>
+        <ColumnDefinition Width="14"/>
+        <ColumnDefinition Width="*"/>
+      </Grid.ColumnDefinitions>
+
+      <Border Style="{StaticResource R24WorkspacePanel}">
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+          </Grid.RowDefinitions>
+
+          <StackPanel>
+            <TextBlock Text="{DynamicResource Account.CloudCollections.AllLists}"
+                       Style="{StaticResource R23SectionHeading}"/>
+            <TextBlock Text="{DynamicResource Cloud.Collections.Help}"
+                       Style="{StaticResource R23SecondaryText}"
+                       TextWrapping="Wrap" Margin="0,4,0,10"/>
+          </StackPanel>
+
+          <ListBox Grid.Row="1"
+                   ItemsSource="{Binding CloudCollections}"
+                   SelectedItem="{Binding SelectedCloudCollection, Mode=TwoWay}"
+                   Background="Transparent"
+                   BorderThickness="0"
+                   Foreground="{StaticResource R23TextBrush}">
+            <ListBox.ItemTemplate>
+              <DataTemplate>
+                <Grid Margin="2,5">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                  </Grid.ColumnDefinitions>
+                  <StackPanel>
+                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
+                    <TextBlock FontSize="11.5" Margin="0,2,0,0">
+                      <TextBlock.Style>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource R23SecondaryText}">
+                          <Setter Property="Text" Value="{DynamicResource Cloud.Collections.CustomListLabel}"/>
+                          <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsSystem}" Value="True">
+                              <Setter Property="Text" Value="{DynamicResource Cloud.Collections.SystemListLabel}"/>
+                            </DataTrigger>
+                          </Style.Triggers>
+                        </Style>
+                      </TextBlock.Style>
+                    </TextBlock>
+                  </StackPanel>
+                  <Border Grid.Column="1"
+                          Style="{StaticResource R24StatusPill}"
+                          VerticalAlignment="Center" Margin="8,0,0,0">
+                    <TextBlock Text="{Binding ItemCount}" FontSize="11"/>
+                  </Border>
+                </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+
+          <StackPanel Grid.Row="2" Margin="0,12,0,0">
+            <TextBox Text="{Binding NewCollectionName, UpdateSourceTrigger=PropertyChanged}"
+                     MinHeight="36"
+                     ToolTip="{DynamicResource Cloud.Collections.NamePlaceholder}"/>
+            <Grid Margin="0,7,0,0">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+              </Grid.ColumnDefinitions>
+              <Button Style="{StaticResource R23ToolbarButton}"
+                      Content="{DynamicResource Cloud.Collections.Create}"
+                      Command="{Binding CreateCloudListCommand}"
+                      Margin="0,0,4,0"/>
+              <Button Grid.Column="1"
+                      Content="{DynamicResource Cloud.Collections.Rename}"
+                      Command="{Binding RenameCloudListCommand}"
+                      Margin="8,0,0,0"
+                      MinWidth="118">
+                <Button.Style>
+                  <Style TargetType="Button" BasedOn="{StaticResource R23ToolbarButton}">
+                    <Setter Property="Visibility" Value="Visible"/>
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding SelectedCloudCollection}" Value="{x:Null}">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                      </DataTrigger>
+                      <DataTrigger Binding="{Binding SelectedCloudCollection.IsSystem}" Value="True">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </Button.Style>
+              </Button>
+            </Grid>
+            <Button Content="{DynamicResource Cloud.Collections.Delete}"
+                    Command="{Binding DeleteCloudListCommand}"
+                    Margin="0,7,0,0">
+              <Button.Style>
+                <Style TargetType="Button" BasedOn="{StaticResource R23ToolbarButton}">
+                  <Setter Property="Visibility" Value="Visible"/>
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding SelectedCloudCollection}" Value="{x:Null}">
+                      <Setter Property="Visibility" Value="Collapsed"/>
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding SelectedCloudCollection.IsSystem}" Value="True">
+                      <Setter Property="Visibility" Value="Collapsed"/>
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </Button.Style>
+            </Button>
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <Border Grid.Column="2" Style="{StaticResource R24WorkspacePanel}">
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+          </Grid.RowDefinitions>
+
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+              <Grid>
+                <TextBlock Text="{DynamicResource Account.CloudCollections.PageTitle}">
+                  <TextBlock.Style>
+                    <Style TargetType="TextBlock" BasedOn="{StaticResource R23SectionHeading}">
+                      <Setter Property="Visibility" Value="Collapsed"/>
+                      <Style.Triggers>
+                        <DataTrigger Binding="{Binding SelectedCloudCollection}" Value="{x:Null}">
+                          <Setter Property="Visibility" Value="Visible"/>
+                        </DataTrigger>
+                      </Style.Triggers>
+                    </Style>
+                  </TextBlock.Style>
+                </TextBlock>
+                <TextBlock Text="{Binding SelectedCloudCollection.Name}">
+                  <TextBlock.Style>
+                    <Style TargetType="TextBlock" BasedOn="{StaticResource R23SectionHeading}">
+                      <Setter Property="Visibility" Value="Visible"/>
+                      <Style.Triggers>
+                        <DataTrigger Binding="{Binding SelectedCloudCollection}" Value="{x:Null}">
+                          <Setter Property="Visibility" Value="Collapsed"/>
+                        </DataTrigger>
+                      </Style.Triggers>
+                    </Style>
+                  </TextBlock.Style>
+                </TextBlock>
+              </Grid>
+              <TextBlock Text="{Binding Summary}"
+                         Style="{StaticResource R23SecondaryText}"
+                         Margin="0,4,0,0"/>
+            </StackPanel>
+            <Button Grid.Column="1"
+                    Style="{StaticResource R23ToolbarPrimaryButton}"
+                    Content="{DynamicResource Cloud.Collections.AddContent}"
+                    Command="{Binding DataContext.AddContentToSelectedCloudListCommand,
+                                      RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"/>
+          </Grid>
+
+          <Border Grid.Row="1" Style="{StaticResource R23Toolbar}" Margin="0,10,0,8">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+              </Grid.ColumnDefinitions>
+              <TextBlock Text="{DynamicResource Cloud.Collections.ListHint}"
+                         Style="{StaticResource R23SecondaryText}"
+                         VerticalAlignment="Center"/>
+              <Button Grid.Column="1"
+                      Style="{StaticResource R23ToolbarButton}"
+                      Content="{DynamicResource Cloud.Collections.RemoveSelected}"
+                      Command="{Binding RemoveFromSelectedCloudListCommand}"
+                      Margin="8,0,0,0"/>
+            </Grid>
+          </Border>
+
+          <Grid Grid.Row="2">
+            <ListBox ItemsSource="{Binding CloudItems}"
+                     SelectedItem="{Binding SelectedCloudItem, Mode=TwoWay}"
+                     Background="Transparent"
+                     BorderThickness="0"
+                     Foreground="{StaticResource R23TextBrush}">
+              <ListBox.ItemTemplate>
+                <DataTemplate>
+                  <Border Margin="2,3"
+                          Style="{StaticResource R24InsetPanel}"
+                          Padding="12,10">
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                      </Grid.ColumnDefinitions>
+                      <StackPanel>
+                        <TextBlock Text="{Binding Title}"
+                                   FontSize="14.5"
+                                   FontWeight="SemiBold"
+                                   TextTrimming="CharacterEllipsis"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                          <TextBlock Text="{Binding MediaType, Converter={StaticResource CloudMetadataTextConverter}, ConverterParameter=mediaType}"
+                                     Style="{StaticResource R23SecondaryText}"
+                                     FontSize="11.5"/>
+                          <TextBlock Text=" · "
+                                     Style="{StaticResource R23SecondaryText}"
+                                     FontSize="11.5"/>
+                          <TextBlock Text="{Binding Year, TargetNullValue=-}"
+                                     Style="{StaticResource R23SecondaryText}"
+                                     FontSize="11.5"/>
+                          <TextBlock Text=" · "
+                                     Style="{StaticResource R23SecondaryText}"
+                                     FontSize="11.5"/>
+                          <TextBlock Text="{Binding SourceKind, Converter={StaticResource CloudMetadataTextConverter}, ConverterParameter=sourceKind}"
+                                     Style="{StaticResource R23SecondaryText}"
+                                     FontSize="11.5"/>
+                        </StackPanel>
+                      </StackPanel>
+                      <Border Grid.Column="1"
+                              Style="{StaticResource R24StatusPill}"
+                              VerticalAlignment="Center" Margin="12,0,0,0">
+                        <TextBlock Text="{DynamicResource Cloud.Collections.CloudItem}" FontSize="10.5"/>
+                      </Border>
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+
+            <StackPanel VerticalAlignment="Center"
+                        HorizontalAlignment="Center"
+                        MaxWidth="400">
+              <StackPanel.Style>
+                <Style TargetType="StackPanel">
+                  <Setter Property="Visibility" Value="Collapsed"/>
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding CloudItems.Count}" Value="0">
+                      <Setter Property="Visibility" Value="Visible"/>
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </StackPanel.Style>
+              <Border Style="{StaticResource R24EmptyIcon}" HorizontalAlignment="Center">
+                <TextBlock Text="&#xE8CB;"
+                           FontFamily="Segoe MDL2 Assets"
+                           FontSize="24"
+                           Foreground="{StaticResource R23CyanBrush}"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"/>
+              </Border>
+              <TextBlock Text="{DynamicResource Account.CloudCollections.EmptyPage}"
+                         Style="{StaticResource R23SectionHeading}"
+                         Margin="0,14,0,6"
+                         TextWrapping="Wrap"
+                         TextAlignment="Center"/>
+              <TextBlock Text="{DynamicResource Account.CloudCollections.EmptyPageHelp}"
+                         Style="{StaticResource R23SecondaryText}"
+                         TextWrapping="Wrap"
+                         TextAlignment="Center"/>
+            </StackPanel>
+          </Grid>
+
+          <Grid Grid.Row="3" Margin="0,10,0,0">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="{Binding StatusText, Converter={StaticResource UserFacingTextConverter}}"
+                       Style="{StaticResource R23SecondaryText}"
+                       TextWrapping="Wrap"
+                       VerticalAlignment="Center"/>
+            <Button Grid.Column="1"
+                    Style="{StaticResource R23PrimaryButton}"
+                    Content="{DynamicResource Action.PlaySelected}"
+                    Command="{Binding PlaySelectedCommand}"
+                    Margin="12,0,0,0"/>
+          </Grid>
+        </Grid>
+      </Border>
+    </Grid>
+  </Grid>
+</UserControl>

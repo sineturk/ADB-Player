@@ -1,0 +1,231 @@
+<UserControl x:Class="AltyaziDB.Player.App.Views.Pages.SettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{StaticResource R23AppBrush}"
+             Foreground="{StaticResource R23TextBrush}"
+             FontFamily="Segoe UI Variable Text, Segoe UI"
+             FontSize="14"
+             Loaded="SettingsView_OnLoaded"
+             Unloaded="SettingsView_OnUnloaded">
+  <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+    <Grid Margin="20,18,22,24" MaxWidth="1120" HorizontalAlignment="Left">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
+      </Grid.RowDefinitions>
+
+      <StackPanel>
+        <TextBlock Text="{DynamicResource Tab.Settings}" Style="{StaticResource R23PageHeading}"/>
+        <TextBlock Text="{DynamicResource Settings.Api.Subtitle}"
+                   Style="{StaticResource R23SecondaryText}"
+                   Margin="0,4,0,0" TextWrapping="Wrap"/>
+      </StackPanel>
+
+      <Border Grid.Row="1" Style="{StaticResource R24WorkspacePanel}" Margin="0,16,0,0">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+          </Grid.ColumnDefinitions>
+          <Border Width="46" Height="46" CornerRadius="13"
+                  Background="#112B3A" BorderBrush="#285B73" BorderThickness="1">
+            <TextBlock Text="&#xE895;" FontFamily="Segoe MDL2 Assets" FontSize="20"
+                       Foreground="{StaticResource R23CyanBrush}"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+          <StackPanel Grid.Column="1" Margin="13,0,18,0" VerticalAlignment="Center">
+            <TextBlock Text="{DynamicResource Cloud.Preferences.Title}"
+                       Style="{StaticResource R23SectionHeading}"/>
+            <TextBlock Text="{DynamicResource Cloud.Preferences.Help}"
+                       Style="{StaticResource R23SecondaryText}" Margin="0,3,0,0"
+                       TextWrapping="Wrap"/>
+            <TextBlock Text="{Binding CloudPreferencesStatus, Converter={StaticResource UserFacingTextConverter}}"
+                       Foreground="{StaticResource R23CyanBrush}" FontSize="12"
+                       Margin="0,7,0,0" TextWrapping="Wrap"/>
+            <TextBlock Text="{Binding CloudPreferencesLastSyncText}"
+                       Style="{StaticResource R23SecondaryText}" FontSize="11.5"
+                       Margin="0,2,0,0"/>
+          </StackPanel>
+          <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+            <Button Style="{StaticResource R23ToolbarButton}"
+                    Content="{DynamicResource Cloud.Preferences.UseCloud}"
+                    Command="{Binding LoadCloudPreferencesCommand}"
+                    Margin="0,0,6,0"/>
+            <Button Style="{StaticResource R23ToolbarPrimaryButton}"
+                    Content="{DynamicResource Cloud.Preferences.SaveDevice}"
+                    Command="{Binding UploadCloudPreferencesCommand}"/>
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <Border Grid.Row="2" Style="{StaticResource R24InsetPanel}" Margin="0,14,0,14">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+          </Grid.ColumnDefinitions>
+          <Border Width="42" Height="42" CornerRadius="21"
+                  Background="#132132" BorderBrush="#24455A" BorderThickness="1">
+            <TextBlock Text="&#xE72E;" FontFamily="Segoe MDL2 Assets" FontSize="18"
+                       Foreground="{StaticResource R23CyanBrush}"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+          <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+            <TextBlock Text="{DynamicResource Settings.Api.SecurityTitle}" FontWeight="SemiBold"/>
+            <TextBlock Text="{DynamicResource Settings.Api.SecurityHelp}"
+                       Style="{StaticResource R23SecondaryText}" Margin="0,3,0,0"
+                       TextWrapping="Wrap"/>
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <Grid Grid.Row="3">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="14"/>
+          <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <Border Grid.Column="0" Style="{StaticResource R24WorkspacePanel}">
+          <StackPanel>
+            <TextBlock Text="{DynamicResource Settings.Telegram.Title}"
+                       Style="{StaticResource R23SectionHeading}"/>
+            <TextBlock Text="{DynamicResource Settings.Telegram.Help}"
+                       Style="{StaticResource R23SecondaryText}" Margin="0,4,0,14"
+                       TextWrapping="Wrap"/>
+
+            <TextBlock Text="{DynamicResource Settings.Telegram.ApiId}"
+                       Style="{StaticResource R23SecondaryText}"/>
+            <TextBox Text="{Binding ApiSettings.TelegramApiIdText, UpdateSourceTrigger=PropertyChanged}"
+                     Margin="0,4,0,11" MinHeight="40"/>
+
+            <TextBlock Text="{DynamicResource Settings.Telegram.ApiHash}"
+                       Style="{StaticResource R23SecondaryText}"/>
+            <PasswordBox x:Name="TelegramApiHashBox"
+                         PasswordChanged="TelegramApiHashBox_OnPasswordChanged"
+                         Margin="0,4,0,8" MinHeight="40"/>
+
+            <TextBlock Text="{DynamicResource Settings.Api.AutoSaveHint}"
+                       Style="{StaticResource R23SecondaryText}" FontSize="12"
+                       TextWrapping="Wrap"/>
+          </StackPanel>
+        </Border>
+
+        <Border Grid.Column="2" Style="{StaticResource R24WorkspacePanel}">
+          <StackPanel>
+            <TextBlock Text="{DynamicResource Settings.AltyaziDb.Title}"
+                       Style="{StaticResource R23SectionHeading}"/>
+            <TextBlock Text="{DynamicResource Settings.AltyaziDb.Help}"
+                       Style="{StaticResource R23SecondaryText}" Margin="0,4,0,14"
+                       TextWrapping="Wrap"/>
+
+            <TextBlock Text="{DynamicResource Settings.AltyaziDb.ApiUrl}"
+                       Style="{StaticResource R23SecondaryText}"/>
+            <TextBox Text="{Binding ApiSettings.AltyaziDbApiUrl, UpdateSourceTrigger=PropertyChanged}"
+                     Margin="0,4,0,11" MinHeight="40"/>
+
+            <TextBlock Text="{DynamicResource Settings.AltyaziDb.ApiKey}"
+                       Style="{StaticResource R23SecondaryText}"/>
+            <PasswordBox x:Name="AltyaziDbApiKeyBox"
+                         PasswordChanged="AltyaziDbApiKeyBox_OnPasswordChanged"
+                         Margin="0,4,0,8" MinHeight="40"/>
+
+            <TextBlock Text="{DynamicResource Settings.Api.OptionalDefaultHint}"
+                       Style="{StaticResource R23SecondaryText}" FontSize="12"
+                       TextWrapping="Wrap"/>
+          </StackPanel>
+        </Border>
+      </Grid>
+
+      <Expander Grid.Row="4" Margin="0,14,0,0" IsExpanded="False">
+        <Expander.Header>
+          <StackPanel>
+            <TextBlock Text="{DynamicResource Settings.Cloud.Title}"
+                       Style="{StaticResource R23SectionHeading}"/>
+            <TextBlock Text="{DynamicResource Settings.Cloud.Help}"
+                       Style="{StaticResource R23SecondaryText}" Margin="0,3,0,0"/>
+          </StackPanel>
+        </Expander.Header>
+        <Border Style="{StaticResource R24WorkspacePanel}" Margin="0,10,0,0">
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="14"/>
+              <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto"/>
+              <RowDefinition Height="14"/>
+              <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <StackPanel Grid.Column="0">
+              <TextBlock Text="Google Drive" FontWeight="SemiBold" Margin="0,0,0,10"/>
+              <TextBlock Text="{DynamicResource Settings.Cloud.ClientId}" Style="{StaticResource R23SecondaryText}"/>
+              <TextBox Text="{Binding ApiSettings.GoogleClientId, UpdateSourceTrigger=PropertyChanged}"
+                       Margin="0,4,0,9"/>
+              <TextBlock Text="{DynamicResource Settings.Cloud.ClientSecret}" Style="{StaticResource R23SecondaryText}"/>
+              <PasswordBox x:Name="GoogleClientSecretBox"
+                           PasswordChanged="GoogleClientSecretBox_OnPasswordChanged" Margin="0,4,0,0"/>
+            </StackPanel>
+
+            <StackPanel Grid.Column="2">
+              <TextBlock Text="Dropbox" FontWeight="SemiBold" Margin="0,0,0,10"/>
+              <TextBlock Text="{DynamicResource Settings.Cloud.ClientId}" Style="{StaticResource R23SecondaryText}"/>
+              <TextBox Text="{Binding ApiSettings.DropboxClientId, UpdateSourceTrigger=PropertyChanged}"
+                       Margin="0,4,0,9"/>
+              <TextBlock Text="{DynamicResource Settings.Cloud.ClientSecret}" Style="{StaticResource R23SecondaryText}"/>
+              <PasswordBox x:Name="DropboxClientSecretBox"
+                           PasswordChanged="DropboxClientSecretBox_OnPasswordChanged" Margin="0,4,0,0"/>
+            </StackPanel>
+
+            <StackPanel Grid.Row="2" Grid.Column="0">
+              <TextBlock Text="OneDrive" FontWeight="SemiBold" Margin="0,0,0,10"/>
+              <TextBlock Text="{DynamicResource Settings.Cloud.ClientId}" Style="{StaticResource R23SecondaryText}"/>
+              <TextBox Text="{Binding ApiSettings.OneDriveClientId, UpdateSourceTrigger=PropertyChanged}"
+                       Margin="0,4,0,9"/>
+              <TextBlock Text="{DynamicResource Settings.Cloud.ClientSecret}" Style="{StaticResource R23SecondaryText}"/>
+              <PasswordBox x:Name="OneDriveClientSecretBox"
+                           PasswordChanged="OneDriveClientSecretBox_OnPasswordChanged" Margin="0,4,0,0"/>
+            </StackPanel>
+
+            <StackPanel Grid.Row="2" Grid.Column="2">
+              <TextBlock Text="pCloud" FontWeight="SemiBold" Margin="0,0,0,10"/>
+              <TextBlock Text="{DynamicResource Settings.Cloud.ClientId}" Style="{StaticResource R23SecondaryText}"/>
+              <TextBox Text="{Binding ApiSettings.PCloudClientId, UpdateSourceTrigger=PropertyChanged}"
+                       Margin="0,4,0,9"/>
+              <TextBlock Text="{DynamicResource Settings.Cloud.ClientSecret}" Style="{StaticResource R23SecondaryText}"/>
+              <PasswordBox x:Name="PCloudClientSecretBox"
+                           PasswordChanged="PCloudClientSecretBox_OnPasswordChanged" Margin="0,4,0,0"/>
+            </StackPanel>
+          </Grid>
+        </Border>
+      </Expander>
+
+      <Border Grid.Row="5" Style="{StaticResource R23Toolbar}" Margin="0,16,0,0">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+          </Grid.ColumnDefinitions>
+          <TextBlock Text="{Binding ApiSettings.StatusText, Converter={StaticResource UserFacingTextConverter}}"
+                     Style="{StaticResource R23SecondaryText}"
+                     VerticalAlignment="Center" Margin="8,0,12,0"/>
+          <StackPanel Grid.Column="1" Orientation="Horizontal">
+            <Button Style="{StaticResource R23ToolbarButton}"
+                    Content="{DynamicResource Action.Refresh}"
+                    Command="{Binding ApiSettings.ReloadCommand}" Margin="0,0,4,0"/>
+            <Button Style="{StaticResource R23ToolbarPrimaryButton}"
+                    Content="{DynamicResource Action.Save}"
+                    Command="{Binding ApiSettings.SaveNowCommand}"/>
+          </StackPanel>
+        </Grid>
+      </Border>
+    </Grid>
+  </ScrollViewer>
+</UserControl>

@@ -1,0 +1,1036 @@
+<UserControl x:Class="AltyaziDB.Player.App.Views.Pages.LibraryView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{StaticResource R23AppBrush}"
+             Foreground="{StaticResource R23TextBrush}"
+             FontFamily="Segoe UI Variable Text, Segoe UI"
+             FontSize="14">
+  <Grid Margin="20,18,22,20">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="*"/>
+    </Grid.RowDefinitions>
+
+    <Grid Margin="0,0,0,17">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="Auto"/>
+      </Grid.ColumnDefinitions>
+      <StackPanel>
+        <TextBlock Text="{DynamicResource R23.Page.Library.Title}" Style="{StaticResource R23PageHeading}"/>
+        <TextBlock Text="{DynamicResource R23.Page.Library.Help}"
+                   Style="{StaticResource R23SecondaryText}" Margin="0,5,0,0"/>
+      </StackPanel>
+      <Button Grid.Column="1"
+              Style="{StaticResource R23ToolbarButton}"
+              Content="{DynamicResource Account.CloudCollections.OpenLists}"
+              Command="{Binding ShowCloudListsCommand}"
+              VerticalAlignment="Top"/>
+    </Grid>
+
+    <Grid Grid.Row="1" DataContext="{Binding Library}">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="250"/>
+        <ColumnDefinition Width="14"/>
+        <ColumnDefinition Width="*"/>
+      </Grid.ColumnDefinitions>
+
+      <Border Style="{StaticResource R23Panel}">
+        <DockPanel LastChildFill="True">
+          <StackPanel DockPanel.Dock="Top">
+            <TextBlock Text="{DynamicResource R23.Library.Folders}"
+                       Style="{StaticResource R23SectionHeading}"/>
+            <TextBlock Text="{Binding Summary}"
+                       Style="{StaticResource R23SecondaryText}" Margin="0,5,0,12"/>
+          </StackPanel>
+
+          <StackPanel DockPanel.Dock="Bottom">
+            <Button Style="{StaticResource R23PrimaryButton}"
+                    Content="{DynamicResource Action.AddFolder}"
+                    Command="{Binding AddFolderCommand}" Margin="0,0,8,8"/>
+            <Button Style="{StaticResource R23Button}"
+                    Content="{DynamicResource Action.ScanAll}"
+                    Command="{Binding ScanAllCommand}" Margin="0,0,8,8"/>
+            <Button Style="{StaticResource R23Button}"
+                    Content="{DynamicResource Action.Remove}"
+                    Command="{Binding RemoveFolderCommand}" Margin="0,0,8,8"/>
+          </StackPanel>
+
+          <ListBox ItemsSource="{Binding Folders}"
+                   SelectedItem="{Binding SelectedFolder, Mode=TwoWay}"
+                   DisplayMemberPath="Name"
+                   ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>
+        </DockPanel>
+      </Border>
+
+      <Grid Grid.Column="2">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="*"/>
+          <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Grid Margin="0,0,0,10">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="150"/>
+            <ColumnDefinition Width="190"/>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="Auto"/>
+          </Grid.ColumnDefinitions>
+
+          <TextBox Grid.Column="0"
+                   Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                   MinHeight="44"
+                   ToolTip="{DynamicResource Library.Search.SmartHelp}"/>
+
+          <ComboBox Grid.Column="1"
+                    Margin="10,0,0,0"
+                    ItemsSource="{Binding Filters}"
+                    SelectedItem="{Binding SelectedFilter, Mode=TwoWay}">
+            <ComboBox.ItemTemplate>
+              <DataTemplate>
+                <TextBlock Text="{Binding Label, Converter={StaticResource LocalizedTextConverter}}"/>
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+
+          <ComboBox Grid.Column="2"
+                    Margin="10,0"
+                    ItemsSource="{Binding SortChoices}"
+                    SelectedItem="{Binding SelectedSort, Mode=TwoWay}">
+            <ComboBox.ItemTemplate>
+              <DataTemplate>
+                <TextBlock Text="{Binding Label, Converter={StaticResource LocalizedTextConverter}}"/>
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+
+          <Border Grid.Column="3"
+                  Style="{StaticResource R23Toolbar}"
+                  Margin="0,0,10,0"
+                  VerticalAlignment="Stretch">
+            <StackPanel Orientation="Horizontal">
+              <Button Style="{StaticResource R23ToolbarButton}"
+                      Command="{Binding ShowListViewCommand}"
+                      IsEnabled="{Binding IsGridView}"
+                      Margin="0,0,4,0">
+                <StackPanel Orientation="Horizontal">
+                  <TextBlock Text="&#xE8FD;"
+                             FontFamily="Segoe MDL2 Assets"
+                             Margin="0,0,6,0"/>
+                  <TextBlock Text="{DynamicResource Library.View.List}"/>
+                </StackPanel>
+              </Button>
+              <Button Style="{StaticResource R23ToolbarButton}"
+                      Command="{Binding ShowGridViewCommand}"
+                      IsEnabled="{Binding IsListView}">
+                <StackPanel Orientation="Horizontal">
+                  <TextBlock Text="&#xF0E2;"
+                             FontFamily="Segoe MDL2 Assets"
+                             Margin="0,0,6,0"/>
+                  <TextBlock Text="{DynamicResource Library.View.Grid}"/>
+                </StackPanel>
+              </Button>
+            </StackPanel>
+          </Border>
+
+          <Button Grid.Column="4"
+                  Style="{StaticResource R23Button}"
+                  Content="{DynamicResource Action.Refresh}"
+                  Command="{Binding RefreshCommand}"/>
+        </Grid>
+
+        <Grid Grid.Row="1" Margin="0,0,0,8">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+          </Grid.ColumnDefinitions>
+
+          <Border Grid.Column="0" HorizontalAlignment="Left">
+            <Border.Style>
+              <Style TargetType="Border" BasedOn="{StaticResource R23Toolbar}">
+                <Setter Property="Visibility" Value="Visible"/>
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding Folders.Count}" Value="0">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                  </DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </Border.Style>
+            <StackPanel Orientation="Horizontal">
+              <Button Style="{StaticResource R23ToolbarButton}"
+                      Content="{DynamicResource Action.Scan}"
+                      Command="{Binding ScanSelectedCommand}" Margin="0,0,4,0"/>
+              <Button Style="{StaticResource R23ToolbarButton}"
+                      Content="{DynamicResource Panel.LibraryData}"
+                      Command="{Binding OpenDatabaseFolderCommand}"/>
+            </StackPanel>
+          </Border>
+
+          <ComboBox Grid.Column="1"
+                    Width="180"
+                    Margin="10,0,0,0"
+                    ItemsSource="{Binding ScopeChoices}"
+                    SelectedItem="{Binding SelectedScope, Mode=TwoWay}">
+            <ComboBox.ItemTemplate>
+              <DataTemplate>
+                <TextBlock Text="{Binding Label, Converter={StaticResource LocalizedTextConverter}}"/>
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+
+          <TextBlock Grid.Column="2"
+                     Text="{DynamicResource Library.Search.SmartHelp}"
+                     Style="{StaticResource R23SecondaryText}"
+                     VerticalAlignment="Center"
+                     HorizontalAlignment="Right"
+                     TextTrimming="CharacterEllipsis"
+                     Margin="14,0,0,0"/>
+        </Grid>
+
+        <Border Grid.Row="2" Style="{StaticResource R24WorkspacePanel}">
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <ListBox x:Name="LibraryItems"
+                     Grid.Column="0"
+                     ItemsSource="{Binding Items}"
+                     SelectedItem="{Binding SelectedItem, Mode=TwoWay}"
+                     MouseDoubleClick="Library_OnDoubleClick"
+                     ScrollViewer.ScrollChanged="LibraryItems_OnScrollChanged"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     ScrollViewer.CanContentScroll="True"
+                     VirtualizingPanel.IsVirtualizing="True"
+                     VirtualizingPanel.VirtualizationMode="Recycling"
+                     Background="Transparent"
+                     Foreground="{StaticResource R23TextBrush}"
+                     BorderThickness="0">
+              <ListBox.Style>
+                <Style TargetType="ListBox">
+                  <Setter Property="Visibility" Value="Visible"/>
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsGridView}" Value="True">
+                      <Setter Property="Visibility" Value="Collapsed"/>
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </ListBox.Style>
+              <ListBox.ItemContainerStyle>
+                <Style TargetType="ListBoxItem">
+                  <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                  <Setter Property="Margin" Value="0,0,0,9"/>
+                  <Setter Property="Padding" Value="0"/>
+                  <Setter Property="Background" Value="Transparent"/>
+                  <Setter Property="BorderBrush" Value="Transparent"/>
+                  <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                </Style>
+              </ListBox.ItemContainerStyle>
+              <ListBox.ItemTemplate>
+                <DataTemplate>
+                  <Border MinHeight="124"
+                          Padding="8"
+                          BorderThickness="1"
+                          CornerRadius="12">
+                    <Border.Style>
+                      <Style TargetType="Border">
+                        <Setter Property="Background" Value="{StaticResource R23RaisedBrush}"/>
+                        <Setter Property="BorderBrush" Value="{StaticResource R23StrokeBrush}"/>
+                        <Style.Triggers>
+                          <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsMouseOver}" Value="True">
+                            <Setter Property="Background" Value="#18283B"/>
+                            <Setter Property="BorderBrush" Value="#31556F"/>
+                          </DataTrigger>
+                          <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsSelected}" Value="True">
+                            <Setter Property="Background" Value="#1B2D43"/>
+                            <Setter Property="BorderBrush" Value="#49CFF5"/>
+                          </DataTrigger>
+                        </Style.Triggers>
+                      </Style>
+                    </Border.Style>
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="76"/>
+                        <ColumnDefinition Width="14"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="140"/>
+                      </Grid.ColumnDefinitions>
+                      <Border Width="76"
+                              Height="108"
+                              CornerRadius="8"
+                              Background="#132436"
+                              ClipToBounds="True"
+                              VerticalAlignment="Center">
+                        <Grid>
+                          <Image Source="{Binding ArtworkUrl}"
+                                 Stretch="UniformToFill"
+                                 SnapsToDevicePixels="True">
+                            <Image.Style>
+                              <Style TargetType="Image">
+                                <Setter Property="Visibility" Value="Visible"/>
+                                <Style.Triggers>
+                                  <DataTrigger Binding="{Binding ArtworkUrl}" Value="{x:Null}">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                  </DataTrigger>
+                                </Style.Triggers>
+                              </Style>
+                            </Image.Style>
+                          </Image>
+                          <TextBlock Text="&#xE8B7;"
+                                     FontFamily="Segoe MDL2 Assets"
+                                     FontSize="24"
+                                     Foreground="{StaticResource R23CyanBrush}"
+                                     HorizontalAlignment="Center"
+                                     VerticalAlignment="Center">
+                            <TextBlock.Style>
+                              <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                  <DataTrigger Binding="{Binding ArtworkUrl}" Value="{x:Null}">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                  </DataTrigger>
+                                </Style.Triggers>
+                              </Style>
+                            </TextBlock.Style>
+                          </TextBlock>
+                        </Grid>
+                      </Border>
+
+                      <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding DisplayTitle}"
+                                   FontWeight="SemiBold"
+                                   FontSize="15"
+                                   TextTrimming="CharacterEllipsis"
+                                   ToolTip="{Binding DisplayTitle}"/>
+                        <TextBlock Text="{Binding FileName}"
+                                   Style="{StaticResource R23SecondaryText}"
+                                   TextTrimming="CharacterEllipsis"
+                                   FontSize="11.5"
+                                   Margin="0,4,12,0"/>
+                        <ProgressBar Margin="0,10,18,0"
+                                     Height="4"
+                                     Maximum="100"
+                                     Value="{Binding ProgressPercent, Mode=OneWay}"/>
+                      </StackPanel>
+
+                      <StackPanel Grid.Column="3"
+                                  VerticalAlignment="Center"
+                                  HorizontalAlignment="Right">
+                        <TextBlock Text="{Binding SizeLabel}"
+                                   Foreground="{StaticResource R23CyanBrush}"
+                                   FontSize="12"
+                                   HorizontalAlignment="Right"/>
+                        <TextBlock Text="{Binding ProgressLabel, Converter={StaticResource LocalizedTextConverter}}"
+                                   Style="{StaticResource R23SecondaryText}"
+                                   Margin="0,6,0,0"
+                                   HorizontalAlignment="Right"/>
+                        <TextBlock Text="{Binding MediaType, Converter={StaticResource CloudMetadataTextConverter}, ConverterParameter=mediaType}"
+                                   Style="{StaticResource R23SecondaryText}"
+                                   Margin="0,4,0,0"
+                                   HorizontalAlignment="Right"/>
+                      </StackPanel>
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+
+            <ListBox x:Name="LibraryGridItems"
+                     Grid.Column="0"
+                     ItemsSource="{Binding GridItems}"
+                     SelectedItem="{Binding SelectedGridItem, Mode=TwoWay}"
+                     MouseDoubleClick="Library_OnDoubleClick"
+                     ScrollViewer.ScrollChanged="LibraryItems_OnScrollChanged"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     ScrollViewer.CanContentScroll="False"
+                     Background="Transparent"
+                     Foreground="{StaticResource R23TextBrush}"
+                     BorderThickness="0">
+              <ListBox.Style>
+                <Style TargetType="ListBox">
+                  <Setter Property="Visibility" Value="Collapsed"/>
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsGridView}" Value="True">
+                      <Setter Property="Visibility" Value="Visible"/>
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </ListBox.Style>
+              <ListBox.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <WrapPanel/>
+                </ItemsPanelTemplate>
+              </ListBox.ItemsPanel>
+              <ListBox.ItemContainerStyle>
+                <Style TargetType="ListBoxItem">
+                  <Setter Property="Width" Value="184"/>
+                  <Setter Property="Height" Value="308"/>
+                  <Setter Property="Margin" Value="0,0,10,12"/>
+                  <Setter Property="Padding" Value="0"/>
+                  <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                  <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+                  <Setter Property="Background" Value="Transparent"/>
+                  <Setter Property="BorderBrush" Value="Transparent"/>
+                  <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                </Style>
+              </ListBox.ItemContainerStyle>
+              <ListBox.ItemTemplate>
+                <DataTemplate>
+                  <Border Padding="7"
+                          BorderThickness="1"
+                          CornerRadius="13">
+                    <Border.Style>
+                      <Style TargetType="Border">
+                        <Setter Property="Background" Value="{StaticResource R23RaisedBrush}"/>
+                        <Setter Property="BorderBrush" Value="{StaticResource R23StrokeBrush}"/>
+                        <Style.Triggers>
+                          <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsMouseOver}" Value="True">
+                            <Setter Property="Background" Value="#18283B"/>
+                            <Setter Property="BorderBrush" Value="#31556F"/>
+                          </DataTrigger>
+                          <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsSelected}" Value="True">
+                            <Setter Property="Background" Value="#1B2D43"/>
+                            <Setter Property="BorderBrush" Value="#49CFF5"/>
+                          </DataTrigger>
+                        </Style.Triggers>
+                      </Style>
+                    </Border.Style>
+                    <Grid>
+                      <Grid.RowDefinitions>
+                        <RowDefinition Height="226"/>
+                        <RowDefinition Height="*"/>
+                      </Grid.RowDefinitions>
+                      <Border CornerRadius="9"
+                              Background="#132436"
+                              ClipToBounds="True">
+                        <Grid>
+                          <Image Source="{Binding ArtworkUrl}"
+                                 Stretch="UniformToFill"
+                                 SnapsToDevicePixels="True">
+                            <Image.Style>
+                              <Style TargetType="Image">
+                                <Setter Property="Visibility" Value="Visible"/>
+                                <Style.Triggers>
+                                  <DataTrigger Binding="{Binding ArtworkUrl}" Value="{x:Null}">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                  </DataTrigger>
+                                </Style.Triggers>
+                              </Style>
+                            </Image.Style>
+                          </Image>
+                          <TextBlock Text="&#xE8B7;"
+                                     FontFamily="Segoe MDL2 Assets"
+                                     FontSize="32"
+                                     Foreground="{StaticResource R23CyanBrush}"
+                                     HorizontalAlignment="Center"
+                                     VerticalAlignment="Center">
+                            <TextBlock.Style>
+                              <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                  <DataTrigger Binding="{Binding ArtworkUrl}" Value="{x:Null}">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                  </DataTrigger>
+                                </Style.Triggers>
+                              </Style>
+                            </TextBlock.Style>
+                          </TextBlock>
+                          <ProgressBar Value="{Binding ProgressPercent, Mode=OneWay}"
+                                       Maximum="100"
+                                       VerticalAlignment="Bottom"
+                                       Height="4"
+                                       BorderThickness="0"
+                                       Foreground="{StaticResource R23CyanBrush}"
+                                       Background="#28364C"/>
+                        </Grid>
+                      </Border>
+
+                      <StackPanel Grid.Row="1" Margin="3,8,3,0">
+                        <TextBlock Text="{Binding DisplayTitle}"
+                                   FontSize="12.5"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource R23TextBrush}"
+                                   TextWrapping="Wrap"
+                                   LineHeight="17"
+                                   MaxHeight="42"
+                                   ToolTip="{Binding DisplayTitle}"/>
+                        <Grid Margin="0,5,0,0">
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                          </Grid.ColumnDefinitions>
+                          <TextBlock Text="{Binding MediaType, Converter={StaticResource CloudMetadataTextConverter}, ConverterParameter=mediaType}"
+                                     Style="{StaticResource R23SecondaryText}"
+                                     FontSize="11"/>
+                          <TextBlock Grid.Column="1"
+                                     Text="{Binding MetaLabel}"
+                                     Foreground="{StaticResource R23CyanBrush}"
+                                     FontSize="11"
+                                     TextTrimming="CharacterEllipsis"/>
+                        </Grid>
+                      </StackPanel>
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+
+            <Border Grid.Column="1"
+                    Width="420"
+                    Margin="14,0,0,0"
+                    Background="#101B2A"
+                    BorderBrush="{StaticResource R23StrokeBrush}"
+                    BorderThickness="1"
+                    CornerRadius="14"
+                    ClipToBounds="True">
+              <Border.Style>
+                <Style TargetType="Border">
+                  <Setter Property="Visibility" Value="Visible"/>
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding SelectedSeriesHub}" Value="{x:Null}">
+                      <Setter Property="Visibility" Value="Collapsed"/>
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </Border.Style>
+
+              <Grid>
+                <Grid.RowDefinitions>
+                  <RowDefinition Height="160"/>
+                  <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0" ClipToBounds="True">
+                  <Image Source="{Binding SelectedSeriesHub.BackdropUrl}"
+                         Stretch="UniformToFill"
+                         Opacity=".62"/>
+                  <Border Background="#8F07101A"/>
+                  <Grid Margin="14">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="82"/>
+                      <ColumnDefinition Width="12"/>
+                      <ColumnDefinition Width="*"/>
+                      <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Border Width="82"
+                            Height="122"
+                            VerticalAlignment="Bottom"
+                            CornerRadius="8"
+                            ClipToBounds="True"
+                            Background="#132436"
+                            BorderBrush="#40506B"
+                            BorderThickness="1">
+                      <Image Source="{Binding SelectedSeriesHub.ArtworkUrl}"
+                             Stretch="UniformToFill"/>
+                    </Border>
+
+                    <StackPanel Grid.Column="2"
+                                VerticalAlignment="Bottom"
+                                Margin="0,0,0,4">
+                      <TextBlock Text="{DynamicResource Library.SeriesHub.Title}"
+                                 Foreground="{StaticResource R23CyanBrush}"
+                                 FontSize="11"
+                                 FontWeight="SemiBold"/>
+                      <TextBlock Text="{Binding SelectedSeriesHub.DisplayTitle}"
+                                 FontSize="19"
+                                 FontWeight="SemiBold"
+                                 Foreground="White"
+                                 TextWrapping="Wrap"
+                                 MaxHeight="52"
+                                 Margin="0,3,0,0"/>
+                      <TextBlock Text="{Binding SelectedSeriesHub.MetaLabel}"
+                                 Foreground="#C4D0DE"
+                                 FontSize="12"
+                                 Margin="0,6,0,0"/>
+                    </StackPanel>
+
+                    <Button Grid.Column="3"
+                            Width="32"
+                            Height="32"
+                            Padding="0"
+                            VerticalAlignment="Top"
+                            Style="{StaticResource R23ToolbarButton}"
+                            Command="{Binding CloseDetailCommand}"
+                            ToolTip="{DynamicResource Library.Detail.Close}">
+                      <TextBlock Text="&#xE711;" FontFamily="Segoe MDL2 Assets"/>
+                    </Button>
+                  </Grid>
+                </Grid>
+
+                <Grid Grid.Row="1" Margin="14,12,14,12">
+                  <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                  </Grid.RowDefinitions>
+
+                  <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*"/>
+                      <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{DynamicResource Library.SeriesHub.Seasons}"
+                               Style="{StaticResource R23SectionHeading}"
+                               VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1"
+                               Text="{Binding SelectedSeriesHub.SizeLabel}"
+                               Foreground="{StaticResource R23CyanBrush}"
+                               VerticalAlignment="Center"/>
+                  </Grid>
+
+                  <Grid Grid.Row="1" Margin="0,7,0,10">
+                    <Grid.RowDefinitions>
+                      <RowDefinition Height="Auto"/>
+                      <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <ComboBox ItemsSource="{Binding SeriesSeasonChoices}"
+                              SelectedItem="{Binding SelectedSeriesSeason, Mode=TwoWay}"
+                              MinHeight="36">
+                      <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                          <TextBlock Text="{Binding Label}"/>
+                        </DataTemplate>
+                      </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <ProgressBar Grid.Row="1"
+                                 Value="{Binding SelectedSeriesHub.ProgressPercent, Mode=OneWay}"
+                                 Maximum="100"
+                                 Height="4"
+                                 Margin="0,8,0,0"/>
+                  </Grid>
+
+                  <Border Grid.Row="2"
+                          MinHeight="180"
+                          Background="#0A1522"
+                          BorderBrush="#263A50"
+                          BorderThickness="1"
+                          CornerRadius="11"
+                          ClipToBounds="True">
+                    <Grid>
+                      <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                      </Grid.RowDefinitions>
+
+                      <Border Grid.Row="0"
+                              Padding="11,9"
+                              Background="#101E2E"
+                              BorderBrush="#263A50"
+                              BorderThickness="0,0,0,1">
+                        <Grid>
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                          </Grid.ColumnDefinitions>
+
+                          <StackPanel>
+                            <TextBlock Text="{DynamicResource Library.SeriesHub.Episodes}"
+                                       Style="{StaticResource R23SectionHeading}"/>
+                            <TextBlock Text="{DynamicResource Library.SeriesHub.EpisodeListHelp}"
+                                       Style="{StaticResource R23SecondaryText}"
+                                       FontSize="10.5"
+                                       Margin="0,3,0,0"/>
+                          </StackPanel>
+
+                          <Border Grid.Column="1"
+                                  Padding="9,4"
+                                  VerticalAlignment="Center"
+                                  Background="#14283C"
+                                  BorderBrush="#31556F"
+                                  BorderThickness="1"
+                                  CornerRadius="9">
+                            <TextBlock Text="{Binding SelectedSeriesSeason.EpisodeCount}"
+                                       Foreground="{StaticResource R23CyanBrush}"
+                                       FontWeight="SemiBold"
+                                       FontSize="12"/>
+                          </Border>
+                        </Grid>
+                      </Border>
+
+                      <ListBox Grid.Row="1"
+                               Margin="8,8,5,8"
+                               ItemsSource="{Binding SeriesEpisodes}"
+                               SelectedItem="{Binding SelectedSeriesEpisode, Mode=TwoWay}"
+                               MouseDoubleClick="SeriesEpisode_OnDoubleClick"
+                               Background="Transparent"
+                               BorderThickness="0"
+                               ScrollViewer.VerticalScrollBarVisibility="Auto"
+                               ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                               ScrollViewer.CanContentScroll="True">
+                        <ListBox.ItemContainerStyle>
+                          <Style TargetType="ListBoxItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            <Setter Property="Margin" Value="0,0,3,7"/>
+                            <Setter Property="Padding" Value="0"/>
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="BorderBrush" Value="Transparent"/>
+                            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                          </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                          <DataTemplate>
+                            <Border MinHeight="62"
+                                    Padding="9,8"
+                                    BorderThickness="1"
+                                    CornerRadius="9">
+                              <Border.Style>
+                                <Style TargetType="Border">
+                                  <Setter Property="Background" Value="#101D2C"/>
+                                  <Setter Property="BorderBrush" Value="#23364A"/>
+                                  <Style.Triggers>
+                                    <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsMouseOver}" Value="True">
+                                      <Setter Property="Background" Value="#16283A"/>
+                                      <Setter Property="BorderBrush" Value="#31556F"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsSelected}" Value="True">
+                                      <Setter Property="Background" Value="#193047"/>
+                                      <Setter Property="BorderBrush" Value="#49CFF5"/>
+                                    </DataTrigger>
+                                  </Style.Triggers>
+                                </Style>
+                              </Border.Style>
+
+                              <Grid>
+                                <Grid.ColumnDefinitions>
+                                  <ColumnDefinition Width="70"/>
+                                  <ColumnDefinition Width="*"/>
+                                  <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <Border Width="60"
+                                        Height="30"
+                                        Padding="6,0"
+                                        VerticalAlignment="Center"
+                                        HorizontalAlignment="Left"
+                                        Background="#102A3C"
+                                        BorderBrush="#31556F"
+                                        BorderThickness="1"
+                                        CornerRadius="7">
+                                  <TextBlock Text="{Binding EpisodeLabel}"
+                                             Foreground="{StaticResource R23CyanBrush}"
+                                             FontWeight="SemiBold"
+                                             FontSize="11.5"
+                                             HorizontalAlignment="Center"
+                                             VerticalAlignment="Center"/>
+                                </Border>
+
+                                <StackPanel Grid.Column="1"
+                                            Margin="2,0,10,0"
+                                            VerticalAlignment="Center">
+                                  <TextBlock Text="{Binding FileName}"
+                                             Foreground="{StaticResource R23TextBrush}"
+                                             FontSize="11.5"
+                                             FontWeight="SemiBold"
+                                             TextTrimming="CharacterEllipsis"/>
+                                  <TextBlock Text="{Binding ProgressLabel, Converter={StaticResource LocalizedTextConverter}}"
+                                             Style="{StaticResource R23SecondaryText}"
+                                             FontSize="10.5"
+                                             Margin="0,3,0,0"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="2"
+                                            VerticalAlignment="Center"
+                                            HorizontalAlignment="Right">
+                                  <TextBlock Text="{Binding SizeLabel}"
+                                             Foreground="{StaticResource R23MutedBrush}"
+                                             FontSize="10.5"
+                                             HorizontalAlignment="Right"/>
+                                  <TextBlock Text="&#xE768;"
+                                             FontFamily="Segoe MDL2 Assets"
+                                             Foreground="{StaticResource R23CyanBrush}"
+                                             FontSize="12"
+                                             HorizontalAlignment="Right"
+                                             Margin="0,5,1,0"/>
+                                </StackPanel>
+                              </Grid>
+                            </Border>
+                          </DataTemplate>
+                        </ListBox.ItemTemplate>
+                      </ListBox>
+                    </Grid>
+                  </Border>
+
+                  <Grid Grid.Row="3" Margin="0,10,0,0">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*"/>
+                      <ColumnDefinition Width="10"/>
+                      <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Button Grid.Column="0"
+                            Style="{StaticResource R23Button}"
+                            Content="{DynamicResource Library.SeriesHub.Continue}"
+                            Command="{Binding PlaySeriesNextCommand}"/>
+                    <Button Grid.Column="2"
+                            Style="{StaticResource R23PrimaryButton}"
+                            Content="{DynamicResource Library.SeriesHub.PlayEpisode}"
+                            Command="{Binding PlaySeriesEpisodeCommand}"/>
+                  </Grid>
+                </Grid>
+              </Grid>
+            </Border>
+
+            <Border Grid.Column="1"
+                    Width="390"
+                    Margin="14,0,0,0"
+                    Background="#101B2A"
+                    BorderBrush="{StaticResource R23StrokeBrush}"
+                    BorderThickness="1"
+                    CornerRadius="14"
+                    ClipToBounds="True">
+              <Border.Style>
+                <Style TargetType="Border">
+                  <Setter Property="Visibility" Value="Visible"/>
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding SelectedDetailItem}" Value="{x:Null}">
+                      <Setter Property="Visibility" Value="Collapsed"/>
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </Border.Style>
+
+              <Grid>
+                <Grid.RowDefinitions>
+                  <RowDefinition Height="186"/>
+                  <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0" ClipToBounds="True">
+                  <Image Source="{Binding SelectedDetailItem.BackdropUrl}"
+                         Stretch="UniformToFill"
+                         Opacity=".62"/>
+                  <Border Background="#8F07101A"/>
+                  <Grid Margin="14">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="92"/>
+                      <ColumnDefinition Width="12"/>
+                      <ColumnDefinition Width="*"/>
+                      <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Border Width="92"
+                            Height="138"
+                            VerticalAlignment="Bottom"
+                            CornerRadius="8"
+                            ClipToBounds="True"
+                            Background="#132436"
+                            BorderBrush="#40506B"
+                            BorderThickness="1">
+                      <Image Source="{Binding SelectedDetailItem.ArtworkUrl}"
+                             Stretch="UniformToFill"/>
+                    </Border>
+
+                    <StackPanel Grid.Column="2"
+                                VerticalAlignment="Bottom"
+                                Margin="0,0,0,6">
+                      <TextBlock Text="{Binding SelectedDetailItem.DisplayTitle}"
+                                 FontSize="20"
+                                 FontWeight="SemiBold"
+                                 Foreground="White"
+                                 TextWrapping="Wrap"
+                                 MaxHeight="58"/>
+                      <StackPanel Orientation="Horizontal" Margin="0,7,0,0">
+                        <TextBlock Text="{Binding SelectedDetailItem.MediaType, Converter={StaticResource CloudMetadataTextConverter}, ConverterParameter=mediaType}"
+                                   Foreground="#C4D0DE"
+                                   FontSize="12"/>
+                        <TextBlock Text=" · " Foreground="#71839A" FontSize="12"/>
+                        <TextBlock Text="{Binding SelectedDetailItem.ProgressLabel, Converter={StaticResource LocalizedTextConverter}}"
+                                   Foreground="#C4D0DE"
+                                   FontSize="12"/>
+                      </StackPanel>
+                    </StackPanel>
+
+                    <Button Grid.Column="3"
+                            Width="32"
+                            Height="32"
+                            Padding="0"
+                            VerticalAlignment="Top"
+                            Style="{StaticResource R23ToolbarButton}"
+                            Command="{Binding CloseDetailCommand}"
+                            ToolTip="{DynamicResource Library.Detail.Close}">
+                      <TextBlock Text="&#xE711;" FontFamily="Segoe MDL2 Assets"/>
+                    </Button>
+                  </Grid>
+                </Grid>
+
+                <ScrollViewer Grid.Row="1"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                  <StackPanel Margin="16,14,16,16">
+                    <TextBlock Text="{Binding SelectedDetailStatusText}"
+                               Foreground="{StaticResource R23CyanBrush}"
+                               FontSize="12"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,8"/>
+
+                    <TextBlock Text="{DynamicResource Library.Detail.Overview}"
+                               Style="{StaticResource R23SectionHeading}"/>
+                    <TextBlock Text="{Binding SelectedDetailItem.Overview}"
+                               TextWrapping="Wrap"
+                               LineHeight="20"
+                               Margin="0,7,0,0">
+                      <TextBlock.Style>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource R23SecondaryText}">
+                          <Setter Property="Visibility" Value="Visible"/>
+                          <Style.Triggers>
+                            <DataTrigger Binding="{Binding SelectedDetailItem.Overview}" Value="{x:Null}">
+                              <Setter Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                          </Style.Triggers>
+                        </Style>
+                      </TextBlock.Style>
+                    </TextBlock>
+                    <TextBlock Text="{DynamicResource Library.Detail.NoOverview}"
+                               TextWrapping="Wrap"
+                               Margin="0,7,0,0">
+                      <TextBlock.Style>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource R23SecondaryText}">
+                          <Setter Property="Visibility" Value="Collapsed"/>
+                          <Style.Triggers>
+                            <DataTrigger Binding="{Binding SelectedDetailItem.Overview}" Value="{x:Null}">
+                              <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                          </Style.Triggers>
+                        </Style>
+                      </TextBlock.Style>
+                    </TextBlock>
+
+                    <Separator Margin="0,16,0,14"/>
+
+                    <TextBlock Text="{DynamicResource Library.Detail.Identity}"
+                               Style="{StaticResource R23SectionHeading}"/>
+                    <Grid Margin="0,9,0,0">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="90"/>
+                        <ColumnDefinition Width="*"/>
+                      </Grid.ColumnDefinitions>
+                      <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                      </Grid.RowDefinitions>
+
+                      <TextBlock Text="{DynamicResource Library.Detail.AdbId}" Style="{StaticResource R23SecondaryText}"/>
+                      <TextBlock Grid.Column="1" Text="{Binding SelectedDetailItem.AdbId}" Foreground="{StaticResource R23TextBrush}"/>
+
+                      <TextBlock Grid.Row="1" Text="{DynamicResource Library.Detail.TmdbId}" Style="{StaticResource R23SecondaryText}" Margin="0,6,0,0"/>
+                      <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding SelectedDetailItem.TmdbId}" Foreground="{StaticResource R23TextBrush}" Margin="0,6,0,0"/>
+
+                      <TextBlock Grid.Row="2" Text="{DynamicResource Library.Detail.ImdbId}" Style="{StaticResource R23SecondaryText}" Margin="0,6,0,0"/>
+                      <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding SelectedDetailItem.ImdbId}" Foreground="{StaticResource R23TextBrush}" Margin="0,6,0,0"/>
+
+                      <TextBlock Grid.Row="3" Text="{DynamicResource Library.Detail.Source}" Style="{StaticResource R23SecondaryText}" Margin="0,6,0,0"/>
+                      <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding SelectedDetailItem.MetadataSource}" Foreground="{StaticResource R23TextBrush}" Margin="0,6,0,0"/>
+
+                      <TextBlock Grid.Row="4" Text="{DynamicResource Library.Detail.Confidence}" Style="{StaticResource R23SecondaryText}" Margin="0,6,0,0"/>
+                      <TextBlock Grid.Row="4" Grid.Column="1"
+                                 Text="{Binding SelectedDetailItem.MatchConfidence, StringFormat={}{0:P0}}"
+                                 Foreground="{StaticResource R23TextBrush}"
+                                 Margin="0,6,0,0"/>
+
+                      <TextBlock Grid.Row="5" Text="{DynamicResource Library.Detail.Subtitles}" Style="{StaticResource R23SecondaryText}" Margin="0,6,0,0"/>
+                      <TextBlock Grid.Row="5" Grid.Column="1"
+                                 Text="{Binding SelectedDetailItem.SubtitleAvailabilityLabel}"
+                                 Foreground="{StaticResource R23TextBrush}"
+                                 Margin="0,6,0,0"/>
+                    </Grid>
+
+                    <Separator Margin="0,16,0,14"/>
+
+                    <TextBlock Text="{DynamicResource Library.Detail.File}"
+                               Style="{StaticResource R23SectionHeading}"/>
+                    <TextBlock Text="{Binding SelectedDetailItem.FileName}"
+                               Style="{StaticResource R23SecondaryText}"
+                               TextWrapping="Wrap"
+                               Margin="0,7,0,0"/>
+                    <Grid Margin="0,8,0,0">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                      </Grid.ColumnDefinitions>
+                      <TextBlock Text="{Binding SelectedDetailItem.ProgressLabel, Converter={StaticResource LocalizedTextConverter}}"
+                                 Style="{StaticResource R23SecondaryText}"/>
+                      <TextBlock Grid.Column="1"
+                                 Text="{Binding SelectedDetailItem.SizeLabel}"
+                                 Foreground="{StaticResource R23CyanBrush}"/>
+                    </Grid>
+                    <ProgressBar Value="{Binding SelectedDetailItem.ProgressPercent, Mode=OneWay}"
+                                 Maximum="100"
+                                 Height="4"
+                                 Margin="0,8,0,0"/>
+
+                    <Button Style="{StaticResource R23PrimaryButton}"
+                            Content="{DynamicResource Action.PlaySelected}"
+                            Command="{Binding PlaySelectedCommand}"
+                            Margin="0,16,0,0"
+                            HorizontalAlignment="Stretch"/>
+                  </StackPanel>
+                </ScrollViewer>
+              </Grid>
+            </Border>
+
+            <StackPanel Grid.ColumnSpan="2"
+                        VerticalAlignment="Center"
+                        HorizontalAlignment="Center"
+                        MaxWidth="380">
+              <StackPanel.Style>
+                <Style TargetType="StackPanel">
+                  <Setter Property="Visibility" Value="Collapsed"/>
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding Items.Count}" Value="0">
+                      <Setter Property="Visibility" Value="Visible"/>
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </StackPanel.Style>
+              <Border Style="{StaticResource R24EmptyIcon}" HorizontalAlignment="Center">
+                <TextBlock Text="&#xE8B7;"
+                           FontFamily="Segoe MDL2 Assets"
+                           FontSize="24"
+                           Foreground="{StaticResource R23CyanBrush}"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"/>
+              </Border>
+              <TextBlock Text="{DynamicResource R23.Library.Empty}"
+                         Style="{StaticResource R23SectionHeading}"
+                         Margin="0,14,0,6"
+                         TextWrapping="Wrap"
+                         TextAlignment="Center"/>
+              <TextBlock Text="{DynamicResource R23.Library.EmptyHelp}"
+                         Style="{StaticResource R23SecondaryText}"
+                         TextWrapping="Wrap"
+                         TextAlignment="Center"/>
+              <Button Style="{StaticResource R23PrimaryButton}"
+                      Content="{DynamicResource Action.AddFolder}"
+                      Command="{Binding AddFolderCommand}"
+                      HorizontalAlignment="Center"
+                      Margin="0,16,0,0"
+                      MinWidth="150"/>
+            </StackPanel>
+          </Grid>
+        </Border>
+
+        <DockPanel Grid.Row="3" Margin="0,12,0,0">
+          <TextBlock Text="{Binding StatusText, Converter={StaticResource UserFacingTextConverter}}"
+                     Style="{StaticResource R23SecondaryText}"
+                     VerticalAlignment="Center"/>
+          <Button DockPanel.Dock="Right"
+                  Style="{StaticResource R23PrimaryButton}"
+                  Content="{DynamicResource Action.PlaySelected}"
+                  Command="{Binding PlaySelectedCommand}"
+                  HorizontalAlignment="Right"
+                  Margin="12,0,0,0"/>
+        </DockPanel>
+      </Grid>
+    </Grid>
+  </Grid>
+</UserControl>

@@ -1,0 +1,431 @@
+<UserControl x:Class="AltyaziDB.Player.App.Views.Pages.DiscoverView"
+             x:Name="DiscoverRoot"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{StaticResource R23AppBrush}"
+             Foreground="{StaticResource R23TextBrush}"
+             Loaded="Discover_OnLoaded"
+             Unloaded="Discover_OnUnloaded"
+             DataContextChanged="Discover_OnDataContextChanged">
+  <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                HorizontalContentAlignment="Stretch">
+    <StackPanel Margin="18,18,20,26" MaxWidth="1500" HorizontalAlignment="Stretch">
+      <Border x:Name="DiscoverHero" Height="172" Style="{StaticResource R23HeroPanel}">
+        <Grid>
+          <Border IsHitTestVisible="False">
+            <Border.Background>
+              <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
+                <GradientStop Color="#F205080D" Offset="0"/>
+                <GradientStop Color="#C807101B" Offset="0.48"/>
+                <GradientStop Color="#5505080D" Offset="1"/>
+              </LinearGradientBrush>
+            </Border.Background>
+          </Border>
+          <Grid HorizontalAlignment="Right" VerticalAlignment="Center"
+                Width="360" Height="160" Margin="0,0,22,0" IsHitTestVisible="False">
+            <Ellipse Style="{StaticResource R24HeroArtworkRing}" Width="150" Height="150"
+                     HorizontalAlignment="Right" VerticalAlignment="Center"/>
+            <Ellipse Style="{StaticResource R24HeroArtworkRing}" Width="240" Height="240"
+                     HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,-58,0"
+                     Opacity=".16"/>
+            <TextBlock Text="&#xE12B;" FontFamily="Segoe MDL2 Assets" FontSize="70"
+                       Foreground="{StaticResource R23CyanBrush}" Opacity=".24"
+                       HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,42,0"/>
+          </Grid>
+          <StackPanel MaxWidth="690" Margin="28,20"
+                      HorizontalAlignment="Left" VerticalAlignment="Center">
+            <TextBlock Text="{DynamicResource Tab.Discover}" FontSize="12"
+                       FontWeight="SemiBold" Foreground="{StaticResource R23CyanBrush}"/>
+            <TextBlock Text="{DynamicResource R23.Discover.Headline}"
+                       FontFamily="Segoe UI Variable Display, Segoe UI"
+                       FontSize="32" FontWeight="SemiBold"
+                       Foreground="{StaticResource R23TextBrush}" Margin="0,3,0,7"/>
+            <TextBlock Text="{DynamicResource R23.Discover.Description}"
+                       Style="{StaticResource R23SecondaryText}" MaxWidth="650"/>
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <Border Style="{StaticResource R23Toolbar}" Margin="0,14,0,14" Padding="5">
+        <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="2*"/>
+          <ColumnDefinition Width="180"/>
+          <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        <Grid Grid.Column="0" Margin="0,0,9,0">
+          <TextBox x:Name="CatalogSearchBox" MinHeight="43"
+                   Text="{Binding Addons.SearchText, UpdateSourceTrigger=PropertyChanged}"
+                   ToolTip="{DynamicResource Discover.SearchHint}"
+                   AutomationProperties.Name="Catalog search"/>
+          <TextBlock Margin="14,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False"
+                     Text="{DynamicResource R23.Discover.SearchPlaceholder}"
+                     Foreground="{StaticResource R23MutedBrush}" FontSize="13">
+            <TextBlock.Style>
+              <Style TargetType="TextBlock">
+                <Setter Property="Visibility" Value="Collapsed"/>
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding Text, ElementName=CatalogSearchBox}" Value="">
+                    <Setter Property="Visibility" Value="Visible"/>
+                  </DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </TextBlock.Style>
+          </TextBlock>
+        </Grid>
+        <ComboBox Grid.Column="1" MinHeight="43" Margin="0,0,9,0"
+                  ItemsSource="{Binding Addons.Filters}"
+                  SelectedItem="{Binding Addons.SelectedFilter, Mode=TwoWay}"
+                  AutomationProperties.Name="Catalog type">
+          <ComboBox.ItemTemplate>
+            <DataTemplate>
+              <TextBlock Text="{Binding Label, Converter={StaticResource LocalizedTextConverter}}"/>
+            </DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
+        <Button Grid.Column="2" Style="{StaticResource R23ToolbarButton}"
+                Command="{Binding Addons.RefreshCommand}"
+                Content="{DynamicResource Action.Refresh}"/>
+      </Grid>
+
+      </Border>
+
+      <Border Style="{StaticResource R24InsetPanel}" Margin="0,0,0,13" Padding="14,9">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="1.5*"/><ColumnDefinition Width="1"/>
+            <ColumnDefinition Width="*"/><ColumnDefinition Width="1"/>
+            <ColumnDefinition Width="*"/>
+          </Grid.ColumnDefinitions>
+          <StackPanel Grid.Column="0">
+            <TextBlock Text="{DynamicResource R23.Discover.Total}" Style="{StaticResource R23SecondaryText}"/>
+            <TextBlock Text="{Binding Addons.SummaryText}" TextTrimming="CharacterEllipsis"
+                       FontWeight="SemiBold" FontSize="14" Foreground="{StaticResource R23TextBrush}"/>
+          </StackPanel>
+          <Border Grid.Column="1" Width="1" Background="#1E3041" Margin="0,1"/>
+          <StackPanel Grid.Column="2" Margin="16,0">
+            <TextBlock Text="{DynamicResource R23.Discover.Movies}" Style="{StaticResource R23SecondaryText}"/>
+            <TextBlock Text="{Binding Addons.MovieCount}" FontWeight="SemiBold" FontSize="18"/>
+          </StackPanel>
+          <Border Grid.Column="3" Width="1" Background="#1E3041" Margin="0,1"/>
+          <StackPanel Grid.Column="4" Margin="16,0">
+            <TextBlock Text="{DynamicResource R23.Discover.Series}" Style="{StaticResource R23SecondaryText}"/>
+            <TextBlock Text="{Binding Addons.SeriesCount}" FontWeight="SemiBold" FontSize="18"/>
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <!-- Bounded viewport: outer page scroll and internal poster paging stay independent. -->
+      <Grid Height="515">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="14"/>
+          <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        <Border Grid.Column="0" Style="{StaticResource R23Panel}">
+          <DockPanel LastChildFill="True">
+            <Grid DockPanel.Dock="Top" Margin="0,0,0,12">
+              <TextBlock Text="{DynamicResource R23.Discover.Featured}" Style="{StaticResource R23SectionHeading}"/>
+              <Button HorizontalAlignment="Right" Style="{StaticResource R23ToolbarButton}"
+                      Content="{DynamicResource Discover.Action.ManageAddons}"
+                      Click="ManageAddons_Click" Padding="11,4" MinHeight="32"/>
+            </Grid>
+            <Grid>
+              <ListBox x:Name="CatalogList"
+                       ItemsSource="{Binding ElementName=DiscoverRoot, Path=VisibleItems}"
+                       SelectedItem="{Binding Addons.SelectedItem, Mode=TwoWay}"
+                       Background="Transparent" BorderThickness="0"
+                       ScrollViewer.VerticalScrollBarVisibility="Auto"
+                       ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                       ScrollViewer.ScrollChanged="Catalog_OnScrollChanged"
+                       PreviewMouseLeftButtonUp="Catalog_OnPreviewMouseLeftButtonUp"
+                       KeyDown="Catalog_OnKeyDown">
+                <ListBox.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <WrapPanel IsItemsHost="True"/>
+                  </ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
+                <ListBox.ItemContainerStyle>
+                  <Style TargetType="ListBoxItem">
+                    <Setter Property="Width" Value="154"/>
+                    <Setter Property="Margin" Value="0,0,9,10"/>
+                    <Setter Property="Padding" Value="0"/>
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                    <Setter Property="Template">
+                      <Setter.Value>
+                        <ControlTemplate TargetType="ListBoxItem">
+                          <Border x:Name="Card" Background="{StaticResource R23CardBrush}"
+                                  BorderBrush="{StaticResource R23StrokeBrush}"
+                                  BorderThickness="1" CornerRadius="11">
+                            <ContentPresenter Margin="4"/>
+                          </Border>
+                          <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                              <Setter TargetName="Card" Property="BorderBrush" Value="#36536D"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                              <Setter TargetName="Card" Property="BorderBrush" Value="{StaticResource R23CyanBrush}"/>
+                              <Setter TargetName="Card" Property="BorderThickness" Value="1"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                              <Setter TargetName="Card" Property="BorderBrush" Value="{StaticResource R23CyanBrush}"/>
+                            </Trigger>
+                          </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                      </Setter.Value>
+                    </Setter>
+                  </Style>
+                </ListBox.ItemContainerStyle>
+                <ListBox.ItemTemplate>
+                  <DataTemplate>
+                    <StackPanel>
+                      <Border Width="142" Height="178" Background="{StaticResource R23RaisedBrush}"
+                              CornerRadius="8" ClipToBounds="True">
+                        <Image Source="{Binding PosterUrl}" Stretch="UniformToFill">
+                          <Image.Style>
+                            <Style TargetType="Image">
+                              <Setter Property="Opacity" Value="1"/>
+                              <Style.Triggers>
+                                <DataTrigger Binding="{Binding PosterUrl}" Value="{x:Null}">
+                                  <Setter Property="Opacity" Value="0"/>
+                                </DataTrigger>
+                              </Style.Triggers>
+                            </Style>
+                          </Image.Style>
+                        </Image>
+                      </Border>
+                      <TextBlock Text="{Binding Title}" Width="142" Margin="1,6,0,0"
+                                 TextTrimming="CharacterEllipsis" Foreground="{StaticResource R23TextBrush}"
+                                 FontSize="12.5" FontWeight="SemiBold"/>
+                      <TextBlock Text="{Binding YearLabel}" Width="142" Margin="1,2,0,4"
+                                 Foreground="{StaticResource R23MutedBrush}" FontSize="12"/>
+                    </StackPanel>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+              <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="350">
+                <StackPanel.Style>
+                  <Style TargetType="StackPanel">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding Addons.HasItems}" Value="False">
+                        <Setter Property="Visibility" Value="Visible"/>
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </StackPanel.Style>
+                <Border Style="{StaticResource R24EmptyIcon}" HorizontalAlignment="Center">
+                  <TextBlock Text="&#xE12B;" FontFamily="Segoe MDL2 Assets" FontSize="24"
+                             Foreground="{StaticResource R23CyanBrush}"
+                             HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <TextBlock Text="{DynamicResource Discover.Empty}" Margin="0,14,0,5"
+                           TextWrapping="Wrap" TextAlignment="Center"
+                           Foreground="{StaticResource R23TextBrush}" FontWeight="SemiBold" FontSize="15"/>
+                <TextBlock Text="{DynamicResource R25.Discover.EmptyHelp}"
+                           Style="{StaticResource R23SecondaryText}"
+                           TextWrapping="Wrap" TextAlignment="Center"/>
+                <Button Style="{StaticResource R23ToolbarButton}"
+                        Content="{DynamicResource Discover.Action.ManageAddons}"
+                        Click="ManageAddons_Click"
+                        HorizontalAlignment="Center" Margin="0,13,0,0"/>
+              </StackPanel>
+            </Grid>
+          </DockPanel>
+        </Border>
+
+        <Border x:Name="DetailsPanel" Grid.Column="2" Width="440"
+                Style="{StaticResource R24WorkspacePanel}" Padding="15"
+                Visibility="Collapsed">
+          <Grid>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto"/>
+              <RowDefinition Height="*"/>
+              <RowDefinition Height="Auto"/>
+              <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <Grid Grid.Row="0" Margin="0,0,0,10">
+              <TextBlock Text="{Binding Addons.SelectedItem.Title}"
+                         Style="{StaticResource R23SectionHeading}"
+                         TextTrimming="CharacterEllipsis" Margin="2,0,46,0"/>
+              <Button HorizontalAlignment="Right" Style="{StaticResource R23ToolbarButton}"
+                      Content="✕" Click="CloseDetails_Click"
+                      Padding="10,4" MinHeight="30"
+                      ToolTip="{DynamicResource Action.Close}"
+                      AutomationProperties.Name="{DynamicResource Action.Close}"/>
+            </Grid>
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+              <StackPanel>
+                <!-- Catalog data exposes poster artwork, not a landscape backdrop.
+                     Show it at portrait aspect ratio; never stretch it into a huge blurred banner. -->
+                <Border Background="{StaticResource R23HeroBrush}" MinHeight="192"
+                        CornerRadius="12" ClipToBounds="True" Padding="12">
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="112"/>
+                      <ColumnDefinition Width="12"/>
+                      <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Width="112" Height="165" CornerRadius="8"
+                            Background="{StaticResource R23RaisedBrush}" ClipToBounds="True"
+                            VerticalAlignment="Top">
+                      <Image Source="{Binding Addons.SelectedItem.PosterUrl}"
+                             Stretch="UniformToFill" HorizontalAlignment="Center"/>
+                    </Border>
+                    <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                      <TextBlock Text="{Binding Addons.SelectedItem.Title}"
+                                 FontWeight="Bold" FontSize="21" TextWrapping="Wrap"
+                                 Foreground="{StaticResource R23TextBrush}" MaxHeight="65"/>
+                      <TextBlock Text="{Binding Addons.SelectedItemMetadata}"
+                                 Foreground="{StaticResource R23CyanBrush}"
+                                 TextWrapping="Wrap" FontSize="12" Margin="0,7,0,0"/>
+                      <TextBlock Text="{Binding Addons.SelectedItem.Description}"
+                                 Margin="0,9,0,0" FontSize="12.5"
+                                 TextTrimming="WordEllipsis" MaxHeight="95"
+                                 Foreground="{StaticResource R23MutedBrush}" TextWrapping="Wrap"/>
+                    </StackPanel>
+                  </Grid>
+                </Border>
+
+                <Button Margin="0,10,0,0" MinHeight="49"
+                        Style="{StaticResource R23PrimaryButton}"
+                        Content="{DynamicResource Discover.Action.Play}"
+                        Command="{Binding Addons.PlayStreamCommand}"
+                        IsEnabled="{Binding Addons.HasStreams}"/>
+
+                <Border Style="{StaticResource R24InsetPanel}" Margin="0,10,0,10" Padding="12,11">
+                  <StackPanel>
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                      </Grid.ColumnDefinitions>
+                      <StackPanel Margin="0,0,12,0">
+                        <TextBlock Text="{DynamicResource Discover.Cloud.SaveTitle}"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource R23TextBrush}"/>
+                        <TextBlock Text="{DynamicResource Discover.Cloud.SaveHelp}"
+                                   Style="{StaticResource R23SecondaryText}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,3,0,0"/>
+                      </StackPanel>
+                      <Button Grid.Column="1"
+                              Style="{StaticResource R23ToolbarButton}"
+                              Content="{DynamicResource Discover.Cloud.BackToLists}"
+                              Command="{Binding ShowCloudListsCommand}"
+                              Padding="10,4"
+                              MinHeight="32"
+                              VerticalAlignment="Top"/>
+                    </Grid>
+
+                    <Grid Margin="0,10,0,0">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="*"/>
+                      </Grid.ColumnDefinitions>
+                      <Button Grid.Column="0"
+                              Style="{StaticResource R23ToolbarButton}"
+                              Content="{Binding Addons.FavoriteActionText}"
+                              Command="{Binding Addons.ToggleFavoriteCommand}"
+                              MinHeight="38"/>
+                      <Button Grid.Column="2"
+                              Style="{StaticResource R23ToolbarButton}"
+                              Content="{Binding Addons.WatchlistActionText}"
+                              Command="{Binding Addons.ToggleWatchlistCommand}"
+                              MinHeight="38"/>
+                    </Grid>
+
+                    <Border Margin="0,10,0,0" Padding="10,9"
+                            Background="{StaticResource R23RaisedBrush}"
+                            BorderBrush="{StaticResource R23StrokeBrush}"
+                            BorderThickness="1"
+                            CornerRadius="9">
+                      <Border.Style>
+                        <Style TargetType="Border">
+                          <Setter Property="Visibility" Value="Collapsed"/>
+                          <Style.Triggers>
+                            <DataTrigger Binding="{Binding Addons.HasTargetCollections}" Value="True">
+                              <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                          </Style.Triggers>
+                        </Style>
+                      </Border.Style>
+                      <Grid>
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="*"/>
+                          <ColumnDefinition Width="8"/>
+                          <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                          <TextBlock Text="{DynamicResource Discover.Cloud.TargetTitle}"
+                                     FontWeight="SemiBold"
+                                     FontSize="12.5"/>
+                          <TextBlock Text="{DynamicResource Discover.Cloud.TargetHelp}"
+                                     Style="{StaticResource R23SecondaryText}"
+                                     TextWrapping="Wrap"
+                                     Margin="0,2,0,6"/>
+                          <ComboBox ItemsSource="{Binding Addons.TargetCollections}"
+                                    SelectedItem="{Binding Addons.SelectedTargetCollection, Mode=TwoWay}"
+                                    DisplayMemberPath="Name"
+                                    MinHeight="36"
+                                    AutomationProperties.Name="{DynamicResource Discover.Cloud.TargetTitle}"/>
+                        </StackPanel>
+                        <Button Grid.Column="2"
+                                Style="{StaticResource R23ToolbarPrimaryButton}"
+                                Content="{Binding Addons.TargetCollectionActionText}"
+                                Command="{Binding Addons.AddToTargetCollectionCommand}"
+                                IsEnabled="{Binding Addons.HasTargetCollection}"
+                                MinHeight="36"
+                                MinWidth="112"
+                                VerticalAlignment="Bottom"/>
+                      </Grid>
+                    </Border>
+                  </StackPanel>
+                </Border>
+
+                <TextBlock Text="{DynamicResource R23.Discover.Episodes}"
+                           Margin="0,3,0,6">
+                  <TextBlock.Style>
+                    <Style TargetType="TextBlock" BasedOn="{StaticResource R23SectionHeading}">
+                      <Setter Property="Visibility" Value="Collapsed"/>
+                      <Style.Triggers>
+                        <DataTrigger Binding="{Binding Addons.HasEpisodes}" Value="True">
+                          <Setter Property="Visibility" Value="Visible"/>
+                        </DataTrigger>
+                      </Style.Triggers>
+                    </Style>
+                  </TextBlock.Style>
+                </TextBlock>
+                <ComboBox ItemsSource="{Binding Addons.Episodes}"
+                          SelectedItem="{Binding Addons.SelectedEpisode, Mode=TwoWay}"
+                          DisplayMemberPath="Title" Margin="0,0,0,12">
+                  <ComboBox.Style>
+                    <Style TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
+                      <Setter Property="Visibility" Value="Collapsed"/>
+                      <Style.Triggers>
+                        <DataTrigger Binding="{Binding Addons.HasEpisodes}" Value="True">
+                          <Setter Property="Visibility" Value="Visible"/>
+                        </DataTrigger>
+                      </Style.Triggers>
+                    </Style>
+                  </ComboBox.Style>
+                </ComboBox>
+                <TextBlock Text="{DynamicResource R23.Discover.AvailableStreams}"
+                           Style="{StaticResource R23SectionHeading}" Margin="0,0,0,6"/>
+                <ComboBox ItemsSource="{Binding Addons.Streams}"
+                          SelectedItem="{Binding Addons.SelectedStream, Mode=TwoWay}"
+                          DisplayMemberPath="Name" MinHeight="43"
+                          AutomationProperties.Name="Available streams"/>
+                <TextBlock Text="{Binding Addons.StatusText, Converter={StaticResource UserFacingTextConverter}}"
+                           Style="{StaticResource R23SecondaryText}" Margin="0,9,0,0"/>
+                <TextBlock Text="{Binding Addons.WarningsText, Converter={StaticResource UserFacingTextConverter}}"
+                           Foreground="#FFCD96" FontSize="12" TextWrapping="Wrap" Margin="0,6,0,0"/>
+              </StackPanel>
+            </ScrollViewer>
+          </Grid>
+        </Border>
+      </Grid>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

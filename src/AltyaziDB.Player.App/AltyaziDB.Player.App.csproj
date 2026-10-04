@@ -1,0 +1,84 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <PlatformTarget>x64</PlatformTarget>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <UseAppHost>true</UseAppHost>
+    <SelfContained>false</SelfContained>
+    <RootNamespace>AltyaziDB.Player.App</RootNamespace>
+    <AssemblyName>ADB.Player</AssemblyName>
+    <Title>ADB Player</Title>
+    <Product>ADB Player</Product>
+    <Description>ADB Player for Windows</Description>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AltyaziDB.Player.Addons\AltyaziDB.Player.Addons.csproj" />
+    <ProjectReference Include="..\AltyaziDB.Player.AudioSync\AltyaziDB.Player.AudioSync.csproj" />
+    <ProjectReference Include="..\AltyaziDB.Player.Connections\AltyaziDB.Player.Connections.csproj" />
+    <ProjectReference Include="..\AltyaziDB.Player.Core\AltyaziDB.Player.Core.csproj" />
+    <ProjectReference Include="..\AltyaziDB.Player.Cloud\AltyaziDB.Player.Cloud.csproj" />
+    <ProjectReference Include="..\AltyaziDB.Player.Infrastructure\AltyaziDB.Player.Infrastructure.csproj" />
+    <ProjectReference Include="..\AltyaziDB.Player.Playback\AltyaziDB.Player.Playback.csproj" />
+    <ProjectReference Include="..\AltyaziDB.Player.Library\AltyaziDB.Player.Library.csproj" />
+    <ProjectReference Include="..\AltyaziDB.Player.Subtitles\AltyaziDB.Player.Subtitles.csproj" />
+    <ProjectReference Include="..\AltyaziDB.Player.SubtitleSync\AltyaziDB.Player.SubtitleSync.csproj" />
+    <ProjectReference Include="..\AltyaziDB.Player.Sources\AltyaziDB.Player.Sources.csproj" />
+    <ProjectReference Include="..\AltyaziDB.Player.Telegram\AltyaziDB.Player.Telegram.csproj" />
+    <ProjectReference Include="..\AltyaziDB.Player.Torrent\AltyaziDB.Player.Torrent.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Endpne.LibMPV.Windows" GeneratePathProperty="true" />
+    <PackageReference Include="SharpCompress" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\app.ico" />
+    <Resource Include="Assets\app_icon.png" />
+    <Resource Include="Assets\logo.png" />
+    <!-- Optional cinematic artwork copied when installed; clean builds retain safe WPF gradient fallbacks. -->
+    <Content Include="Assets\hero\*.jpg" Link="Assets\hero\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\..\native\telegram\**\*.*" Link="native\telegram\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\native\torrent\**\*.*" Link="native\torrent\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\native\rclone\**\*.*" Link="native\rclone\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\native\ffmpeg\**\*.*" Link="native\ffmpeg\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\native\anime4k\**\*.*" Link="native\anime4k\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\native\artcnn\**\*.*" Link="native\artcnn\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\native\audiosynctool\**\*.*" Link="native\audiosynctool\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\native\subtitlesync\**\*.*" Link="native\subtitlesync\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <Target Name="CopyLibMpvNativeRuntimeToBuild" AfterTargets="Build">
+    <ItemGroup>
+      <LibMpvNativeFiles Include="$(PkgEndpne_LibMPV_Windows)\runtimes\win-x64\native\**\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(LibMpvNativeFiles)"
+          DestinationFolder="$(OutDir)"
+          SkipUnchangedFiles="true" />
+    <Message Importance="High"
+             Condition="'@(LibMpvNativeFiles)' != ''"
+             Text="libmpv native dosyaları Debug/Release çıktı klasörüne kopyalandı." />
+    <Warning Condition="'@(LibMpvNativeFiles)' == ''"
+             Text="NuGet paket yolu üzerinden libmpv native dosyası bulunamadı; build-debug.ps1 yedek kopyalama yolunu deneyecek." />
+  </Target>
+
+  <Target Name="CopyLibMpvNativeRuntimeToPublish" AfterTargets="Publish">
+    <ItemGroup>
+      <LibMpvPublishFiles Include="$(PkgEndpne_LibMPV_Windows)\runtimes\win-x64\native\**\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(LibMpvPublishFiles)"
+          DestinationFolder="$(PublishDir)"
+          SkipUnchangedFiles="true"
+          Condition="'@(LibMpvPublishFiles)' != ''" />
+  </Target>
+</Project>
