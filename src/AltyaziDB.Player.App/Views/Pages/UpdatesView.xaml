@@ -31,7 +31,7 @@
             <TextBlock Text="{DynamicResource R23.Update.Version}"
                        Style="{StaticResource R23SectionHeading}"/>
 
-            <Border Margin="0,10,0,18"
+            <Border Margin="0,10,0,12"
                     Padding="16,14"
                     Background="{StaticResource R23RaisedBrush}"
                     BorderBrush="{StaticResource R23StrokeBrush}"
@@ -55,26 +55,78 @@
                         Style="{StaticResource R24StatusPill}"
                         VerticalAlignment="Center"
                         Margin="12,0,0,0">
-                  <TextBlock Text="{Binding SelectedChannel, Converter={StaticResource UpdateChannelTextConverter}}"
+                  <TextBlock Text="{DynamicResource Update.Channel.Stable}"
                              FontSize="11"
                              Foreground="{StaticResource R23CyanBrush}"/>
                 </Border>
               </Grid>
             </Border>
 
+            <Border Margin="0,0,0,12"
+                    Padding="14,12"
+                    Background="{StaticResource R23RaisedBrush}"
+                    BorderBrush="{StaticResource R23CyanBrush}"
+                    BorderThickness="1"
+                    CornerRadius="12">
+              <Border.Style>
+                <Style TargetType="Border">
+                  <Setter Property="Visibility" Value="Collapsed"/>
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsUpdateAvailable}" Value="True">
+                      <Setter Property="Visibility" Value="Visible"/>
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </Border.Style>
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*"/>
+                  <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                  <TextBlock Text="{DynamicResource Update.Available.Label}"
+                             Style="{StaticResource R23SecondaryText}"/>
+                  <TextBlock Text="{Binding AvailableVersionText}"
+                             FontSize="24"
+                             FontWeight="SemiBold"
+                             Foreground="{StaticResource R23TextBrush}"
+                             Margin="0,2,0,0"/>
+                </StackPanel>
+                <TextBlock Grid.Column="1"
+                           Text="&#xE895;"
+                           FontFamily="Segoe MDL2 Assets"
+                           FontSize="22"
+                           Foreground="{StaticResource R23CyanBrush}"
+                           VerticalAlignment="Center"
+                           Margin="12,0,0,0"/>
+              </Grid>
+            </Border>
+
             <TextBlock Text="{DynamicResource Panel.UpdateChannel}"
                        Style="{StaticResource R23SecondaryText}"/>
-            <ComboBox ItemsSource="{Binding Channels}"
-                      SelectedItem="{Binding SelectedChannel, Mode=TwoWay}"
-                      IsEnabled="{Binding CanChangeUpdateSettings}"
-                      MinHeight="43"
-                      Margin="0,5,0,12">
-              <ComboBox.ItemTemplate>
-                <DataTemplate>
-                  <TextBlock Text="{Binding Converter={StaticResource UpdateChannelTextConverter}}"/>
-                </DataTemplate>
-              </ComboBox.ItemTemplate>
-            </ComboBox>
+            <Border Margin="0,5,0,5"
+                    Padding="12,10"
+                    Background="{StaticResource R23RaisedBrush}"
+                    BorderBrush="{StaticResource R23StrokeBrush}"
+                    BorderThickness="1"
+                    CornerRadius="9">
+              <DockPanel LastChildFill="True">
+                <Border DockPanel.Dock="Right"
+                        Style="{StaticResource R24StatusPill}"
+                        Margin="10,0,0,0">
+                  <TextBlock Text="{DynamicResource Update.Channel.Stable}"
+                             FontSize="11"
+                             Foreground="{StaticResource R23CyanBrush}"/>
+                </Border>
+                <TextBlock Text="{DynamicResource Update.State.Ready}"
+                           Foreground="{StaticResource R23TextBrush}"
+                           VerticalAlignment="Center"/>
+              </DockPanel>
+            </Border>
+            <TextBlock Text="{DynamicResource Update.Channel.StableOnlyHelp}"
+                       Style="{StaticResource R23SecondaryText}"
+                       TextWrapping="Wrap"
+                       Margin="0,0,0,12"/>
 
             <CheckBox Content="{DynamicResource Panel.CheckOnStartup}"
                       IsChecked="{Binding CheckOnStartup, Mode=TwoWay}"
@@ -86,7 +138,7 @@
                       Content="{DynamicResource Action.CheckUpdate}"
                       Command="{Binding CheckCommand}"
                       Margin="0,0,8,8"/>
-              <Button Content="{DynamicResource Action.DownloadInstall}"
+              <Button Content="{Binding UpdateActionText}"
                       Command="{Binding DownloadAndInstallCommand}"
                       Margin="0,0,8,8">
                 <Button.Style>

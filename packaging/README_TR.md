@@ -3,8 +3,8 @@
 ## Üretilen dosyalar
 
 - `artifacts/portable/`: self-contained Windows x64 uygulama klasörü
-- `artifacts/release/ADB-Player-Portable-v1.0.0.0-x64.zip`
-- `artifacts/installer/ADB-Player-Setup-v1.0.0.0-x64.exe`
+- `artifacts/release/ADB-Player-Portable-v1.0.1.0-x64.zip`
+- `artifacts/installer/ADB-Player-Setup-v1.0.1.0-x64.exe`
 - `artifacts/release/update-manifest.json`
 - `artifacts/release/SHA256SUMS.txt`
 
@@ -52,8 +52,8 @@ Stable public gate:
 ```powershell
 .\tool\verify-public-release-gate.ps1 `
   -Mode Public `
-  -InstallerBaseUrl "https://github.com/<owner>/<public-repo>/releases/download/v1.0.0" `
-  -PortableBaseUrl "https://github.com/<owner>/<public-repo>/releases/download/v1.0.0" `
+  -InstallerBaseUrl "https://github.com/<owner>/<public-repo>/releases/download/v1.0.1" `
+  -PortableBaseUrl "https://github.com/<owner>/<public-repo>/releases/download/v1.0.1" `
   -ManualAcceptanceConfirmed
 ```
 
@@ -70,7 +70,7 @@ Kod imzası hard gate olacaksa ayrıca:
 Public source snapshot çıktısı:
 
 ```text
-artifacts\public-source\ADB-Player-v1.0.0.0
+artifacts\public-source\ADB-Player-v1.0.1.0
 ```
 
 Snapshot; araştırma/evidence arşivlerini, tarihî patch/build notlarını, backend deployment kaynaklarını ve private handoff belgelerini içermez.

@@ -1,10 +1,9 @@
-﻿using System.IO;
-using System.Diagnostics;
-using System.Windows;
+﻿using System.Diagnostics;
+using System.IO;
 using System.Windows.Input;
 using AltyaziDB.Player.App.Commands;
-using AltyaziDB.Player.App.Services;
 using AltyaziDB.Player.App.Localization;
+using AltyaziDB.Player.App.Services;
 using AltyaziDB.Player.Core.Interfaces;
 using AltyaziDB.Player.Core.Models;
 using AltyaziDB.Player.Infrastructure;
@@ -21,7 +20,7 @@ public sealed class UpdatePanelViewModel : ObservableObject
     private readonly AppPaths _paths;
     private readonly CrashReportService _crashReports;
     private UpdateManifest? _availableManifest;
-    private string _statusText = "Güncelleme denetlenmedi.";
+    private string _statusText = string.Empty;
     private string _releaseNotes = string.Empty;
     private double _downloadProgress;
     private bool _isBusy;
@@ -43,11 +42,38 @@ public sealed class UpdatePanelViewModel : ObservableObject
         _logger = logger;
         _paths = paths;
         _crashReports = crashReports;
+
+        // V1.0.1 RC2 ships one official stable feed. Older settings may contain
+        // an empty/custom manifest URL or the retired preview channel; normalize
+        // them so upgrading users immediately receive the supported feed.
+        var updateSettingsChanged = false;
+        if (!string.Equals(
+                _settings.UpdateManifestUrl,
+                PlayerSettings.OfficialStableUpdateManifestUrl,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            _settings.UpdateManifestUrl = PlayerSettings.OfficialStableUpdateManifestUrl;
+            updateSettingsChanged = true;
+        }
+
+        if (!string.Equals(_settings.UpdateChannel, "stable", StringComparison.OrdinalIgnoreCase))
+        {
+            _settings.UpdateChannel = "stable";
+            updateSettingsChanged = true;
+        }
+
+        if (updateSettingsChanged)
+        {
+            _ = _saveSettingsAsync();
+        }
+
         StatusText = LocalizationManager.Get("Update.Status.NotChecked");
 
-        Channels = new[] { "stable", "preview" };
+        Channels = new[] { "stable" };
         CheckCommand = new AsyncRelayCommand(() => CheckAsync(false), () => !IsBusy);
-        DownloadAndInstallCommand = new AsyncRelayCommand(DownloadAndInstallAsync, () => IsUpdateAvailable && !IsBusy);
+        DownloadAndInstallCommand = new AsyncRelayCommand(
+            DownloadAndInstallAsync,
+            () => IsUpdateAvailable && !IsBusy);
         OpenUpdateFolderCommand = new RelayCommand(() => OpenFolder(_paths.UpdateDirectory));
         CreateDiagnosticsCommand = new RelayCommand(CreateDiagnostics);
     }
@@ -58,45 +84,38 @@ public sealed class UpdatePanelViewModel : ObservableObject
     public ICommand OpenUpdateFolderCommand { get; }
     public ICommand CreateDiagnosticsCommand { get; }
 
-    public string CurrentVersionText => $"V{_updateService.CurrentVersion.Major}.{_updateService.CurrentVersion.Minor}";
+    public string CurrentVersionText => FormatVersionLabel(_updateService.CurrentVersion.ToString());
+    public string AvailableVersionText => _availableManifest is null
+        ? string.Empty
+        : FormatVersionLabel(_availableManifest.Version);
+
     public string DeploymentModeText => LocalizationManager.Get(
         _paths.IsPortable ? "Update.Deployment.Portable" : "Update.Deployment.Installed");
 
-    public string ManifestUrl
-    {
-        get => _settings.UpdateManifestUrl;
-        set
-        {
-            var normalized = value?.Trim() ?? string.Empty;
-            if (_settings.UpdateManifestUrl == normalized)
-            {
-                return;
-            }
-
-            _settings.UpdateManifestUrl = normalized;
-            OnPropertyChanged();
-            ResetAvailableUpdateState();
-            _ = _saveSettingsAsync();
-        }
-    }
+    public string ManifestUrl => PlayerSettings.OfficialStableUpdateManifestUrl;
 
     public string SelectedChannel
     {
-        get => string.IsNullOrWhiteSpace(_settings.UpdateChannel) ? "stable" : _settings.UpdateChannel;
+        get => "stable";
         set
         {
-            var normalized = string.IsNullOrWhiteSpace(value) ? "stable" : value.Trim().ToLowerInvariant();
-            if (_settings.UpdateChannel == normalized)
+            if (string.Equals(_settings.UpdateChannel, "stable", StringComparison.OrdinalIgnoreCase))
             {
                 return;
             }
 
-            _settings.UpdateChannel = normalized;
+            _settings.UpdateChannel = "stable";
             OnPropertyChanged();
             ResetAvailableUpdateState();
             _ = _saveSettingsAsync();
         }
     }
+
+    public bool CanChangeUpdateChannel => false;
+    public bool IsPortableDeployment => _paths.IsPortable;
+
+    public string UpdateActionText => LocalizationManager.Get(
+        _paths.IsPortable ? "Action.DownloadPortable" : "Action.DownloadInstall");
 
     public bool CheckOnStartup
     {
@@ -163,8 +182,8 @@ public sealed class UpdatePanelViewModel : ObservableObject
     }
 
     public bool CanChangeUpdateSettings => !IsBusy;
-
     public bool IsUpdateAvailable => _availableManifest is not null;
+    public bool HasUpdateBadge => IsUpdateAvailable;
 
     public bool IsDownloading
     {
@@ -174,7 +193,7 @@ public sealed class UpdatePanelViewModel : ObservableObject
 
     public async Task CheckOnStartupAsync()
     {
-        if (!CheckOnStartup || string.IsNullOrWhiteSpace(ManifestUrl))
+        if (!CheckOnStartup)
         {
             return;
         }
@@ -190,23 +209,39 @@ public sealed class UpdatePanelViewModel : ObservableObject
         try
         {
             StatusText = LocalizationManager.Get("Update.Status.Checking");
-            var result = await _updateService.CheckAsync(ManifestUrl, SelectedChannel).ConfigureAwait(true);
+            var result = await _updateService
+                .CheckAsync(ManifestUrl, SelectedChannel)
+                .ConfigureAwait(true);
+
             _availableManifest = result.IsUpdateAvailable ? result.Manifest : null;
-            StatusText = result.IsUpdateAvailable && result.AvailableVersion is not null
-                ? LocalizationManager.Format(
+
+            if (result.IsUpdateAvailable && result.AvailableVersion is not null)
+            {
+                StatusText = LocalizationManager.Format(
                     "Update.Status.Available",
-                    FormatVersionLabel(result.AvailableVersion.ToString()))
-                : result.Message;
-            ReleaseNotes = result.Manifest?.ReleaseNotes ?? string.Empty;
-            OnPropertyChanged(nameof(IsUpdateAvailable));
-            RaiseCommandStates();
+                    FormatVersionLabel(result.AvailableVersion.ToString()));
+                ReleaseNotes = result.Manifest?.ReleaseNotes ?? string.Empty;
+            }
+            else
+            {
+                var blockedByPlatform = result.AvailableVersion is not null
+                    && result.AvailableVersion > result.CurrentVersion;
+                StatusText = blockedByPlatform
+                    ? result.Message
+                    : LocalizationManager.Get("Update.Status.Current");
+                ReleaseNotes = string.Empty;
+            }
+
+            NotifyUpdateStateChanged();
         }
         catch (Exception exception)
         {
             _availableManifest = null;
             ReleaseNotes = string.Empty;
-            StatusText = $"Güncelleme denetlenemedi: {exception.Message}";
-            OnPropertyChanged(nameof(IsUpdateAvailable));
+            StatusText = LocalizationManager.Format(
+                "Update.Status.CheckFailed",
+                exception.Message);
+            NotifyUpdateStateChanged();
             _logger.Error("Güncelleme denetimi başarısız.", exception);
             if (!quiet)
             {
@@ -240,17 +275,37 @@ public sealed class UpdatePanelViewModel : ObservableObject
         DownloadProgress = 0;
         try
         {
-            StatusText = LocalizationManager.Get("Update.Status.Downloading");
+            StatusText = LocalizationManager.Get(
+                _paths.IsPortable
+                    ? "Update.Status.DownloadingPortable"
+                    : "Update.Status.Downloading");
+
             var progress = new Progress<double>(value => DownloadProgress = value);
-            var download = await _updateService.DownloadInstallerAsync(
-                    _availableManifest,
-                    _paths.UpdateDirectory,
-                    progress)
-                .ConfigureAwait(true);
+            var download = _paths.IsPortable
+                ? await _updateService.DownloadPortableAsync(
+                        _availableManifest,
+                        _paths.UpdateDirectory,
+                        progress)
+                    .ConfigureAwait(true)
+                : await _updateService.DownloadInstallerAsync(
+                        _availableManifest,
+                        _paths.UpdateDirectory,
+                        progress)
+                    .ConfigureAwait(true);
+
+            if (_paths.IsPortable)
+            {
+                StatusText = LocalizationManager.Format(
+                    "Update.Status.PortableReady",
+                    Path.GetFileName(download.FilePath));
+                OpenFolder(_paths.UpdateDirectory);
+                return;
+            }
 
             StatusText = LocalizationManager.Format(
                 "Update.Status.DownloadVerified",
                 Path.GetFileName(download.FilePath));
+
             if (!_dialogs.Confirm(
                     LocalizationManager.Get("Update.Confirm.Install"),
                     LocalizationManager.Get("Update.Install.Title")))
@@ -263,7 +318,9 @@ public sealed class UpdatePanelViewModel : ObservableObject
         }
         catch (Exception exception)
         {
-            StatusText = $"Güncelleme indirilemedi: {exception.Message}";
+            StatusText = LocalizationManager.Format(
+                "Update.Status.DownloadFailed",
+                exception.Message);
             _logger.Error("Güncelleme indirme/kurulum işlemi başarısız.", exception);
             _dialogs.ShowError(LocalizationManager.TranslateMessage(StatusText));
         }
@@ -281,6 +338,7 @@ public sealed class UpdatePanelViewModel : ObservableObject
         OnPropertyChanged(nameof(DeploymentModeText));
         OnPropertyChanged(nameof(Channels));
         OnPropertyChanged(nameof(SelectedChannel));
+        OnPropertyChanged(nameof(UpdateActionText));
         OnPropertyChanged(nameof(ReleaseNotesDisplayText));
     }
 
@@ -341,13 +399,20 @@ public sealed class UpdatePanelViewModel : ObservableObject
         _availableManifest = null;
         ReleaseNotes = string.Empty;
         DownloadProgress = 0;
-        OnPropertyChanged(nameof(IsUpdateAvailable));
-        RaiseCommandStates();
+        NotifyUpdateStateChanged();
 
         if (setStatus)
         {
             StatusText = LocalizationManager.Get("Update.Status.NotChecked");
         }
+    }
+
+    private void NotifyUpdateStateChanged()
+    {
+        OnPropertyChanged(nameof(IsUpdateAvailable));
+        OnPropertyChanged(nameof(HasUpdateBadge));
+        OnPropertyChanged(nameof(AvailableVersionText));
+        RaiseCommandStates();
     }
 
     private void RaiseCommandStates()

@@ -53,6 +53,8 @@ public partial class SettingsView : UserControl
     {
         if (e.PropertyName is nameof(ApiSettingsPanelViewModel.TelegramApiHash)
             or nameof(ApiSettingsPanelViewModel.AltyaziDbApiKey)
+            or nameof(ApiSettingsPanelViewModel.GofileApiToken)
+            or nameof(ApiSettingsPanelViewModel.AkiraBoxApiCredential)
             or nameof(ApiSettingsPanelViewModel.GoogleClientSecret)
             or nameof(ApiSettingsPanelViewModel.DropboxClientSecret)
             or nameof(ApiSettingsPanelViewModel.OneDriveClientSecret)
@@ -72,6 +74,8 @@ public partial class SettingsView : UserControl
         {
             SetPassword(TelegramApiHashBox, _settings.TelegramApiHash);
             SetPassword(AltyaziDbApiKeyBox, _settings.AltyaziDbApiKey);
+            SetPassword(GofileApiTokenBox, _settings.GofileApiToken);
+            SetPassword(AkiraBoxApiCredentialBox, _settings.AkiraBoxApiCredential);
             SetPassword(GoogleClientSecretBox, _settings.GoogleClientSecret);
             SetPassword(DropboxClientSecretBox, _settings.DropboxClientSecret);
             SetPassword(OneDriveClientSecretBox, _settings.OneDriveClientSecret);
@@ -102,6 +106,18 @@ public partial class SettingsView : UserControl
     {
         if (!_syncing && _settings is not null && sender is PasswordBox box)
             _settings.AltyaziDbApiKey = box.Password;
+    }
+
+    private void GofileApiTokenBox_OnPasswordChanged(object sender, RoutedEventArgs e)
+    {
+        if (!_syncing && _settings is not null && sender is PasswordBox box)
+            _settings.GofileApiToken = box.Password;
+    }
+
+    private void AkiraBoxApiCredentialBox_OnPasswordChanged(object sender, RoutedEventArgs e)
+    {
+        if (!_syncing && _settings is not null && sender is PasswordBox box)
+            _settings.AkiraBoxApiCredential = box.Password;
     }
 
     private void GoogleClientSecretBox_OnPasswordChanged(object sender, RoutedEventArgs e)

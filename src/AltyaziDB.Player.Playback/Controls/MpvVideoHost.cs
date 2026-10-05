@@ -11,10 +11,17 @@ public sealed class MpvVideoHost : HwndHost
     private const int WsClipSiblings = 0x04000000;
     private const int WsClipChildren = 0x02000000;
     private const int SsBlackRect = 0x00000004;
+    private const int WmMouseMove = 0x0200;
+    private const int WmLButtonDown = 0x0201;
+    private const int WmLButtonUp = 0x0202;
+    private const int WmRButtonDown = 0x0204;
+    private const int WmMouseWheel = 0x020A;
 
     private nint _childHandle;
+    private bool _pointerActivityPending;
 
     public event EventHandler<nint>? HandleCreated;
+    public event EventHandler? PointerActivity;
 
     public nint ChildHandle => _childHandle;
 
@@ -41,6 +48,26 @@ public sealed class MpvVideoHost : HwndHost
 
         Dispatcher.InvokeAsync(() => HandleCreated?.Invoke(this, _childHandle));
         return new HandleRef(this, _childHandle);
+    }
+
+    protected override nint WndProc(nint hwnd, int msg, nint wParam, nint lParam, ref bool handled)
+    {
+        if (msg is WmMouseMove or WmLButtonDown or WmLButtonUp or WmRButtonDown or WmMouseWheel)
+        {
+            // Native mouse traffic can be very chatty. Coalesce messages so fullscreen
+            // chrome receives at most one queued activity notification per UI turn.
+            if (!_pointerActivityPending)
+            {
+                _pointerActivityPending = true;
+                _ = Dispatcher.InvokeAsync(() =>
+                {
+                    _pointerActivityPending = false;
+                    PointerActivity?.Invoke(this, EventArgs.Empty);
+                }, System.Windows.Threading.DispatcherPriority.Input);
+            }
+        }
+
+        return base.WndProc(hwnd, msg, wParam, lParam, ref handled);
     }
 
     protected override void DestroyWindowCore(HandleRef hwnd)

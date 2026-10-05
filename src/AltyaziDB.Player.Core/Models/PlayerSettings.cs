@@ -2,6 +2,9 @@ namespace AltyaziDB.Player.Core.Models;
 
 public sealed class PlayerSettings
 {
+    public const string OfficialStableUpdateManifestUrl =
+        "https://github.com/sineturk/ADB-Player/releases/latest/download/update-manifest.json";
+
     public string UiLanguage { get; set; } = "tr-TR";
     public double Volume { get; set; } = 80;
     public int VolumeBoostLimit { get; set; } = 150;
@@ -82,6 +85,6 @@ public sealed class PlayerSettings
     // W5 yayın ve güncelleme ayarları. Güncelleme manifesti yalnız HTTPS üzerinden okunur.
     public bool CheckUpdatesOnStartup { get; set; } = true;
     public string UpdateChannel { get; set; } = "stable";
-    public string UpdateManifestUrl { get; set; } = string.Empty;
+    public string UpdateManifestUrl { get; set; } = OfficialStableUpdateManifestUrl;
 }
 

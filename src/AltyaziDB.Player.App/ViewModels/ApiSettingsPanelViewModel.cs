@@ -17,6 +17,9 @@ public sealed class ApiSettingsPanelViewModel : ObservableObject, IDisposable
 {
     public const string TelegramApiHashSecretKey = "telegram:api-hash";
     public const string AltyaziDbApiKeySecretKey = "altyazidb:api-key";
+    public const string GofileApiTokenSecretKey = "gofile:api-token";
+    public const string AkiraBoxApiBaseUrlSecretKey = "akirabox:api-base-url";
+    public const string AkiraBoxApiCredentialSecretKey = "akirabox:api-key";
     public const string GoogleClientIdSecretKey = "cloud:google-client-id";
     public const string GoogleClientSecretSecretKey = "cloud:google-client-secret";
     public const string DropboxClientIdSecretKey = "cloud:dropbox-client-id";
@@ -41,6 +44,9 @@ public sealed class ApiSettingsPanelViewModel : ObservableObject, IDisposable
     private string _telegramApiHash = string.Empty;
     private string _altyaziDbApiUrl = string.Empty;
     private string _altyaziDbApiKey = string.Empty;
+    private string _gofileApiToken = string.Empty;
+    private string _akiraBoxApiBaseUrl = "https://akirabox.com/api";
+    private string _akiraBoxApiCredential = string.Empty;
     private string _googleClientId = string.Empty;
     private string _googleClientSecret = string.Empty;
     private string _dropboxClientId = string.Empty;
@@ -108,6 +114,24 @@ public sealed class ApiSettingsPanelViewModel : ObservableObject, IDisposable
         set => SetAndSchedule(ref _altyaziDbApiKey, value);
     }
 
+    public string GofileApiToken
+    {
+        get => _gofileApiToken;
+        set => SetAndSchedule(ref _gofileApiToken, value);
+    }
+
+    public string AkiraBoxApiBaseUrl
+    {
+        get => _akiraBoxApiBaseUrl;
+        set => SetAndSchedule(ref _akiraBoxApiBaseUrl, value);
+    }
+
+    public string AkiraBoxApiCredential
+    {
+        get => _akiraBoxApiCredential;
+        set => SetAndSchedule(ref _akiraBoxApiCredential, value);
+    }
+
     public string GoogleClientId
     {
         get => _googleClientId;
@@ -171,6 +195,10 @@ public sealed class ApiSettingsPanelViewModel : ObservableObject, IDisposable
                 ? "https://altyazidb.com/api/v1"
                 : _settings.AltyaziDbApiUrl;
             AltyaziDbApiKey = await _secrets.GetAsync(AltyaziDbApiKeySecretKey).ConfigureAwait(true) ?? string.Empty;
+            GofileApiToken = await _secrets.GetAsync(GofileApiTokenSecretKey).ConfigureAwait(true) ?? string.Empty;
+            AkiraBoxApiBaseUrl = await _secrets.GetAsync(AkiraBoxApiBaseUrlSecretKey).ConfigureAwait(true)
+                ?? "https://akirabox.com/api";
+            AkiraBoxApiCredential = await _secrets.GetAsync(AkiraBoxApiCredentialSecretKey).ConfigureAwait(true) ?? string.Empty;
             GoogleClientId = await _secrets.GetAsync(GoogleClientIdSecretKey).ConfigureAwait(true) ?? string.Empty;
             GoogleClientSecret = await _secrets.GetAsync(GoogleClientSecretSecretKey).ConfigureAwait(true) ?? string.Empty;
             DropboxClientId = await _secrets.GetAsync(DropboxClientIdSecretKey).ConfigureAwait(true) ?? string.Empty;
@@ -217,6 +245,15 @@ public sealed class ApiSettingsPanelViewModel : ObservableObject, IDisposable
 
             await _secrets.SetAsync(TelegramApiHashSecretKey, NormalizeSecret(TelegramApiHash)).ConfigureAwait(true);
             await _secrets.SetAsync(AltyaziDbApiKeySecretKey, NormalizeSecret(AltyaziDbApiKey)).ConfigureAwait(true);
+            await _secrets.SetAsync(GofileApiTokenSecretKey, NormalizeSecret(GofileApiToken)).ConfigureAwait(true);
+            await _secrets.SetAsync(
+                AkiraBoxApiBaseUrlSecretKey,
+                string.IsNullOrWhiteSpace(AkiraBoxApiBaseUrl)
+                    ? "https://akirabox.com/api"
+                    : AkiraBoxApiBaseUrl.Trim()).ConfigureAwait(true);
+            await _secrets.SetAsync(
+                AkiraBoxApiCredentialSecretKey,
+                NormalizeSecret(AkiraBoxApiCredential)).ConfigureAwait(true);
             await _secrets.SetAsync(GoogleClientIdSecretKey, NormalizeSecret(GoogleClientId)).ConfigureAwait(true);
             await _secrets.SetAsync(GoogleClientSecretSecretKey, NormalizeSecret(GoogleClientSecret)).ConfigureAwait(true);
             await _secrets.SetAsync(DropboxClientIdSecretKey, NormalizeSecret(DropboxClientId)).ConfigureAwait(true);

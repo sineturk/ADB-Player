@@ -91,29 +91,76 @@ public sealed class HttpUpdateService : IUpdateService, IDisposable
                 : "ADB Player güncel.");
     }
 
-    public async Task<UpdateDownloadResult> DownloadInstallerAsync(
+    public Task<UpdateDownloadResult> DownloadInstallerAsync(
         UpdateManifest manifest,
         string destinationDirectory,
         IProgress<double>? progress = null,
         CancellationToken cancellationToken = default)
     {
         ValidateHttpsDownload(manifest.InstallerUrl, manifest.InstallerSha256);
+        var fileName = GetSafeDownloadFileName(
+            manifest.InstallerUrl,
+            $"ADB-Player-Setup-v{manifest.Version}-x64.exe");
+        return DownloadVerifiedAsync(
+            manifest.InstallerUrl,
+            manifest.InstallerSha256,
+            destinationDirectory,
+            fileName,
+            progress,
+            cancellationToken);
+    }
+
+    public Task<UpdateDownloadResult> DownloadPortableAsync(
+        UpdateManifest manifest,
+        string destinationDirectory,
+        IProgress<double>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateHttpsDownload(manifest.PortableUrl, manifest.PortableSha256);
+        var fileName = GetSafeDownloadFileName(
+            manifest.PortableUrl,
+            $"ADB-Player-Portable-v{manifest.Version}-x64.zip");
+        return DownloadVerifiedAsync(
+            manifest.PortableUrl,
+            manifest.PortableSha256,
+            destinationDirectory,
+            fileName,
+            progress,
+            cancellationToken);
+    }
+
+    private async Task<UpdateDownloadResult> DownloadVerifiedAsync(
+        string url,
+        string expectedSha256,
+        string destinationDirectory,
+        string fileName,
+        IProgress<double>? progress,
+        CancellationToken cancellationToken)
+    {
         Directory.CreateDirectory(destinationDirectory);
 
-        var uri = new Uri(manifest.InstallerUrl, UriKind.Absolute);
-        var safeVersion = string.Join("-", manifest.Version.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries));
-        var destination = Path.Combine(destinationDirectory, $"ADB-Player-Setup-{safeVersion}-x64.exe");
+        var uri = new Uri(url, UriKind.Absolute);
+        var destination = Path.Combine(destinationDirectory, fileName);
         var partial = destination + ".partial";
 
         try
         {
-            using var response = await _httpClient.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+            using var response = await _httpClient.GetAsync(
+                    uri,
+                    HttpCompletionOption.ResponseHeadersRead,
+                    cancellationToken)
                 .ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
             var total = response.Content.Headers.ContentLength;
 
             await using (var input = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false))
-            await using (var output = new FileStream(partial, FileMode.Create, FileAccess.Write, FileShare.None, 1024 * 128, true))
+            await using (var output = new FileStream(
+                             partial,
+                             FileMode.Create,
+                             FileAccess.Write,
+                             FileShare.None,
+                             1024 * 128,
+                             true))
             {
                 var buffer = new byte[1024 * 128];
                 long written = 0;
@@ -135,14 +182,14 @@ public sealed class HttpUpdateService : IUpdateService, IDisposable
             }
 
             var actualHash = await ComputeSha256Async(partial, cancellationToken).ConfigureAwait(false);
-            if (!actualHash.Equals(NormalizeHash(manifest.InstallerSha256), StringComparison.OrdinalIgnoreCase))
+            if (!actualHash.Equals(NormalizeHash(expectedSha256), StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidDataException(
-                    $"İndirilen kurulum dosyasının SHA-256 doğrulaması başarısız. Beklenen: {manifest.InstallerSha256}, bulunan: {actualHash}");
+                    $"İndirilen güncelleme dosyasının SHA-256 doğrulaması başarısız. Beklenen: {expectedSha256}, bulunan: {actualHash}");
             }
 
             File.Move(partial, destination, true);
-            _logger.Info($"Güncelleme kurulum dosyası indirildi ve doğrulandı: {destination}");
+            _logger.Info($"Güncelleme dosyası indirildi ve doğrulandı: {destination}");
             var info = new FileInfo(destination);
             progress?.Report(100);
             return new UpdateDownloadResult(destination, actualHash, info.Length);
@@ -152,6 +199,21 @@ public sealed class HttpUpdateService : IUpdateService, IDisposable
             TryDelete(partial);
             throw;
         }
+    }
+
+    private static string GetSafeDownloadFileName(string url, string fallback)
+    {
+        if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
+        {
+            var candidate = Path.GetFileName(uri.LocalPath);
+            if (!string.IsNullOrWhiteSpace(candidate)
+                && candidate.IndexOfAny(Path.GetInvalidFileNameChars()) < 0)
+            {
+                return candidate;
+            }
+        }
+
+        return fallback;
     }
 
     public void LaunchInstaller(string installerPath, bool silent)
@@ -190,6 +252,7 @@ public sealed class HttpUpdateService : IUpdateService, IDisposable
         }
 
         ValidateHttpsDownload(manifest.InstallerUrl, manifest.InstallerSha256);
+        ValidateHttpsDownload(manifest.PortableUrl, manifest.PortableSha256);
     }
 
     private static void ValidateHttpsDownload(string url, string sha256)

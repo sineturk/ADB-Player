@@ -16,6 +16,7 @@ V1.0 focuses on one place for local playback, user-connected sources, subtitles,
 - External audio synchronization and subtitle synchronization with confidence/safety gates.
 - Turkish and English user interface.
 - Installer and portable Windows x64 distributions.
+- In-app updates from the official stable GitHub feed with HTTPS + SHA-256 verification.
 
 ADB Player does **not** ship media catalogs, torrent indexers, copyrighted media, third-party account credentials or preconfigured content sources. Users are responsible for the services and content they connect.
 
@@ -30,8 +31,8 @@ ADB Player does **not** ship media catalogs, torrent indexers, copyrighted media
 
 Public releases are distributed as:
 
-- `ADB-Player-Setup-v1.0.0.0-x64.exe`
-- `ADB-Player-Portable-v1.0.0.0-x64.zip`
+- `ADB-Player-Setup-v1.0.1.0-x64.exe`
+- `ADB-Player-Portable-v1.0.1.0-x64.zip`
 - `SHA256SUMS.txt`
 
 Verify release hashes before installation. When a signed build is provided, Windows signature verification should also succeed.
@@ -97,4 +98,4 @@ The public V1.0 source snapshot contains the product source and build/release to
 
 ## Release
 
-See [ADB Player V1.0 release notes](RELEASE_NOTES_v1.0.0.md).
+See [ADB Player V1.0.1 release notes](RELEASE_NOTES_v1.0.1.md).

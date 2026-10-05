@@ -707,7 +707,8 @@ public sealed class SourcePanelViewModel : ObservableObject, IAsyncDisposable
                 ? _currentCloudAccount is not null
                     ? await _cloudService.BrowseAsync(_currentCloudAccount, path).ConfigureAwait(true)
                     : throw new InvalidOperationException("Etkin bulut hesabı bulunamadı.")
-                : path.StartsWith("pcloud://", StringComparison.OrdinalIgnoreCase)
+                : path.StartsWith("pcloud://", StringComparison.OrdinalIgnoreCase) ||
+                  path.StartsWith("gofile://", StringComparison.OrdinalIgnoreCase)
                     ? await _service.ResolvePublicLinkAsync(path).ConfigureAwait(true)
                     : _currentWebDavConnection is not null
                         ? await _service.BrowseWebDavAsync(_currentWebDavConnection, path).ConfigureAwait(true)

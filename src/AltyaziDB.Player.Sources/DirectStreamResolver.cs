@@ -77,6 +77,14 @@ internal sealed class DirectStreamResolver
             throw new InvalidOperationException(
                 "Dosya sunucusu ileri sarmayı sağlayan byte-range akışını desteklemiyor.");
 
+        // Some providers (notably Google Drive) may return an HTML confirmation,
+        // processing or quota page with a binary-looking content type. Do not
+        // hand that response to libmpv where it becomes "unrecognized file format".
+        // This request is validation-only, so consuming a small prefix is safe.
+        if (await LooksLikeHtmlPayloadAsync(response.Content, cancellationToken).ConfigureAwait(false))
+            throw new InvalidOperationException(
+                "Bağlantı gerçek medya baytları yerine bir web/onay sayfası döndürdü.");
+
         return DirectResult(finalUri, FileName(finalUri, "İnternet videosu"), "İleri sarılabilir medya akışı doğrulandı.");
     }
 
@@ -144,6 +152,22 @@ internal sealed class DirectStreamResolver
         var trimmed = body.TrimStart();
         return trimmed.StartsWith("<!doctype html", StringComparison.OrdinalIgnoreCase) ||
                trimmed.StartsWith("<html", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static async Task<bool> LooksLikeHtmlPayloadAsync(
+        HttpContent content,
+        CancellationToken cancellationToken)
+    {
+        await using var stream = await content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        var buffer = new byte[8192];
+        var read = await stream.ReadAsync(buffer.AsMemory(), cancellationToken).ConfigureAwait(false);
+        if (read <= 0) return false;
+
+        var prefix = Encoding.UTF8.GetString(buffer, 0, read).TrimStart('\uFEFF', ' ', '\t', '\r', '\n');
+        return prefix.StartsWith("<!doctype html", StringComparison.OrdinalIgnoreCase) ||
+               prefix.StartsWith("<html", StringComparison.OrdinalIgnoreCase) ||
+               prefix.StartsWith("<head", StringComparison.OrdinalIgnoreCase) ||
+               prefix.StartsWith("<body", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string FileName(Uri uri, string fallback)

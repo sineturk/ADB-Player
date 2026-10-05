@@ -558,6 +558,10 @@ public sealed class TdJsonTelegramService : ITelegramService
         ".aac" => "audio/aac",
         ".ac3" => "audio/ac3",
         ".eac3" => "audio/eac3",
+        ".dts" or ".dtshd" => "audio/vnd.dts",
+        ".thd" or ".truehd" => "audio/true-hd",
+        ".m4a" => "audio/mp4",
+        ".wav" => "audio/wav",
         ".opus" => "audio/opus",
         ".ogg" => "audio/ogg",
         _ => "application/octet-stream"
@@ -811,6 +815,8 @@ public sealed class TdJsonTelegramService : ITelegramService
                 mime = ReadString(media, "mime_type", "application/octet-stream");
                 if (TelegramArchiveSetDetector.IsArchivePartFileName(name))
                     kind = TelegramMediaKind.ArchivePart;
+                else if (IsAudioDocument(name, mime))
+                    kind = TelegramMediaKind.Audio;
                 else if (IsPlayableDocument(name, mime))
                     kind = TelegramMediaKind.Document;
                 else
@@ -850,12 +856,29 @@ public sealed class TdJsonTelegramService : ITelegramService
             fileInfo.IsCompleted);
     }
 
+    private static bool IsAudioDocument(string name, string mime)
+    {
+        if (mime.StartsWith("audio/", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        var extension = Path.GetExtension(name);
+        return new[]
+        {
+            ".mka", ".mp3", ".flac", ".aac", ".ac3", ".eac3", ".dts",
+            ".dtshd", ".thd", ".truehd", ".m4a", ".ogg", ".opus", ".wav"
+        }.Contains(extension, StringComparer.OrdinalIgnoreCase);
+    }
+
     private static bool IsPlayableDocument(string name, string mime)
     {
-        if (mime.StartsWith("video/", StringComparison.OrdinalIgnoreCase) || mime.StartsWith("audio/", StringComparison.OrdinalIgnoreCase)) return true;
+        if (mime.StartsWith("video/", StringComparison.OrdinalIgnoreCase) || IsAudioDocument(name, mime))
+            return true;
+
         var extension = Path.GetExtension(name);
-        return new[] { ".mkv", ".mp4", ".m4v", ".webm", ".mov", ".avi", ".ts", ".m2ts", ".mpg", ".mpeg", ".mka", ".mp3", ".flac", ".aac", ".ac3", ".eac3", ".dts" }
-            .Contains(extension, StringComparer.OrdinalIgnoreCase);
+        return new[]
+        {
+            ".mkv", ".mp4", ".m4v", ".webm", ".mov", ".avi", ".ts", ".m2ts", ".mpg", ".mpeg"
+        }.Contains(extension, StringComparer.OrdinalIgnoreCase);
     }
 
     private async Task ReceiveLoopAsync(CancellationToken cancellationToken)

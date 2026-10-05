@@ -1,8 +1,10 @@
-﻿using System.Globalization;
+﻿using System.Collections.Concurrent;
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using AltyaziDB.Player.Core.Interfaces;
 using AltyaziDB.Player.Core.Models;
@@ -11,6 +13,8 @@ namespace AltyaziDB.Player.Sources;
 
 public sealed class RemoteSourceService : IRemoteSourceService
 {
+    private const string GoogleDriveBrowserUserAgent =
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36";
     private static readonly HashSet<string> VideoExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".mkv", ".mp4", ".avi", ".webm", ".mov", ".m4v", ".ts", ".m2ts", ".mts",
@@ -39,9 +43,16 @@ public sealed class RemoteSourceService : IRemoteSourceService
     private readonly StreamHostResolver _streamHostResolver;
     private readonly PixelDrainLinkResolver _pixelDrainLinkResolver;
     private readonly DirectStreamResolver _directStreamResolver;
+    private readonly AkiraBoxPublicLinkResolver _akiraBoxResolver;
+    private readonly GofilePublicLinkResolver _gofileResolver;
+    private readonly GoogleDriveRangeProxyServer _googleDriveProxy;
+    private readonly ConcurrentDictionary<string, Uri> _googleDriveMediaUris = new(StringComparer.Ordinal);
     private readonly CookieContainer? _cookies;
 
-    public RemoteSourceService(IAppLogger logger, HttpMessageHandler? handler = null)
+    public RemoteSourceService(
+        IAppLogger logger,
+        ISecretStore? secrets = null,
+        HttpMessageHandler? handler = null)
     {
         _logger = logger;
         HttpMessageHandler actualHandler;
@@ -70,6 +81,10 @@ public sealed class RemoteSourceService : IRemoteSourceService
         _streamHostResolver = new StreamHostResolver(_client, _logger, _cookies);
         _pixelDrainLinkResolver = new PixelDrainLinkResolver(_client);
         _directStreamResolver = new DirectStreamResolver(_client);
+        _akiraBoxResolver = new AkiraBoxPublicLinkResolver(_logger, secrets);
+        _gofileResolver = new GofilePublicLinkResolver(_logger, secrets);
+        _googleDriveProxy = new GoogleDriveRangeProxyServer(
+            (message, exception) => _logger.Error(message, exception));
     }
 
     public async Task<RemoteBrowseResult> ResolvePublicLinkAsync(string url, CancellationToken cancellationToken = default)
@@ -79,6 +94,8 @@ public sealed class RemoteSourceService : IRemoteSourceService
 
         if (trimmed.StartsWith("pcloud://", StringComparison.OrdinalIgnoreCase))
             return await BrowsePCloudAsync(trimmed, cancellationToken).ConfigureAwait(false);
+        if (trimmed.StartsWith("gofile://", StringComparison.OrdinalIgnoreCase))
+            return await _gofileResolver.ResolveAsync(trimmed, cancellationToken).ConfigureAwait(false);
         if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var uri) ||
             (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
             throw new InvalidOperationException("Geçerli bir HTTP veya HTTPS bağlantısı girin.");
@@ -90,9 +107,15 @@ public sealed class RemoteSourceService : IRemoteSourceService
             return await _webLinkResolver.ResolveAsync(uri, cancellationToken).ConfigureAwait(false);
         if (StreamHostResolver.IsSupported(uri))
             return await _streamHostResolver.ResolveAsync(uri, cancellationToken).ConfigureAwait(false);
+        if (AkiraBoxPublicLinkResolver.IsSupported(uri))
+            return await _akiraBoxResolver.ResolveAsync(uri, cancellationToken).ConfigureAwait(false);
+        if (GofilePublicLinkResolver.IsSupported(uri))
+            return await _gofileResolver.ResolveAsync(trimmed, cancellationToken).ConfigureAwait(false);
+        if (GofilePublicLinkResolver.IsDirectDownloadSupported(uri))
+            return await _gofileResolver.ResolveDirectDownloadAsync(uri, cancellationToken).ConfigureAwait(false);
         if (IsDropbox(host)) return ResolveDropbox(uri);
         if (IsPCloud(host)) return await BrowsePCloudAsync(trimmed, cancellationToken).ConfigureAwait(false);
-        if (IsGoogleDrive(host)) return ResolveGoogleDrive(uri);
+        if (IsGoogleDrive(host)) return await ResolveGoogleDriveAsync(uri, cancellationToken).ConfigureAwait(false);
         if (IsOneDrive(host)) return ResolveOneDrive(uri);
 
         return await _directStreamResolver.ResolveAsync(uri, cancellationToken).ConfigureAwait(false);
@@ -304,14 +327,481 @@ public sealed class RemoteSourceService : IRemoteSourceService
         throw new InvalidOperationException(lastError?.Message ?? "pCloud paylaşımı açılamadı.", lastError);
     }
 
-    private static RemoteBrowseResult ResolveGoogleDrive(Uri uri)
+    private async Task<RemoteBrowseResult> ResolveGoogleDriveAsync(
+        Uri shareUri,
+        CancellationToken cancellationToken)
     {
-        var id = ExtractGoogleDriveId(uri);
+        var id = ExtractGoogleDriveId(shareUri);
         if (string.IsNullOrWhiteSpace(id))
-            throw new InvalidOperationException("Google Drive dosya kimliği bağlantıdan çıkarılamadı. Yalnız herkese açık dosya bağlantıları desteklenir.");
-        var direct = $"https://drive.usercontent.google.com/download?id={Uri.EscapeDataString(id)}&export=download&confirm=t";
-        var name = FileNameFromUri(uri, "Google Drive dosyası");
-        return DirectResult(RemoteSourceProvider.GoogleDrive, name, direct, "Google Drive herkese açık dosya bağlantısı hazır.");
+            throw new InvalidOperationException(
+                "Google Drive dosya kimliği bağlantıdan çıkarılamadı. Yalnız herkese açık dosya bağlantıları desteklenir.");
+
+        // Google Drive'ın public indirme uç noktası büyük medya dosyalarında
+        // bazen HTML onay/kota sayfası döndürebiliyor. Eski yol bu HTML adresini
+        // doğrudan libmpv'ye veriyor ve sonuç 'unrecognized file format' oluyordu.
+        // Akışı önce Range isteğiyle doğrula; yalnız gerçek medya byte'ı dönen
+        // adresi oynatıcıya geçir.
+        var escapedId = Uri.EscapeDataString(id);
+        var candidates = new List<Uri>(3);
+
+        // If the user pasted Google's own short-lived "Download anyway" URL,
+        // preserve it exactly instead of throwing away uuid/at/confirm and
+        // rebuilding a weaker anonymous URL from only the file id.
+        if (IsGoogleDownloadHost(shareUri.Host) && HasGoogleDriveConfirmationToken(shareUri))
+            candidates.Add(shareUri);
+
+        // Start from Google's stable public download page, then resolve the
+        // "Download anyway" confirmation form into its short-lived tokenized URL.
+        candidates.Add(new Uri($"https://drive.usercontent.google.com/download?id={escapedId}&export=download&authuser=0"));
+
+        // Keep the legacy public endpoint as a fallback; it commonly redirects
+        // to the same usercontent confirmation flow.
+        candidates.Add(new Uri($"https://drive.google.com/uc?export=download&id={escapedId}"));
+
+        Exception? lastFailure = null;
+        foreach (var candidate in candidates)
+        {
+            try
+            {
+                var resolvedCandidate = await ResolveGoogleDriveConfirmationUrlAsync(
+                        candidate,
+                        cancellationToken)
+                    .ConfigureAwait(false)
+                    ?? candidate;
+
+                // The uuid/at URL produced by Google's "Download anyway" form is
+                // short-lived and may be invalidated/rotated after the first GET.
+                // Do not consume it with a preflight Range request and then hand
+                // the same token to libmpv. The confirmation page itself is our
+                // validation boundary; let libmpv make the first media request.
+                var hasConfirmationToken = HasGoogleDriveConfirmationToken(resolvedCandidate);
+                RemoteOpenRequest direct;
+                if (hasConfirmationToken)
+                {
+                    var initialTokenUri = resolvedCandidate;
+                    var proxyUrl = _googleDriveProxy.Register(
+                        "google-drive-media.mkv",
+                        (rangeHeader, token) => OpenGoogleDriveUpstreamAsync(
+                            id,
+                            initialTokenUri,
+                            rangeHeader,
+                            token));
+                    direct = new RemoteOpenRequest(
+                        proxyUrl,
+                        "Google Drive dosyası",
+                        null,
+                        "Google Drive",
+                        shareUri.ToString());
+                    _logger.Info("Google Drive confirmation token resolved; playback routed through session-preserving localhost range proxy.");
+                }
+                else
+                {
+                    var validated = await _directStreamResolver
+                        .ResolveAsync(resolvedCandidate, cancellationToken)
+                        .ConfigureAwait(false);
+                    direct = validated.DirectOpen
+                        ?? throw new InvalidOperationException("Google Drive medya adresi oluşturulamadı.");
+                }
+
+                var finalUri = new Uri(direct.Source, UriKind.Absolute);
+
+                var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                if (direct.HttpHeaders is not null)
+                {
+                    foreach (var pair in direct.HttpHeaders)
+                        headers[pair.Key] = pair.Value;
+                }
+
+                if (IsGoogleDownloadHost(finalUri.Host))
+                {
+                    headers["Referer"] = "https://drive.google.com/";
+
+                    // Direct Google handoff still keeps cookies when no localhost
+                    // proxy is required. Tokenized confirmation downloads use the
+                    // proxy so HttpClient owns the whole Google session.
+                    if (_cookies is not null)
+                    {
+                        var cookieHeader = _cookies.GetCookieHeader(finalUri);
+                        if (!string.IsNullOrWhiteSpace(cookieHeader))
+                            headers["Cookie"] = cookieHeader;
+                    }
+                }
+
+                var displayName = direct.DisplayName;
+                if (string.IsNullOrWhiteSpace(displayName) ||
+                    displayName.Equals("download", StringComparison.OrdinalIgnoreCase) ||
+                    displayName.Equals("uc", StringComparison.OrdinalIgnoreCase))
+                {
+                    displayName = "Google Drive dosyası";
+                }
+
+                return new RemoteBrowseResult(
+                    RemoteSourceProvider.GoogleDrive,
+                    displayName,
+                    null,
+                    [],
+                    new RemoteOpenRequest(
+                        direct.Source,
+                        displayName,
+                        headers,
+                        "Google Drive",
+                        shareUri.ToString()),
+                    StatusMessage: "Google Drive medya akışı doğrulandı.");
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                lastFailure = exception;
+                _logger.Warning($"Google Drive indirme adresi doğrulanamadı ({candidate.Host}): {exception.Message}");
+            }
+        }
+
+        throw new InvalidOperationException(
+            "Google Drive bağlantısı gerçek bir medya akışı döndürmedi. Dosyanın 'Bağlantıya sahip herkes' erişiminde olduğundan, indirmeye izin verildiğinden ve Drive indirme kotasının dolmadığından emin olun.",
+            lastFailure);
+    }
+
+    private async Task<HttpResponseMessage> OpenGoogleDriveUpstreamAsync(
+        string id,
+        Uri? initialTokenUri,
+        string? rangeHeader,
+        CancellationToken cancellationToken)
+    {
+        if (_googleDriveMediaUris.TryGetValue(id, out var cachedMediaUri))
+        {
+            var cachedResponse = await SendGoogleDriveMediaRequestAsync(
+                    cachedMediaUri,
+                    rangeHeader,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            if (IsGoogleDriveMediaResponse(cachedResponse))
+            {
+                _logger.Info(
+                    $"Google Drive proxy cached media URL ready: HTTP {(int)cachedResponse.StatusCode} · range={(string.IsNullOrWhiteSpace(rangeHeader) ? "none" : "yes")}");
+                return cachedResponse;
+            }
+
+            cachedResponse.Dispose();
+            _googleDriveMediaUris.TryRemove(id, out _);
+        }
+
+        var escapedId = Uri.EscapeDataString(id);
+        var candidates = new List<Uri>(3);
+        if (initialTokenUri is not null &&
+            IsGoogleDownloadHost(initialTokenUri.Host) &&
+            HasGoogleDriveConfirmationToken(initialTokenUri))
+        {
+            candidates.Add(initialTokenUri);
+        }
+
+        candidates.Add(new Uri($"https://drive.usercontent.google.com/download?id={escapedId}&export=download&authuser=0"));
+        candidates.Add(new Uri($"https://drive.google.com/uc?export=download&id={escapedId}"));
+
+        Exception? lastFailure = null;
+        foreach (var candidate in candidates)
+        {
+            try
+            {
+                var resolved = HasGoogleDriveConfirmationToken(candidate)
+                    ? candidate
+                    : await ResolveGoogleDriveConfirmationUrlAsync(
+                            candidate,
+                            cancellationToken)
+                        .ConfigureAwait(false)
+                        ?? candidate;
+
+                var response = await SendGoogleDriveMediaRequestAsync(
+                        resolved,
+                        rangeHeader,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (!IsGoogleDriveMediaResponse(response) && !string.IsNullOrWhiteSpace(rangeHeader))
+                {
+                    // Current Drive confirmation URLs can answer Range requests
+                    // with the HTML warning page even though the exact same token
+                    // returns the media on a normal GET. Retry once without Range;
+                    // the localhost proxy can synthesize the requested range from
+                    // this response, while the final redirected media URL is cached
+                    // for subsequent native byte-range requests.
+                    response.Dispose();
+                    response = await SendGoogleDriveMediaRequestAsync(
+                            resolved,
+                            null,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                    if (IsGoogleDriveMediaResponse(response))
+                    {
+                        _logger.Info("Google Drive token rejected Range; full media GET fallback accepted.");
+                    }
+                }
+
+                if (!IsGoogleDriveMediaResponse(response))
+                {
+                    var mediaType = response.Content.Headers.ContentType?.MediaType ?? string.Empty;
+                    lastFailure = new InvalidOperationException(
+                        $"Google Drive upstream HTTP {(int)response.StatusCode} ({mediaType}).");
+                    response.Dispose();
+                    continue;
+                }
+
+                var finalUri = response.RequestMessage?.RequestUri;
+                if (finalUri is not null && IsGoogleDownloadHost(finalUri.Host))
+                    _googleDriveMediaUris[id] = finalUri;
+
+                _logger.Info(
+                    $"Google Drive proxy upstream ready: HTTP {(int)response.StatusCode} · range={(string.IsNullOrWhiteSpace(rangeHeader) ? "none" : "yes")}");
+                return response;
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                lastFailure = exception;
+                _logger.Warning($"Google Drive proxy upstream failed ({candidate.Host}): {exception.Message}");
+            }
+        }
+
+        throw new InvalidOperationException(
+            "Google Drive proxy gerçek medya byte akışını oluşturamadı.",
+            lastFailure);
+    }
+
+    private async Task<HttpResponseMessage> SendGoogleDriveMediaRequestAsync(
+        Uri uri,
+        string? rangeHeader,
+        CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+        request.Headers.TryAddWithoutValidation("User-Agent", GoogleDriveBrowserUserAgent);
+        request.Headers.Accept.ParseAdd("application/octet-stream,*/*;q=0.8");
+        request.Headers.Referrer = new Uri("https://drive.google.com/");
+        request.Headers.TryAddWithoutValidation("Accept-Encoding", "identity");
+        if (!string.IsNullOrWhiteSpace(rangeHeader))
+            request.Headers.TryAddWithoutValidation("Range", rangeHeader);
+
+        return await _client.SendAsync(
+                request,
+                HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private static bool IsGoogleDriveMediaResponse(HttpResponseMessage response)
+    {
+        if (!response.IsSuccessStatusCode)
+            return false;
+
+        var mediaType = response.Content.Headers.ContentType?.MediaType ?? string.Empty;
+        return !mediaType.Contains("html", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task<Uri?> ResolveGoogleDriveConfirmationUrlAsync(
+        Uri candidate,
+        CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, candidate);
+        request.Headers.TryAddWithoutValidation("User-Agent", GoogleDriveBrowserUserAgent);
+        request.Headers.Accept.ParseAdd(
+            "text/html,application/xhtml+xml,application/octet-stream;q=0.9,*/*;q=0.5");
+        // Fetch the virus-scan / "Download anyway" interstitial exactly like a
+        // browser navigation. Google currently includes short-lived fields such
+        // as uuid/at only in this normal GET flow; a Range request can yield an
+        // incomplete confirmation page whose retry still returns HTML.
+        request.Headers.Referrer = new Uri("https://drive.google.com/");
+
+        using var response = await _client.SendAsync(
+                request,
+                HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        if (!response.IsSuccessStatusCode)
+            return null;
+
+        var finalUri = response.RequestMessage?.RequestUri ?? candidate;
+        var mediaType = response.Content.Headers.ContentType?.MediaType ?? string.Empty;
+
+        // If Google already returned a proper byte-range response, there is no
+        // confirmation page to parse. The normal direct-stream validator will
+        // perform the final media check.
+        var range = response.Content.Headers.ContentRange;
+        if (response.StatusCode == HttpStatusCode.PartialContent &&
+            range is not null &&
+            string.Equals(range.Unit, "bytes", StringComparison.OrdinalIgnoreCase) &&
+            range.From == 0 &&
+            !mediaType.Contains("html", StringComparison.OrdinalIgnoreCase))
+        {
+            return finalUri;
+        }
+
+        var html = await ReadGoogleDriveResponsePrefixAsync(
+                response.Content,
+                256 * 1024,
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (!LooksLikeHtml(html, mediaType))
+            return finalUri;
+
+        var confirmed = TryExtractGoogleDriveDownloadUri(html, finalUri);
+        if (confirmed is not null)
+        {
+            _logger.Info("Google Drive confirmation URL resolved for public media playback.");
+            return confirmed;
+        }
+
+        return finalUri;
+    }
+
+    private static async Task<string> ReadGoogleDriveResponsePrefixAsync(
+        HttpContent content,
+        int maximumBytes,
+        CancellationToken cancellationToken)
+    {
+        await using var stream = await content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        using var buffer = new MemoryStream();
+        var chunk = new byte[8192];
+
+        while (buffer.Length < maximumBytes)
+        {
+            var remaining = maximumBytes - (int)buffer.Length;
+            var read = await stream.ReadAsync(
+                    chunk.AsMemory(0, Math.Min(chunk.Length, remaining)),
+                    cancellationToken)
+                .ConfigureAwait(false);
+            if (read <= 0)
+                break;
+            buffer.Write(chunk, 0, read);
+        }
+
+        return Encoding.UTF8.GetString(buffer.ToArray());
+    }
+
+    private static bool LooksLikeHtml(string body, string mediaType)
+    {
+        if (mediaType.Contains("html", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        var trimmed = body.TrimStart('\uFEFF', ' ', '\t', '\r', '\n');
+        return trimmed.StartsWith("<!doctype html", StringComparison.OrdinalIgnoreCase) ||
+               trimmed.StartsWith("<html", StringComparison.OrdinalIgnoreCase) ||
+               trimmed.StartsWith("<head", StringComparison.OrdinalIgnoreCase) ||
+               trimmed.StartsWith("<body", StringComparison.OrdinalIgnoreCase) ||
+               trimmed.Contains("<form", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private Uri? TryExtractGoogleDriveDownloadUri(string html, Uri baseUri)
+    {
+        foreach (Match form in Regex.Matches(
+                     html,
+                     @"<form\b(?<attrs>[^>]*)>(?<body>.*?)</form\s*>",
+                     RegexOptions.IgnoreCase | RegexOptions.Singleline))
+        {
+            var action = ReadHtmlAttribute(form.Groups["attrs"].Value, "action");
+            if (string.IsNullOrWhiteSpace(action))
+                continue;
+
+            if (!Uri.TryCreate(baseUri, action, out var actionUri) ||
+                !IsGoogleDownloadHost(actionUri.Host))
+                continue;
+
+            var values = ParseHtmlInputValues(form.Groups["body"].Value);
+            if (!values.ContainsKey("id") && !values.ContainsKey("uuid"))
+                continue;
+
+            if (!values.ContainsKey("at"))
+            {
+                var pageAt = TryExtractGoogleDriveAtToken(html);
+                if (!string.IsNullOrWhiteSpace(pageAt))
+                    values["at"] = pageAt;
+            }
+
+            _logger.Info(
+                "Google Drive confirmation fields: " +
+                string.Join(",", values.Keys.OrderBy(value => value, StringComparer.OrdinalIgnoreCase)));
+
+            var builder = new UriBuilder(actionUri);
+            var query = ParseQuery(builder.Query);
+            foreach (var pair in values)
+                query[pair.Key] = pair.Value;
+            builder.Query = BuildQuery(query);
+
+            _logger.Info(
+                "Google Drive resolved query fields: " +
+                string.Join(",", query.Keys.OrderBy(value => value, StringComparer.OrdinalIgnoreCase)));
+            return builder.Uri;
+        }
+
+        // Some Drive responses expose the final URL as a normal anchor instead
+        // of a form. Keep this as a conservative fallback.
+        foreach (Match anchor in Regex.Matches(
+                     html,
+                     @"<a\b(?<attrs>[^>]*)>",
+                     RegexOptions.IgnoreCase | RegexOptions.Singleline))
+        {
+            var href = ReadHtmlAttribute(anchor.Groups["attrs"].Value, "href");
+            if (string.IsNullOrWhiteSpace(href) ||
+                !Uri.TryCreate(baseUri, href, out var hrefUri) ||
+                !IsGoogleDownloadHost(hrefUri.Host))
+                continue;
+
+            if (hrefUri.AbsolutePath.Contains("/download", StringComparison.OrdinalIgnoreCase))
+                return hrefUri;
+        }
+
+        return null;
+    }
+
+    private static string? TryExtractGoogleDriveAtToken(string html)
+    {
+        var patterns = new[]
+        {
+            @"\bname\s*=\s*[""']at[""'][^>]*\bvalue\s*=\s*[""'](?<value>[^""']+)[""']",
+            @"(?:[?&]|&amp;)at=(?<value>[^&""'<>\s]+)",
+            @"""at""\s*:\s*""(?<value>[^""]+)"""
+        };
+
+        foreach (var pattern in patterns)
+        {
+            var match = Regex.Match(
+                html,
+                pattern,
+                RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            if (!match.Success)
+                continue;
+
+            var value = WebUtility.HtmlDecode(match.Groups["value"].Value);
+            if (!string.IsNullOrWhiteSpace(value))
+                return value;
+        }
+
+        return null;
+    }
+
+    private static Dictionary<string, string> ParseHtmlInputValues(string formBody)
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (Match input in Regex.Matches(
+                     formBody,
+                     @"<input\b(?<attrs>[^>]*)>",
+                     RegexOptions.IgnoreCase | RegexOptions.Singleline))
+        {
+            var attributes = input.Groups["attrs"].Value;
+            var name = ReadHtmlAttribute(attributes, "name");
+            if (string.IsNullOrWhiteSpace(name))
+                continue;
+
+            var value = ReadHtmlAttribute(attributes, "value") ?? string.Empty;
+            result[name] = value;
+        }
+
+        return result;
+    }
+
+    private static string? ReadHtmlAttribute(string attributes, string name)
+    {
+        var pattern = $@"\b{Regex.Escape(name)}\s*=\s*(?:""(?<value>[^""]*)""|'(?<value>[^']*)'|(?<value>[^\s>]+))";
+        var match = Regex.Match(attributes, pattern, RegexOptions.IgnoreCase | RegexOptions.Singleline);
+        return match.Success
+            ? WebUtility.HtmlDecode(match.Groups["value"].Value)
+            : null;
     }
 
     private static RemoteBrowseResult ResolveOneDrive(Uri uri)
@@ -433,6 +923,8 @@ public sealed class RemoteSourceService : IRemoteSourceService
         RemoteSourceProvider.OkRu => "OK.ru",
         RemoteSourceProvider.Vk => "VK Video",
         RemoteSourceProvider.PixelDrain => "PixelDrain",
+        RemoteSourceProvider.AkiraBox => "AkiraBox",
+        RemoteSourceProvider.Gofile => "Gofile",
         RemoteSourceProvider.WebDav => "WebDAV",
         _ => "Bağlantı"
     };
@@ -490,7 +982,20 @@ public sealed class RemoteSourceService : IRemoteSourceService
 
     private static bool IsDropbox(string host) => host.EndsWith("dropbox.com", StringComparison.OrdinalIgnoreCase) || host.EndsWith("dropboxusercontent.com", StringComparison.OrdinalIgnoreCase);
     private static bool IsPCloud(string host) => host.Equals("pc.cd", StringComparison.OrdinalIgnoreCase) || host.EndsWith("pcloud.link", StringComparison.OrdinalIgnoreCase) || host.EndsWith("pcloud.com", StringComparison.OrdinalIgnoreCase);
-    private static bool IsGoogleDrive(string host) => host.Equals("drive.google.com", StringComparison.OrdinalIgnoreCase) || host.Equals("docs.google.com", StringComparison.OrdinalIgnoreCase);
+    private static bool IsGoogleDrive(string host) =>
+        host.Equals("drive.google.com", StringComparison.OrdinalIgnoreCase) ||
+        host.Equals("docs.google.com", StringComparison.OrdinalIgnoreCase) ||
+        host.Equals("drive.usercontent.google.com", StringComparison.OrdinalIgnoreCase);
+    private static bool IsGoogleDownloadHost(string host) =>
+        host.Equals("drive.google.com", StringComparison.OrdinalIgnoreCase) ||
+        host.Equals("drive.usercontent.google.com", StringComparison.OrdinalIgnoreCase) ||
+        host.EndsWith(".googleusercontent.com", StringComparison.OrdinalIgnoreCase);
+
+    private static bool HasGoogleDriveConfirmationToken(Uri uri)
+    {
+        var query = ParseQuery(uri.Query);
+        return query.ContainsKey("uuid") || query.ContainsKey("at");
+    }
     private static bool IsOneDrive(string host) => host.Equals("1drv.ms", StringComparison.OrdinalIgnoreCase) || host.Contains("onedrive", StringComparison.OrdinalIgnoreCase) || host.EndsWith("sharepoint.com", StringComparison.OrdinalIgnoreCase);
 
     private static string? ExtractGoogleDriveId(Uri uri)
@@ -583,5 +1088,11 @@ public sealed class RemoteSourceService : IRemoteSourceService
         long? Size,
         DateTimeOffset? ModifiedUtc);
 
-    public void Dispose() => _client.Dispose();
+    public void Dispose()
+    {
+        _akiraBoxResolver.Dispose();
+        _gofileResolver.Dispose();
+        _googleDriveProxy.Dispose();
+        _client.Dispose();
+    }
 }

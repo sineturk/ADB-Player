@@ -792,7 +792,8 @@ public sealed class TelegramPanelViewModel : ObservableObject, IAsyncDisposable
     }
 
     private static bool IsAudioFile(string fileName) => Path.GetExtension(fileName).ToLowerInvariant() is
-        ".mka" or ".mp3" or ".flac" or ".aac" or ".ac3" or ".eac3" or ".dts" or ".opus" or ".ogg";
+        ".mka" or ".mp3" or ".flac" or ".aac" or ".ac3" or ".eac3" or ".dts" or
+        ".dtshd" or ".thd" or ".truehd" or ".m4a" or ".opus" or ".ogg" or ".wav";
 
     private async Task LogoutAsync()
     {

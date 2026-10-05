@@ -15,16 +15,16 @@ function Need([string]$Relative, [string]$Needle = "") {
     }
 }
 
-if ($version -ne "1.0.0.0") { throw "Expected public source version 1.0.0.0; got $version" }
+if ($version -ne "1.0.1.0") { throw "Expected public source version 1.0.1.0; got $version" }
 
 Need "README.md" "# ADB Player"
 Need "README_TR.md" "# ADB Player"
-Need "CHANGELOG.md" "## 1.0.0"
+Need "CHANGELOG.md" "## 1.0.1"
 Need "PRIVACY.md"
 Need "SECURITY.md"
 Need "LICENSE"
 Need "THIRD_PARTY_NOTICES.md"
-Need "RELEASE_NOTES_v1.0.0.md"
+Need "RELEASE_NOTES_v1.0.1.md"
 Need "Directory.Build.props" "<Product>ADB Player</Product>"
 
 foreach ($forbidden in @(
@@ -64,6 +64,13 @@ if ((Test-Path -LiteralPath $docsPath) -and
 }
 
 foreach ($verifier in @(
+    "verify-v1.0.1-hotfix.ps1",
+    "verify-v1.0.1-updater-ready.ps1",
+    "verify-v1.0.1-telegram-audio.ps1",
+    "verify-v1.0.1-google-drive.ps1",
+    "verify-v1.0.1-gofile.ps1",
+    "verify-v1.0.1-akirabox.ps1",
+    "verify-v1.0.1-settings-freeze.ps1",
     "verify-player-ux-final-polish.ps1",
     "verify-subtitle-sync-safe-apply.ps1",
     "verify-subtitle-sync-v2.ps1"

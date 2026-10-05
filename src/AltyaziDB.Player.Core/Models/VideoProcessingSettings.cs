@@ -9,7 +9,9 @@ public sealed record VideoProcessingSettings(
     double DebandGrain,
     string ToneMapping,
     string GamutMappingMode,
-    bool TargetColorspaceHint = true,
+    string TargetColorspaceHint = "auto",
     string TargetColorspaceHintMode = "target",
     string TargetTrc = "auto",
-    string TargetPeak = "auto");
+    string TargetPeak = "auto",
+    string D3D11OutputColorSpace = "auto",
+    string D3D11OutputFormat = "auto");

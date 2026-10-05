@@ -6,7 +6,7 @@
     [string]$InstallerBaseUrl = "",
     [string]$PortableBaseUrl = "",
     [ValidateSet("stable", "preview")][string]$Channel = "stable",
-    [string]$ReleaseNotes = "ADB Player V1.0 Windows public release."
+    [string]$ReleaseNotes = "ADB Player V1.0.1 fullscreen, controls, HDR and secure updater hotfix."
 )
 
 . "$PSScriptRoot\common.ps1"

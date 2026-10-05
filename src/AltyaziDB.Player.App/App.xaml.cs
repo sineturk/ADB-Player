@@ -56,12 +56,12 @@ public partial class App : System.Windows.Application
         var audioSync = new FfmpegAudioSyncService(logger);
         var subtitles = new AltyaziDbSubtitleService(logger);
         var subtitleSync = new FfsubsyncSubtitleSyncService(logger);
-        var sources = new RemoteSourceService(logger);
+        var secrets = new DpapiSecretStore(paths, logger);
+        var sources = new RemoteSourceService(logger, secrets);
         var telegram = new TdJsonTelegramService(logger);
         var torrent = new MonoTorrentStreamingService(logger);
         var updates = new HttpUpdateService(logger);
         _updateServiceDisposable = updates;
-        var secrets = new DpapiSecretStore(paths, logger);
         var cloudAccount = new NeonCloudAccountService(secrets, logger);
         _cloudAccountDisposable = cloudAccount;
         var metadata = new AltyaziDbPlayerMetadataService(cloudAccount, logger);

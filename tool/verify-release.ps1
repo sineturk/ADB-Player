@@ -20,7 +20,7 @@ foreach ($required in @(
     (Join-Path $portableDir "SECURITY.md"),
     (Join-Path $portableDir "THIRD_PARTY_NOTICES.md"),
     (Join-Path $portableDir "LICENSE"),
-    (Join-Path $portableDir "RELEASE_NOTES_v1.0.0.md"),
+    (Join-Path $portableDir "RELEASE_NOTES_v1.0.1.md"),
     $portableZip
 )) {
     if (-not (Test-Path -LiteralPath $required)) { $errors.Add("Eksik: $required") }

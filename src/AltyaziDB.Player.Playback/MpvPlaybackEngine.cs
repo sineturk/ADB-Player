@@ -387,7 +387,22 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine
         EnsureInitialized();
         ArgumentNullException.ThrowIfNull(settings);
 
-        SetPropertyString("target-colorspace-hint", settings.TargetColorspaceHint ? "auto" : "no");
+        var colorspaceHint = settings.TargetColorspaceHint?.Trim().ToLowerInvariant();
+        if (colorspaceHint is not ("auto" or "yes" or "no")) colorspaceHint = "auto";
+
+        var outputCsp = settings.D3D11OutputColorSpace?.Trim().ToLowerInvariant();
+        if (outputCsp is not ("auto" or "srgb" or "linear" or "pq" or "bt.2020")) outputCsp = "auto";
+
+        var outputFormat = settings.D3D11OutputFormat?.Trim().ToLowerInvariant();
+        if (outputFormat is not ("auto" or "rgba8" or "bgra8" or "rgb10_a2" or "rgba16f")) outputFormat = "auto";
+
+        // gpu-next/D3D11 uses these swap-chain hints to negotiate SDR/HDR with
+        // Windows. Keep the swap-chain CSP/format on auto for normal profiles;
+        // target-colorspace-hint + target-* metadata drives HDR/SDR intent while
+        // mpv/libplacebo respects the actual desktop/display capabilities.
+        SetPropertyString("d3d11-output-csp", outputCsp);
+        SetPropertyString("d3d11-output-format", outputFormat);
+        SetPropertyString("target-colorspace-hint", colorspaceHint);
         SetPropertyString("target-colorspace-hint-mode", string.IsNullOrWhiteSpace(settings.TargetColorspaceHintMode) ? "target" : settings.TargetColorspaceHintMode);
         SetPropertyString("target-trc", string.IsNullOrWhiteSpace(settings.TargetTrc) ? "auto" : settings.TargetTrc);
         SetPropertyString("target-peak", string.IsNullOrWhiteSpace(settings.TargetPeak) ? "auto" : settings.TargetPeak);
@@ -404,7 +419,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine
         }
 
         _logger.Info(
-            $"Video profili uygulandı: {settings.ProfileCode} · deband={(settings.DebandEnabled ? "on" : "off")} · tone={settings.ToneMapping}");
+            $"Video profili uygulandı: {settings.ProfileCode} · deband={(settings.DebandEnabled ? "on" : "off")} · tone={settings.ToneMapping} · target={colorspaceHint}/{settings.TargetTrc} · d3d11={outputCsp}/{outputFormat}");
     }
 
     public void SetVideoEqualizer(double brightness, double contrast, double saturation, double gamma)

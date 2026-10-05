@@ -16,6 +16,7 @@ V1.0; yerel oynatma, kullanıcının kendi bağladığı kaynaklar, altyazılar,
 - Güven ve Safe Apply Gate katmanlarıyla harici ses ve altyazı senkronu.
 - Türkçe ve İngilizce arayüz.
 - Installer ve portable Windows x64 dağıtımları.
+- Resmî stable GitHub akışı üzerinden HTTPS + SHA-256 doğrulamalı uygulama içi güncelleme.
 
 ADB Player; hazır medya kataloğu, torrent indexer'ı, telifli medya, üçüncü taraf hesap kimliği veya önceden tanımlı içerik kaynağı **sunmaz**. Kullanıcı bağladığı hizmet ve içeriklerden sorumludur.
 
@@ -30,8 +31,8 @@ ADB Player; hazır medya kataloğu, torrent indexer'ı, telifli medya, üçünc�
 
 Public sürümde şu çıktılar yayınlanır:
 
-- `ADB-Player-Setup-v1.0.0.0-x64.exe`
-- `ADB-Player-Portable-v1.0.0.0-x64.zip`
+- `ADB-Player-Setup-v1.0.1.0-x64.exe`
+- `ADB-Player-Portable-v1.0.1.0-x64.zip`
 - `SHA256SUMS.txt`
 
 Kurulumdan önce SHA-256 değerlerini doğrulayın. Kod imzalı bir paket yayınlandıysa Windows imzasının da geçerli olması gerekir.
@@ -96,4 +97,4 @@ V1.0 public kaynak snapshot'ı ürün kaynak kodunu ve ADB Player'ı incelemek/d
 
 ## Sürüm
 
-[ADB Player V1.0 sürüm notları](RELEASE_NOTES_v1.0.0.md).
+[ADB Player V1.0.1 sürüm notları](RELEASE_NOTES_v1.0.1.md).

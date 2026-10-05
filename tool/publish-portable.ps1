@@ -94,7 +94,7 @@ Copy-Item "$root\README_PUBLIC.md" "$output\README.md" -Force
 Copy-Item "$root\README_PUBLIC_TR.md" "$output\README_TR.md" -Force
 Copy-Item "$root\PRIVACY.md" "$output\PRIVACY.md" -Force
 Copy-Item "$root\SECURITY.md" "$output\SECURITY.md" -Force
-Copy-Item "$root\RELEASE_NOTES_v1.0.0.md" "$output\RELEASE_NOTES_v1.0.0.md" -Force
+Copy-Item "$root\RELEASE_NOTES_v1.0.1.md" "$output\RELEASE_NOTES_v1.0.1.md" -Force
 Copy-Item "$root\THIRD_PARTY_NOTICES.md" "$output\THIRD_PARTY_NOTICES.md" -Force
 Copy-Item "$root\LICENSE" "$output\LICENSE" -Force
 Copy-Item "$root\LICENSE_GPL-3.0.txt" "$output\LICENSE_GPL-3.0.txt" -Force

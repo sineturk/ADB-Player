@@ -67,7 +67,33 @@
               <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE896;" FontFamily="Segoe MDL2 Assets" FontSize="18" Width="33"/><TextBlock Text="{DynamicResource Tab.Torrent}" VerticalAlignment="Center"/></StackPanel>
             </Button>
             <Button x:Name="NavUpdate" Tag="9" Click="Navigate_Click" Style="{StaticResource R23NavButton}" AutomationProperties.Name="Updates">
-              <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE777;" FontFamily="Segoe MDL2 Assets" FontSize="18" Width="33"/><TextBlock Text="{DynamicResource Tab.Update}" VerticalAlignment="Center"/></StackPanel>
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="33"/>
+                  <ColumnDefinition Width="*"/>
+                  <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="&#xE777;" FontFamily="Segoe MDL2 Assets" FontSize="18"/>
+                <TextBlock Grid.Column="1" Text="{DynamicResource Tab.Update}" VerticalAlignment="Center"/>
+                <Border Grid.Column="2"
+                        Width="8"
+                        Height="8"
+                        Margin="10,0,2,0"
+                        VerticalAlignment="Center"
+                        Background="{StaticResource R23CyanBrush}"
+                        CornerRadius="4">
+                  <Border.Style>
+                    <Style TargetType="Border">
+                      <Setter Property="Visibility" Value="Collapsed"/>
+                      <Style.Triggers>
+                        <DataTrigger Binding="{Binding Updates.HasUpdateBadge}" Value="True">
+                          <Setter Property="Visibility" Value="Visible"/>
+                        </DataTrigger>
+                      </Style.Triggers>
+                    </Style>
+                  </Border.Style>
+                </Border>
+              </Grid>
             </Button>
             <Button x:Name="NavSettings" Tag="10" Click="Navigate_Click" Style="{StaticResource R23NavButton}" AutomationProperties.Name="Settings">
               <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="18" Width="33"/><TextBlock Text="{DynamicResource Tab.Settings}" VerticalAlignment="Center"/></StackPanel>

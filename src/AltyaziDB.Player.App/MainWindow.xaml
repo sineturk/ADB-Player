@@ -16,6 +16,8 @@
         Drop="Window_OnDrop"
         DragOver="Window_OnDragOver"
         PreviewKeyDown="Window_OnKeyDown"
+        PreviewMouseMove="Window_OnPreviewMouseMove"
+        SizeChanged="Window_OnSizeChanged"
         Background="#05080D"
         UseLayoutRounding="True">
 
@@ -529,7 +531,7 @@
       </Grid>
     </Border>
 
-    <Grid Grid.Row="1" Margin="16,14,16,0">
+    <Grid x:Name="PlayerContentGrid" Grid.Row="1" Margin="16,14,16,0">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="*" />
         <ColumnDefinition x:Name="MediaCenterToggleColumn" Width="30" />
@@ -1286,13 +1288,13 @@
                 <StackPanel Margin="4">
                   <Border Padding="10" Background="#172B43" CornerRadius="8"><TextBlock Text="{Binding CurrentVersionText}" FontSize="15" FontWeight="SemiBold"/></Border>
                   <TextBlock Margin="3,12,3,4" Text="{DynamicResource Panel.UpdateChannel}" Foreground="{StaticResource MutedTextBrush}"/>
-                  <ComboBox ItemsSource="{Binding Channels}" SelectedItem="{Binding SelectedChannel, Mode=TwoWay}" IsEnabled="{Binding CanChangeUpdateSettings}">
+                  <ComboBox ItemsSource="{Binding Channels}" SelectedItem="{Binding SelectedChannel, Mode=TwoWay}" IsEnabled="{Binding CanChangeUpdateChannel}">
                     <ComboBox.ItemTemplate>
                       <DataTemplate><TextBlock Text="{Binding Converter={StaticResource UpdateChannelTextConverter}}"/></DataTemplate>
                     </ComboBox.ItemTemplate>
                   </ComboBox>
                   <CheckBox Content="{DynamicResource Panel.CheckOnStartup}" IsChecked="{Binding CheckOnStartup, Mode=TwoWay}" IsEnabled="{Binding CanChangeUpdateSettings}"/>
-                  <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,7,0,0"><Button Content="{DynamicResource Action.CheckUpdate}" Style="{StaticResource PrimaryButtonStyle}" Command="{Binding CheckCommand}"/><Button Content="{DynamicResource Action.DownloadInstall}" Command="{Binding DownloadAndInstallCommand}" IsEnabled="{Binding IsUpdateAvailable}"/></StackPanel>
+                  <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,7,0,0"><Button Content="{DynamicResource Action.CheckUpdate}" Style="{StaticResource PrimaryButtonStyle}" Command="{Binding CheckCommand}"/><Button Content="{Binding UpdateActionText}" Command="{Binding DownloadAndInstallCommand}" IsEnabled="{Binding IsUpdateAvailable}"/></StackPanel>
                   <ProgressBar Height="7" Margin="3,8" Minimum="0" Maximum="100" Value="{Binding DownloadProgress, Mode=OneWay}">
                     <ProgressBar.Style>
                       <Style TargetType="ProgressBar">
@@ -1565,6 +1567,91 @@
             </StackPanel>
           </Border>
         </Grid>
+
+        <!-- v1.0.1: native HwndHost video cannot be covered reliably by an in-tree WPF overlay.
+             Popup owns a separate HWND, so the fullscreen transport stays visible above libmpv. -->
+        <Popup x:Name="FullscreenControlsPopup"
+               PlacementTarget="{Binding ElementName=VideoBorder}"
+               Placement="Relative"
+               AllowsTransparency="True"
+               StaysOpen="True"
+               PopupAnimation="Fade"
+               Focusable="False"
+               IsOpen="False">
+          <Border x:Name="FullscreenControlPanel"
+                  Height="112"
+                  Padding="16,10"
+                  Background="#F20A1119"
+                  BorderBrush="#345F77"
+                  BorderThickness="1"
+                  CornerRadius="16"
+                  MouseMove="FullscreenControls_OnMouseMove">
+            <Border.Effect>
+              <DropShadowEffect BlurRadius="22" ShadowDepth="0" Opacity="0.55"/>
+            </Border.Effect>
+            <Grid>
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+              </Grid.RowDefinitions>
+
+              <Grid Grid.Row="0">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="72"/>
+                  <ColumnDefinition Width="*"/>
+                  <ColumnDefinition Width="72"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="{Binding PositionText}" Foreground="#DDEAF0" VerticalAlignment="Center" TextAlignment="Left" FontWeight="SemiBold"/>
+                <Slider x:Name="FullscreenSeekSlider"
+                        Grid.Column="1"
+                        Margin="8,0"
+                        Height="22"
+                        Style="{StaticResource PlayerSeekSliderStyle}"
+                        Minimum="0"
+                        Maximum="{Binding DurationSeconds}"
+                        Value="{Binding PositionSeconds, Mode=OneWay}"
+                        PreviewMouseLeftButtonDown="FullscreenSeekSlider_OnPreviewMouseLeftButtonDown"
+                        PreviewMouseMove="FullscreenSeekSlider_OnPreviewMouseMove"
+                        PreviewMouseLeftButtonUp="FullscreenSeekSlider_OnPreviewMouseLeftButtonUp"/>
+                <TextBlock Grid.Column="2" Text="{Binding DurationText}" Foreground="#DDEAF0" VerticalAlignment="Center" TextAlignment="Right" FontWeight="SemiBold"/>
+              </Grid>
+
+              <Grid Grid.Row="1" Margin="0,7,0,0">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*"/>
+                  <ColumnDefinition Width="Auto"/>
+                  <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                  <TextBlock Text="🔊" Margin="0,0,7,0" VerticalAlignment="Center" FontSize="14"/>
+                  <Slider Width="132"
+                          Style="{StaticResource PlayerVolumeSliderStyle}"
+                          Minimum="0"
+                          Maximum="{Binding VolumeBoostLimit}"
+                          Value="{Binding Volume, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                  <Button Content="{Binding SeekBackwardLabel}" Style="{StaticResource PlayerTransportButtonStyle}" Command="{Binding SeekBackwardCommand}" ToolTip="{DynamicResource Player.Seek.Backward}"/>
+                  <Button Width="52" Height="52" MinWidth="52" Content="{Binding PlayPauseText}" Style="{StaticResource PlayerPrimaryTransportButtonStyle}" Command="{Binding PlayPauseCommand}" ToolTip="{DynamicResource Tooltip.PlayPause}"/>
+                  <Button Content="{Binding SeekForwardLabel}" Style="{StaticResource PlayerTransportButtonStyle}" Command="{Binding SeekForwardCommand}" ToolTip="{DynamicResource Player.Seek.Forward}"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                  <Button Style="{StaticResource PlayerUtilityButtonStyle}"
+                          Content="CC"
+                          Command="{Binding AttachSubtitleCommand}"
+                          ToolTip="{DynamicResource Action.AttachSubtitle}"/>
+                  <Button Style="{StaticResource PlayerUtilityButtonStyle}"
+                          Content="⛶"
+                          Click="FullscreenButton_OnClick"
+                          ToolTip="{DynamicResource Action.Fullscreen}"/>
+                </StackPanel>
+              </Grid>
+            </Grid>
+          </Border>
+        </Popup>
 
         <Popup PlacementTarget="{Binding ElementName=SubtitleSettingsToggle}" Placement="Top" StaysOpen="False" AllowsTransparency="True" IsOpen="{Binding IsChecked, ElementName=SubtitleSettingsToggle, Mode=TwoWay}">
           <Border Width="500" Margin="0,0,0,9" Padding="14" Background="{StaticResource PanelRaisedBrush}" BorderBrush="#29465D" BorderThickness="1" CornerRadius="14">

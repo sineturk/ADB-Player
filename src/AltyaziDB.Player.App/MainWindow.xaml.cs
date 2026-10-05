@@ -48,6 +48,12 @@ public partial class MainWindow : Window
     private GridLength _previousHeaderHeight;
     private GridLength _previousControlsHeight;
     private GridLength _previousSidebarWidth;
+    private Thickness _previousPlayerContentMargin;
+    private Thickness _previousVideoBorderThickness;
+    private Thickness _previousVideoMargin;
+    private CornerRadius _previousVideoCornerRadius;
+    private bool _fullscreenSeekDragging;
+    private readonly DispatcherTimer _fullscreenControlsHideTimer;
 
     public MainWindow(MainViewModel viewModel, MpvPreviewEngine previewEngine, IAppLogger logger, string? startupSource = null)
     {
@@ -57,8 +63,17 @@ public partial class MainWindow : Window
         _startupSource = startupSource;
         DataContext = viewModel;
         InitializeComponent();
+
+        _fullscreenControlsHideTimer = new DispatcherTimer(DispatcherPriority.Normal)
+        {
+            Interval = TimeSpan.FromSeconds(2.8)
+        };
+        _fullscreenControlsHideTimer.Tick += FullscreenControlsHideTimer_OnTick;
+        FullscreenControlsPopup.DataContext = viewModel;
+
         _viewModel.PropertyChanged += ViewModel_OnPropertyChanged;
         VideoHost.HandleCreated += VideoHost_OnHandleCreated;
+        VideoHost.PointerActivity += VideoHost_OnPointerActivity;
         PreviewVideoHost.HandleCreated += PreviewVideoHost_OnHandleCreated;
         Closing += Window_OnClosing;
         ComponentDispatcher.ThreadPreprocessMessage += ComponentDispatcher_OnThreadPreprocessMessage;
@@ -385,6 +400,133 @@ public partial class MainWindow : Window
 
     private void FullscreenButton_OnClick(object sender, RoutedEventArgs e) => ToggleFullscreen();
 
+    private void VideoHost_OnPointerActivity(object? sender, EventArgs e)
+    {
+        if (_isFullscreen)
+        {
+            ShowFullscreenControls();
+        }
+    }
+
+    private void Window_OnPreviewMouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (_isFullscreen)
+        {
+            ShowFullscreenControls();
+        }
+    }
+
+    private void Window_OnSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (_isFullscreen && FullscreenControlsPopup.IsOpen)
+        {
+            PositionFullscreenControls();
+        }
+    }
+
+    private void FullscreenControls_OnMouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (_isFullscreen)
+        {
+            RestartFullscreenControlsTimer();
+        }
+    }
+
+    private void FullscreenControlsHideTimer_OnTick(object? sender, EventArgs e)
+    {
+        if (!_isFullscreen)
+        {
+            HideFullscreenControls();
+            return;
+        }
+
+        if (FullscreenControlPanel.IsMouseOver || _fullscreenSeekDragging)
+        {
+            RestartFullscreenControlsTimer();
+            return;
+        }
+
+        _fullscreenControlsHideTimer.Stop();
+        FullscreenControlsPopup.IsOpen = false;
+    }
+
+    private void ShowFullscreenControls()
+    {
+        if (!_isFullscreen || _viewModel.IsMediaCenterVisible)
+        {
+            return;
+        }
+
+        PositionFullscreenControls();
+        FullscreenControlsPopup.IsOpen = true;
+        RestartFullscreenControlsTimer();
+    }
+
+    private void HideFullscreenControls()
+    {
+        _fullscreenControlsHideTimer.Stop();
+        _fullscreenSeekDragging = false;
+        if (FullscreenSeekSlider.IsMouseCaptured)
+        {
+            FullscreenSeekSlider.ReleaseMouseCapture();
+        }
+
+        FullscreenControlsPopup.IsOpen = false;
+    }
+
+    private void RestartFullscreenControlsTimer()
+    {
+        _fullscreenControlsHideTimer.Stop();
+        _fullscreenControlsHideTimer.Start();
+    }
+
+    private void PositionFullscreenControls()
+    {
+        var availableWidth = Math.Max(1, VideoBorder.ActualWidth);
+        var availableHeight = Math.Max(1, VideoBorder.ActualHeight);
+        var panelWidth = Math.Max(420, Math.Min(980, availableWidth - 32));
+
+        FullscreenControlPanel.Width = panelWidth;
+        FullscreenControlsPopup.HorizontalOffset = Math.Max(0, (availableWidth - panelWidth) / 2);
+        FullscreenControlsPopup.VerticalOffset = Math.Max(0, availableHeight - FullscreenControlPanel.Height - 18);
+    }
+
+    private void FullscreenSeekSlider_OnPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not Slider slider) return;
+        _fullscreenSeekDragging = true;
+        SeekFromFullscreenSlider(slider, e.GetPosition(slider));
+        slider.CaptureMouse();
+        RestartFullscreenControlsTimer();
+        e.Handled = true;
+    }
+
+    private void FullscreenSeekSlider_OnPreviewMouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (!_fullscreenSeekDragging || e.LeftButton != MouseButtonState.Pressed || sender is not Slider slider) return;
+        SeekFromFullscreenSlider(slider, e.GetPosition(slider));
+        RestartFullscreenControlsTimer();
+        e.Handled = true;
+    }
+
+    private void FullscreenSeekSlider_OnPreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (!_fullscreenSeekDragging || sender is not Slider slider) return;
+        SeekFromFullscreenSlider(slider, e.GetPosition(slider));
+        _fullscreenSeekDragging = false;
+        if (slider.IsMouseCaptured) slider.ReleaseMouseCapture();
+        RestartFullscreenControlsTimer();
+        e.Handled = true;
+    }
+
+    private void SeekFromFullscreenSlider(Slider slider, System.Windows.Point point)
+    {
+        var width = Math.Max(1, slider.ActualWidth);
+        var ratio = Math.Clamp(point.X / width, 0, 1);
+        var seconds = slider.Minimum + ((slider.Maximum - slider.Minimum) * ratio);
+        _viewModel.SeekTo(seconds);
+    }
+
     private void PlaylistButton_OnClick(object sender, RoutedEventArgs e)
     {
         if (_isFullscreen || _isMiniPlayer)
@@ -666,17 +808,26 @@ public partial class MainWindow : Window
             MediaCenterToggleColumn.Width = new GridLength(0);
             SidebarColumn.Width = new GridLength(0);
             SidebarBorder.Visibility = Visibility.Collapsed;
+
+            // v1.0.1 true fullscreen: remove both the player page inset and the
+            // decorative blue viewport stroke. The old layout left a visible
+            // 16/14 px frame even though the top-level HWND filled the monitor.
+            PlayerContentGrid.Margin = new Thickness(0);
             VideoBorder.Margin = new Thickness(0);
+            VideoBorder.BorderThickness = new Thickness(0);
             VideoBorder.CornerRadius = new CornerRadius(0);
+
             WindowStyle = WindowStyle.None;
             ResizeMode = ResizeMode.NoResize;
             WindowState = WindowState.Normal;
 
             SetWindowPosition(screen.Bounds.Left, screen.Bounds.Top, screen.Bounds.Width, screen.Bounds.Height);
             _isFullscreen = true;
+            _ = Dispatcher.BeginInvoke(new Action(ShowFullscreenControls), DispatcherPriority.Loaded);
         }
         else
         {
+            HideFullscreenControls();
             RestoreWindowPresentationState();
             _isFullscreen = false;
             ApplyPlaylistVisibility();
@@ -726,6 +877,10 @@ public partial class MainWindow : Window
         _previousHeaderHeight = HeaderRow.Height;
         _previousControlsHeight = ControlsRow.Height;
         _previousSidebarWidth = SidebarColumn.Width;
+        _previousPlayerContentMargin = PlayerContentGrid.Margin;
+        _previousVideoBorderThickness = VideoBorder.BorderThickness;
+        _previousVideoMargin = VideoBorder.Margin;
+        _previousVideoCornerRadius = VideoBorder.CornerRadius;
     }
 
     private void RestoreWindowPresentationState()
@@ -736,8 +891,10 @@ public partial class MainWindow : Window
         ControlsRow.Height = _previousControlsHeight;
         SidebarColumn.Width = _previousSidebarWidth;
         MediaCenterToggleColumn.Width = new GridLength(30);
-        VideoBorder.Margin = new Thickness(0, 0, 10, 0);
-        VideoBorder.CornerRadius = new CornerRadius(12);
+        PlayerContentGrid.Margin = _previousPlayerContentMargin;
+        VideoBorder.Margin = _previousVideoMargin;
+        VideoBorder.BorderThickness = _previousVideoBorderThickness;
+        VideoBorder.CornerRadius = _previousVideoCornerRadius;
         WindowState = WindowState.Normal;
         Left = _previousBounds.Left;
         Top = _previousBounds.Top;
@@ -840,6 +997,9 @@ public partial class MainWindow : Window
         {
             ComponentDispatcher.ThreadPreprocessMessage -= ComponentDispatcher_OnThreadPreprocessMessage;
             _viewModel.PropertyChanged -= ViewModel_OnPropertyChanged;
+            VideoHost.PointerActivity -= VideoHost_OnPointerActivity;
+            _fullscreenControlsHideTimer.Stop();
+            _fullscreenControlsHideTimer.Tick -= FullscreenControlsHideTimer_OnTick;
             _previewCts?.Cancel();
             _previewCts?.Dispose();
             await _previewEngine.DisposeAsync();

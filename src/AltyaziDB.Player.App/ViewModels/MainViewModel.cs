@@ -5494,26 +5494,35 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             "sdr" => settings with
             {
                 ToneMapping = tone,
-                TargetColorspaceHint = true,
+                TargetColorspaceHint = "yes",
                 TargetColorspaceHintMode = "target",
                 TargetTrc = "bt.1886",
-                TargetPeak = "203"
+                TargetPeak = "203",
+                D3D11OutputColorSpace = "auto",
+                D3D11OutputFormat = "auto"
             },
             "hdr" => settings with
             {
                 ToneMapping = tone,
-                TargetColorspaceHint = true,
+                TargetColorspaceHint = "yes",
                 TargetColorspaceHintMode = "target",
                 TargetTrc = "pq",
-                TargetPeak = "auto"
+                TargetPeak = "auto",
+                // Do not force the D3D11 swap-chain CSP/format here. mpv/libplacebo
+                // must negotiate against the actual Windows desktop/display state.
+                // Forcing PQ + rgb10_a2 on an SDR desktop produces a severely dark image.
+                D3D11OutputColorSpace = "auto",
+                D3D11OutputFormat = "auto"
             },
             _ => settings with
             {
                 ToneMapping = tone,
-                TargetColorspaceHint = true,
+                TargetColorspaceHint = "auto",
                 TargetColorspaceHintMode = "target",
                 TargetTrc = "auto",
-                TargetPeak = "auto"
+                TargetPeak = "auto",
+                D3D11OutputColorSpace = "auto",
+                D3D11OutputFormat = "auto"
             }
         };
     }
