@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace AltyaziDB.Player.Infrastructure;
 
 public sealed record AppPaths(
@@ -47,6 +49,22 @@ public sealed record AppPaths(
         var rclone = Path.Combine(root, "rclone");
         var rcloneRuntime = Path.Combine(rclone, "runtime");
         var rcloneCache = Path.Combine(rclone, "cache");
+        // An optional dedicated cache location is read before services start.
+        // The selected parent is NEVER cleared: only the reserved marked
+        // ADB Player child directory can be used as a cache root.
+        try
+        {
+            var settings = Path.Combine(root, "settings.json");
+            if (File.Exists(settings))
+            {
+                using var document = JsonDocument.Parse(File.ReadAllText(settings));
+                if (document.RootElement.TryGetProperty("CloudCacheDirectory", out var location)
+                    && location.ValueKind == JsonValueKind.String
+                    && TryPrepareCloudCacheDirectory(location.GetString(), out var chosen))
+                    rcloneCache = chosen;
+            }
+        }
+        catch (Exception) { /* fall back to the app-owned default cache */ }
         var rcloneLogs = Path.Combine(rclone, "logs");
         var connectionCache = Path.Combine(root, "connection-cache");
         var addonCache = Path.Combine(root, "addon-cache");
@@ -88,6 +106,48 @@ public sealed record AppPaths(
             addonCache,
             portable);
     }
+    public static bool TryPrepareCloudCacheDirectory(string? selectedParent, out string managedDirectory)
+    {
+        managedDirectory = string.Empty;
+        if (string.IsNullOrWhiteSpace(selectedParent) || !Path.IsPathFullyQualified(selectedParent))
+            return false;
+        try
+        {
+            var parent = Path.GetFullPath(selectedParent);
+            if (parent.StartsWith(@"\\", StringComparison.Ordinal) ||
+                !Directory.Exists(parent) ||
+                string.Equals(parent.TrimEnd(Path.DirectorySeparatorChar),
+                    Path.GetPathRoot(parent)?.TrimEnd(Path.DirectorySeparatorChar),
+                    StringComparison.OrdinalIgnoreCase))
+                return false;
+            // Reject a parent whose path includes a junction/symlink, and
+            // reject a preexisting non-empty child that we do not own.
+            var dir = new DirectoryInfo(parent);
+            for (var current = dir; current is not null; current = current.Parent)
+                if ((current.Attributes & FileAttributes.ReparsePoint) != 0) return false;
+            var candidate = Path.Combine(parent, "ADB Player Cloud Cache");
+            var marker = Path.Combine(candidate, ".adb-player-cache-owner");
+            if (Directory.Exists(candidate))
+            {
+                if ((File.GetAttributes(candidate) & FileAttributes.ReparsePoint) != 0)
+                    return false;
+                if (File.Exists(marker))
+                {
+                    if (File.ReadAllText(marker).Trim() != "ADB_PLAYER_CLOUD_CACHE_V1")
+                        return false;
+                }
+                else if (Directory.EnumerateFileSystemEntries(candidate).Any())
+                    return false;
+            }
+            Directory.CreateDirectory(candidate);
+            if (!File.Exists(marker))
+                File.WriteAllText(marker, "ADB_PLAYER_CLOUD_CACHE_V1");
+            managedDirectory = candidate;
+            return true;
+        }
+        catch (Exception) { return false; }
+    }
+
     private static string ResolveInstalledRoot(string localAppData)
     {
         var root = Path.Combine(localAppData, "ADB", "Player");

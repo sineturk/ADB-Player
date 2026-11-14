@@ -116,7 +116,10 @@ public sealed record CatalogStream(
     string? FileName,
     string? Quality,
     int? Seeders,
-    long? SizeBytes)
+    long? SizeBytes,
+    // Stremio stream.sources includes tracker URLs. Keep these transient
+    // source hints without serializing credentials into logs or file names.
+    IReadOnlyList<string>? TrackerUrls = null)
 {
     public string SizeLabel => FormatSize(SizeBytes);
     public string SeedersLabel => Seeders is > 0 ? $"{Seeders} seed" : string.Empty;

@@ -9,7 +9,8 @@ public interface IRcloneCloudService : IAsyncDisposable
     Task<string> ConnectAsync(
         RcloneCloudProvider provider,
         string displayName,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        Action<Uri>? onAuthorizationLink = null);
 
     Task DisconnectAsync(
         string remoteName,

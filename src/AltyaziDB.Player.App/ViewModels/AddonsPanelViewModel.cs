@@ -25,6 +25,9 @@ public sealed class AddonsPanelViewModel : ObservableObject, IDisposable
     private readonly IUserDialogService _dialogs;
     private readonly IAppLogger _logger;
     private readonly AppPaths _paths;
+    private readonly LocalizedCatalogOverviewService _localizedOverviews;
+    private CancellationTokenSource? _selectedOverviewCancellation;
+    private string _selectedItemOverview = string.Empty;
     private readonly List<CatalogItem> _allItems = new();
     private readonly Dictionary<string, ExternalRelease> _externalReleasesByStreamKey = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _favoriteKeys = new(StringComparer.OrdinalIgnoreCase);
@@ -58,8 +61,10 @@ public sealed class AddonsPanelViewModel : ObservableObject, IDisposable
         Func<ExternalRelease, Task> openExternalRelease,
         IUserDialogService dialogs,
         IAppLogger logger,
-        AppPaths paths)
+        AppPaths paths,
+        IMediaMetadataService mediaMetadataService)
     {
+        _localizedOverviews = new LocalizedCatalogOverviewService(mediaMetadataService, logger);
         _service = service;
         _cloudAccount = cloudAccount;
         _searchExternalReleases = searchExternalReleases;
@@ -95,6 +100,8 @@ public sealed class AddonsPanelViewModel : ObservableObject, IDisposable
     public event EventHandler? PortablePreferencesChanged;
 
     public event EventHandler? CloudCollectionsChanged;
+
+    public event EventHandler? LocalizedMetadataRefreshRequested;
 
     public ObservableCollection<AddonRegistration> Addons { get; }
     public ObservableCollection<CatalogFilterOption> Filters { get; }
@@ -139,6 +146,7 @@ public sealed class AddonsPanelViewModel : ObservableObject, IDisposable
             OnPropertyChanged(nameof(SelectedItemTypeLabel));
             OnPropertyChanged(nameof(SelectedItemMetadata));
             UpdateSelectedCollectionState();
+            RequestSelectedOverview();
             _streamCancellation?.Cancel();
             Episodes.Clear();
             Streams.Clear();
@@ -152,6 +160,69 @@ public sealed class AddonsPanelViewModel : ObservableObject, IDisposable
                 _ = LoadItemOptionsAsync(value, _streamCancellation.Token);
             }
         }
+    }
+
+    public string SelectedItemOverview
+    {
+        get => _selectedItemOverview;
+        private set => SetProperty(ref _selectedItemOverview, value);
+    }
+
+    public Task<string> GetPreferredOverviewAsync(
+        CatalogItem item, CancellationToken cancellationToken = default) =>
+        GetPreferredOverviewAsync(item, LocalizationManager.CurrentLanguageCode, cancellationToken);
+
+    private async Task<string> GetPreferredOverviewAsync(
+        CatalogItem item, string language, CancellationToken cancellationToken)
+    {
+        var fallback = item.Description ?? string.Empty;
+        if (!language.StartsWith("tr", StringComparison.OrdinalIgnoreCase))
+            return fallback;
+
+        var turkish = await _localizedOverviews
+            .GetTurkishOverviewAsync(item, cancellationToken)
+            .ConfigureAwait(false);
+        return string.IsNullOrWhiteSpace(turkish) ? fallback : turkish;
+    }
+
+    private void RequestSelectedOverview()
+    {
+        _selectedOverviewCancellation?.Cancel();
+        _selectedOverviewCancellation?.Dispose();
+        _selectedOverviewCancellation = null;
+
+        var selected = SelectedItem;
+        SelectedItemOverview = selected?.Description ?? string.Empty;
+        if (_disposed || selected is null || LocalizationManager.IsEnglish)
+            return;
+
+        var language = LocalizationManager.CurrentLanguageCode;
+        _selectedOverviewCancellation = new CancellationTokenSource();
+        _ = LoadSelectedOverviewAsync(selected, language, _selectedOverviewCancellation.Token);
+    }
+
+    private async Task LoadSelectedOverviewAsync(CatalogItem item, string language, CancellationToken token)
+    {
+        try
+        {
+            var value = await GetPreferredOverviewAsync(item, language, token).ConfigureAwait(true);
+            if (!_disposed && !token.IsCancellationRequested &&
+                ReferenceEquals(SelectedItem, item) &&
+                string.Equals(LocalizationManager.CurrentLanguageCode, language,
+                    StringComparison.OrdinalIgnoreCase))
+                SelectedItemOverview = value;
+        }
+        catch (OperationCanceledException)
+        {
+            // Selection or UI language changed while metadata was loading.
+        }
+    }
+
+    public void RefreshLocalizedMetadataAfterLogin()
+    {
+        _localizedOverviews.RetryAfterLogin();
+        RequestSelectedOverview();
+        LocalizedMetadataRefreshRequested?.Invoke(this, EventArgs.Empty);
     }
 
     public CatalogEpisode? SelectedEpisode
@@ -174,10 +245,27 @@ public sealed class AddonsPanelViewModel : ObservableObject, IDisposable
         }
     }
 
+    public bool SelectedStreamIsTorrent => SelectedStream?.Kind == CatalogStreamKind.Torrent;
+
+    // A provider name such as Torrentio does not by itself imply that the
+    // selected playable stream contains a magnet/info-hash for qBittorrent.
+    public string SelectedStreamTransportText => SelectedStream?.Kind switch
+    {
+        CatalogStreamKind.Torrent => LocalizationManager.Get("R5.Torrent.Discover.KindTorrent"),
+        CatalogStreamKind.External => LocalizationManager.Get("R5.Torrent.Discover.KindExternal"),
+        CatalogStreamKind.Direct => LocalizationManager.Get("R5.Torrent.Discover.KindDirect"),
+        _ => string.Empty
+    };
+
     public CatalogStream? SelectedStream
     {
         get => _selectedStream;
-        set => SetProperty(ref _selectedStream, value);
+        set
+        {
+            if (!SetProperty(ref _selectedStream, value)) return;
+            OnPropertyChanged(nameof(SelectedStreamIsTorrent));
+            OnPropertyChanged(nameof(SelectedStreamTransportText));
+        }
     }
 
     public AddonRegistration? SelectedAddon
@@ -1150,9 +1238,11 @@ public sealed class AddonsPanelViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(SummaryText));
         OnPropertyChanged(nameof(SelectedItemTypeLabel));
         OnPropertyChanged(nameof(SelectedItemMetadata));
+        OnPropertyChanged(nameof(SelectedStreamTransportText));
         OnPropertyChanged(nameof(SelectedAddonStateText));
         OnPropertyChanged(nameof(TargetCollectionActionText));
         UpdateSelectedCollectionState();
+        RequestSelectedOverview();
     }
 
     public void Dispose()
@@ -1167,6 +1257,9 @@ public sealed class AddonsPanelViewModel : ObservableObject, IDisposable
         _refreshCancellation?.Dispose();
         _streamCancellation?.Cancel();
         _streamCancellation?.Dispose();
+        _selectedOverviewCancellation?.Cancel();
+        _selectedOverviewCancellation?.Dispose();
+        _localizedOverviews.Dispose();
         _service.Dispose();
     }
 }

@@ -1,0 +1,480 @@
+name: 'ADB Player v1.0.2 RC2 Windows Source and UX Validation'
+
+on:
+  push:
+    branches:
+      - 'feature/v1.0.2-r4111-mini-hover'
+      - 'feature/v1.0.2-r5-cinematic-home-p0'
+      - 'feature/v1.0.2-r5-cinematic-home-p3'
+      - 'feature/v1.0.2-r5-p31-neon-login-artwork'
+      - 'feature/v1.0.2-r5-p32-username-source-cards'
+      - 'feature/v1.0.2-r5-p33-oauth-source-ux'
+      - 'feature/v1.0.2-r5-p34-oauth-browser'
+      - 'feature/v1.0.2-r5-p35-oauth-port-diagnostics'
+      - 'feature/v1.0.2-r5-p43-list-cinematic'
+      - 'feature/v1.0.2-r5-p44-inner-page-refocus'
+      - 'feature/v1.0.2-r5-p45-localized-metadata'
+      - 'feature/v1.0.2-r5-p45-overview-expand'
+      - 'feature/v1.0.2-r5-p46-discover-cinematic'
+      - 'feature/v1.0.2-r5-p461-cinema-first'
+      - 'feature/v1.0.2-r5-p47-content-detail-modal'
+      - 'feature/v1.0.2-r5-p471-modal-fullwidth'
+      - 'feature/v1.0.2-r5-p48-connections-setup-ux'
+      - 'feature/v1.0.2-r5-p49-sources-android-parity'
+      - 'feature/v1.0.2-r5-p410-localization-audit'
+      - 'feature/v1.0.2-r5-p411-qbittorrent-handoff'
+      - 'feature/v1.0.2-r5-p4111-download-location'
+      - 'feature/v1.0.2-r5-p4112-smart-torrent-handoff'
+      - 'feature/v1.0.2-r5-p4112a-discover-stream-size'
+      - 'feature/v1.0.2-r5-p4112b-qb-connection-state'
+      - 'feature/v1.0.2-r5-p4112c-smart-handoff-magnet-fix'
+      - 'feature/v1.0.2-r5-p4113-discover-auto-seed'
+      - 'feature/v1.0.2-r5-p4113a-startup-binding-fix'
+      - 'feature/v1.0.2-r5-p4113b-discover-handoff-visibility'
+      - 'feature/v1.0.2-r5-p4113c-discover-status-always-visible'
+      - 'feature/v1.0.2-r5-p4113d-discover-torrent-session-bridge'
+      - 'feature/v1.0.2-r5-p4113e-stream-source-classification'
+      - 'feature/v1.0.2-r5-p4113f-duplicate-torrent-manager-recovery'
+      - 'feature/v1.0.2-r5-p4113g-stremio-tracker-sources'
+      - 'feature/v1.0.2-r5-p412-discover-episode-numbers'
+      - 'feature/v1.0.2-r5-p413-telegram-zip-attachments'
+      - 'feature/v1.0.2-r5-p413a-telegram-zip-range-attachments'
+      - 'feature/v1.0.2-r5-p413b-telegram-episode-media-pagination'
+      - 'feature/v1.0.2-r5-p413e-telegram-multipart-rollback'
+      - 'feature/v1.0.2-r5-p413f-telegram-topic-history-transfer-control'
+      - 'feature/v1.0.2-r5-p413g-telegram-complete-topic-compact-actions'
+      - 'feature/v1.0.2-r5-p413h-telegram-all-attachments'
+      - 'feature/v1.0.2-r5-p413i-telegram-generic-split-store'
+      - 'feature/v1.0.2-r5-p413j-telegram-7z-store-direct-range'
+      - 'feature/v1.0.2-r5-p414-telegram-cache-management'
+      - 'feature/v1.0.2-r5-p4141-settings-ux-i18n'
+      - 'feature/v1.0.2-r5-p415-feedback-telegram-playback'
+      - 'feature/v1.0.2-r5-p4152-telegram-ux-p1-information-architecture'
+      - 'feature/v1.0.2-r5-p4152-telegram-ux-p2-chat-list'
+      - 'feature/v1.0.2-r5-p4152-telegram-ux-p3-media-list'
+      - 'feature/v1.0.2-r5-p4152-telegram-ux-p4-visual-polish'
+      - 'feature/v1.0.2-r5-p4152-telegram-ux-p5-hub'
+      - 'feature/v1.0.2-r5-p4152-live-crash-fix'
+      - 'feature/v1.0.2-r5-p4153-telegram-ui-refinement'
+      - 'feature/v1.0.2-r5-p4153a-telegram-icons-status'
+      - 'feature/v1.0.2-r5-p4153b-favorite-star-padding'
+      - 'feature/v1.0.2-r5-p4154-unified-continue-watching'
+      - 'feature/v1.0.2-r5-p4155-audio-playback'
+      - 'feature/v1.0.2-r5-p4155a-audio-only-visual-ux'
+      - 'release/v1.0.2-rc1'
+      - 'release/v1.0.2-rc2'
+      - 'release/v1.0.2-rc3'
+      - 'feature/v1.0.2-rc3-p4177-telegram-final-ux'
+      - 'feature/v1.0.2-r5-p4178-telegram-favorites-hub'
+      - 'feature/v1.0.2-rc2-final-release-archive-gate'
+      - 'feature/v1.0.2-rc2-p4175-isolated-drive-filename'
+      - 'feature/v1.0.2-rc2-p4174-drive-form-method'
+      - 'feature/v1.0.2-rc2-p4173-drive-session-regression'
+      - 'feature/v1.0.2-rc2-p4172-cloud-resume-recovery'
+      - 'feature/v1.0.2-rc2-p4171-remote-metadata-filenames'
+      - 'feature/v1.0.2-rc2-p4170-url-only'
+      - 'feature/v1.0.2-r5-p4169-autoplay-export-progress'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Source checks + Release x64
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - name: Enable Windows Git long paths
+        shell: powershell
+        run: git config --global core.longpaths true
+
+      - name: Checkout private development branch
+        uses: actions/checkout@v4
+        with:
+          # The release solution lives under src/. Research evidence contains
+          # deeply nested historical paths which exceed Windows checkout limits.
+          sparse-checkout: |
+            src
+            tool
+            native
+            packaging
+            docs
+            .github
+          sparse-checkout-cone-mode: true
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Generate secret-free CI build configuration
+        shell: powershell
+        # Public production service URLs, NOT credentials. No Neon database URL,
+        # API master key, TMDB key, session token or password is bundled.
+        env:
+          ADB_CLOUD_AUTH_URL: https://ep-delicate-flower-b21al3ms.neonauth.c-6.eu-central-1.aws.neon.tech/neondb/auth
+          ADB_CLOUD_API_URL: https://br-royal-hat-b2d0ig3y-adbcloudapi.compute.c-6.eu-central-1.aws.neon.tech/
+        run: .\tool\generate-app-credentials.ps1 -OmitTelegramCredentials
+
+      - name: Assert BYOC release ignores maintainer Telegram ID and HASH
+        shell: powershell
+        # Re-generating the file must preserve the separate public service URLs
+        # needed by the later Neon/ADB Cloud source validation step.
+        env:
+          ADB_CLOUD_AUTH_URL: https://ep-delicate-flower-b21al3ms.neonauth.c-6.eu-central-1.aws.neon.tech/neondb/auth
+          ADB_CLOUD_API_URL: https://br-royal-hat-b2d0ig3y-adbcloudapi.compute.c-6.eu-central-1.aws.neon.tech/
+        run: |
+          $env:TELEGRAM_API_ID = '123456'
+          $env:TELEGRAM_API_HASH = ('a' * 32)
+          .\tool\generate-app-credentials.ps1 -OmitTelegramCredentials
+          $path = 'src\AltyaziDB.Player.Telegram\Generated\GeneratedTelegramCredentials.g.cs'
+          $txt = [IO.File]::ReadAllText($path)
+          if (-not $txt.Contains('public const int ApiId = 0;') -or
+              -not $txt.Contains('public const string ApiHash = "";')) {
+              throw 'Telegram API credentials must never be embedded in distribution builds.'
+          }
+          Remove-Item Env:\TELEGRAM_API_ID -ErrorAction SilentlyContinue
+          Remove-Item Env:\TELEGRAM_API_HASH -ErrorAction SilentlyContinue
+
+      - name: Verify v1.0.2 RC2 release identity and snapshot safety (offline only)
+        shell: powershell
+        run: .\tool\verify-v102-rc-source.ps1
+
+      - name: Verify Windows-safe public source snapshot before release packaging
+        shell: powershell
+        run: .\tool\verify-public-release-gate.ps1 -Mode Static
+
+      - name: Verify production Neon Auth binding and signed-in artwork refresh
+        shell: powershell
+        run: .\tool\verify-r5-neon-auth-artwork.ps1
+
+      - name: Validate R5/P3.2 username or email login and source cards
+        shell: powershell
+        run: .\tool\verify-r5-username-provider-cards.ps1
+
+      - name: Validate R5/P3.3 OAuth client input, safe errors and modern Sources
+        shell: powershell
+        run: .\tool\verify-r5-oauth-sources-p33.ps1
+
+      - name: Validate R5/P3.4 OAuth browser launch and local link security
+        shell: powershell
+        run: .\tool\verify-r5-oauth-browser-p34.ps1
+
+      - name: Validate R5/P3.5 read-only OAuth port diagnostics
+        shell: powershell
+        run: .\tool\verify-r5-oauth-port-p35.ps1
+
+      - name: Validate R5/P4.1-P4.3 cinematic page contracts
+        shell: powershell
+        run: .\tool\verify-r5-p4-cinematic-pages.ps1
+
+      - name: Validate R5/P4.4 featured catalog and inner-page layouts
+        shell: powershell
+        run: .\tool\verify-r5-p44-inner-page-refocus.ps1
+
+      - name: Validate R5/P4.5 localized content metadata contracts
+        shell: powershell
+        run: .\tool\verify-r5-p45-localized-content.ps1
+
+      - name: Validate R5/P4.5 full synopsis expand UX
+        shell: powershell
+        run: .\tool\verify-r5-p45-overview-expand.ps1
+
+      - name: Validate R5/P4.6 cinematic Discover and playback-first details
+        shell: powershell
+        run: .\tool\verify-r5-p46-discover-cinematic.ps1
+
+      - name: Validate R5/P4.6.1 cinema-first visual hierarchy
+        shell: powershell
+        run: .\tool\verify-r5-p461-cinema-first.ps1
+
+      - name: Validate R5/P4.7 cinematic content detail modal
+        shell: powershell
+        run: .\tool\verify-r5-p47-detail-modal.ps1
+
+      - name: Validate R5/P4.7.1 full-width cinematic modal
+        shell: powershell
+        run: .\tool\verify-r5-p471-modal-fullwidth.ps1
+
+      - name: Validate R5/P4.8 guided connection setup and local HTTP policy
+        shell: powershell
+        run: .\tool\verify-r5-p48-connections-setup.ps1
+
+      - name: Validate R5/P4.9 simplified cloud sources
+        shell: powershell
+        run: .\tool\verify-r5-p49-media-sources-parity.ps1
+
+      - name: Validate R5/P4.10 language parity and translated errors
+        shell: powershell
+        run: .\tool\verify-r5-p410-localization-audit.ps1
+
+      - name: Validate R5/P4.11 qBittorrent secure handoff
+        shell: powershell
+        run: .\tool\verify-r5-p411-qbittorrent-handoff.ps1
+
+      - name: Validate R5/P4.11.1 download folder selection and safety
+        shell: powershell
+        run: .\tool\verify-r5-p4111-download-location.ps1
+
+      - name: Validate R5/P4.11.2 single-writer Smart Handoff
+        shell: powershell
+        run: .\tool\verify-r5-p4112-smart-torrent-handoff.ps1
+
+      - name: Validate R5/P4.11.2a stream sizes in Discover
+        shell: powershell
+        run: .\tool\verify-r5-p4112a-discover-stream-size.ps1
+
+      - name: Validate R5/P4.11.2b saved qBittorrent connection status
+        shell: powershell
+        run: .\tool\verify-r5-p4112b-qb-connection-state.ps1
+
+      - name: Validate R5/P4.11.2c magnet and same-folder qBittorrent handoff
+        shell: powershell
+        run: .\tool\verify-r5-p4112c-magnet-smart-handoff.ps1
+
+      - name: Validate R5/P4.11.3 Discover automatic handoff and qBittorrent recheck start
+        shell: powershell
+        run: .\tool\verify-r5-p4113-discover-auto-seed.ps1
+
+      - name: Validate R5/P4.11.3a WPF read-only startup progress bindings
+        shell: powershell
+        run: .\tool\verify-r5-p4113a-startup-binding.ps1
+
+      - name: Validate R5/P4.11.3b Discover source and handoff status visibility
+        shell: powershell
+        run: .\tool\verify-r5-p4113b-discover-status-visibility.ps1
+
+      - name: Validate R5/P4.11.3c visible Discover torrent status without relying on session triggers
+        shell: powershell
+        run: .\tool\verify-r5-p4113c-always-visible-status.ps1
+
+      - name: Validate R5/P4.11.3d Discover and Prowlarr torrent source session bridge
+        shell: powershell
+        run: .\tool\verify-r5-p4113d-discover-torrent-session-bridge.ps1
+
+      - name: Validate R5/P4.11.3e direct versus torrent source classification and player sidebar
+        shell: powershell
+        run: .\tool\verify-r5-p4113e-source-classification.ps1
+
+      - name: Validate R5/P4.11.3f duplicate manager recovery and safe torrent lifecycle
+        shell: powershell
+        run: .\tool\verify-r5-p4113f-duplicate-manager-recovery.ps1
+
+      - name: Validate R5/P4.11.3g addon tracker sources and magnet construction
+        shell: powershell
+        run: .\tool\verify-r5-p4113g-stremio-tracker-sources.ps1
+
+      - name: Validate R5/P4.12 Discover episode season number and title labels
+        shell: powershell
+        run: .\tool\verify-r5-p412-discover-episode-numbers.ps1
+
+      - name: Validate R5/P4.13 Telegram and local ZIP media attachments
+        shell: powershell
+        run: .\tool\verify-r5-p413-telegram-zip-attachments.ps1
+
+      - name: Validate R5/P4.13a streaming Telegram ZIP Range audio and subtitle
+        shell: powershell
+        run: .\tool\verify-r5-p413a-telegram-zip-range.ps1
+
+      - name: Validate R5/P4.13b season ZIP selection and Telegram media paging
+        shell: powershell
+        run: .\tool\verify-r5-p413b-telegram-episode-pagination.ps1
+
+      - name: Validate R5/P4.13e stable multipart rollback and all forum parts
+        shell: powershell
+        run: .\tool\verify-r5-p413e-multipart-rollback.ps1
+
+      - name: Validate R5/P4.13f Telegram forum history and transfer cancel
+        shell: powershell
+        run: .\tool\verify-r5-p413f-forum-history-stop.ps1
+
+      - name: Validate R5/P4.13g complete forum listing and compact controls
+        shell: powershell
+        run: .\tool\verify-r5-p413g-telegram-complete-topic.ps1
+
+      - name: Validate R5/P4.13h all Telegram attachments and raw split
+        shell: powershell
+        run: .\tool\verify-r5-p413h-telegram-all-attachments.ps1
+
+      - name: Exercise raw MKV parts, 7zip, WinRAR ZIP and MEDIA INFO captions
+        shell: powershell
+        run: dotnet run --project .\tool\telegram-all-attachments-smoke\TelegramAllAttachmentsSmoke.csproj --configuration Release
+
+      - name: Exercise real negative ID and incomplete forum history merge
+        shell: powershell
+        run: dotnet run --project .\tool\telegram-topic-merge-smoke\TelegramTopicMergeSmoke.csproj --configuration Release
+
+      - name: Exercise Telegram short history pages and archive file enumeration
+        shell: powershell
+        run: dotnet run --project .\tool\telegram-forum-history-smoke\TelegramForumHistorySmoke.csproj --configuration Release
+
+      - name: Exercise real multipart 7zip and WinRAR split ZIP single-card restore
+        shell: powershell
+        run: dotnet run --project .\tool\telegram-multipart-restore-smoke\TelegramMultipartRestoreSmoke.csproj --configuration Release
+
+      - name: Exercise real season-episode ZIP track matcher
+        shell: powershell
+        run: dotnet run --project .\tool\telegram-episode-smoke\TelegramEpisodeSmoke.csproj --configuration Release
+
+      - name: Validate legacy Telegram audio attach contract
+        shell: powershell
+        run: .\tool\verify-v1.0.1-telegram-audio.ps1
+
+      - name: Exercise real ZIP extraction with sample audio and subtitles
+        shell: powershell
+        run: dotnet run --project .\tool\zip-attachment-smoke\ZipAttachmentSmoke.csproj --configuration Release
+
+      - name: Exercise real Telegram ZIP Range and selected archive entries
+        shell: powershell
+        run: dotnet run --project .\tool\telegram-zip-range-smoke\TelegramZipRangeSmoke.csproj --configuration Release
+      
+      - name: Verify real 7z Store direct Range and seek with multipart Telegram data
+        shell: powershell
+        run: dotnet run --project .\tool\telegram-7z-store-smoke\Telegram7zStoreSmoke.csproj --configuration Release
+
+      - name: Validate R4.1.1 Mini hover paired HUD
+        shell: powershell
+        run: .\tool\verify-v1.0.2-feedback-r1.ps1
+
+      - name: Validate R5/P0-P3 Home, source identity, glass and responsive source guards
+        shell: powershell
+        run: .\tool\verify-r5-home-p0.ps1
+
+      - name: Verify R5/P4.15.5a audio-only WPF surface and honest metadata (offline only)
+        shell: powershell
+        run: .\tool\verify-r5-p4155a-audio-only-visual.ps1
+
+      - name: Verify R5/P4.15.5 local audio picker and playlist contracts (offline only)
+        shell: powershell
+        run: .\tool\verify-r5-p4155-local-audio-playback.ps1
+
+      - name: Exercise R5/P4.15.5 MP3 FLAC WAV extension policies (offline only)
+        shell: powershell
+        run: dotnet run --project .\tool\audio-playback-smoke\AudioPlaybackSmoke.csproj --configuration Release
+
+      - name: Verify R5/P4.15.4 Unified Continue Watching source and account safety (offline only)
+        shell: powershell
+        run: .\tool\verify-r5-p4154-unified-continue-watching.ps1
+
+      - name: Verify R5/P4.15.3 concise Telegram Hub and archive UI (offline only)
+        shell: powershell
+        run: .\tool\verify-r5-p4153-telegram-ui-refinement.ps1
+
+      - name: Verify R5/P4.15.2 P5 Telegram Hub and source policies (offline only)
+        shell: powershell
+        run: .\tool\verify-r5-p4152-p5-telegram-hub.ps1
+
+      - name: Exercise P5 Telegram Hub opened vs resume source policies (offline only)
+        shell: powershell
+        run: dotnet run --project .\tool\telegram-hub-smoke\TelegramHubSmoke.csproj --configuration Release
+
+      - name: Verify R5/P4.15.2 P4 responsive Telegram surface (offline only)
+        shell: powershell
+        run: .\tool\verify-r5-p4152-p4-telegram-responsive.ps1
+
+      - name: Verify R5/P4.15.2 P3 Telegram media list and status (offline only)
+        shell: powershell
+        run: .\tool\verify-r5-p4152-p3-telegram-media-list.ps1
+
+      - name: Verify R5/P4.15.2 P2 Telegram chat list (offline only)
+        shell: powershell
+        run: .\tool\verify-r5-p4152-p2-telegram-chat-list.ps1
+
+      - name: Verify R5/P4.15.2 P1 Telegram information architecture (offline only)
+        shell: powershell
+        run: .\tool\verify-r5-p4152-p1-information-architecture.ps1
+
+      - name: Verify R5/P4.15 Telegram UX and playback regressions
+        shell: powershell
+        run: .\tool\verify-r5-p415-user-feedback.ps1
+
+      - name: Verify R5/P4.14.1 Settings layout and TR-EN text parity
+        shell: powershell
+        run: .\tool\verify-r5-p4141-settings-ux-i18n.ps1
+
+      - name: Validate R5/P4.14 Telegram cache management and Store regression guards
+        shell: powershell
+        run: .\tool\verify-r5-p414-telegram-cache-management.ps1
+
+      - name: Verify Telegram cache defaults and JSON preferences round-trip
+        shell: powershell
+        run: dotnet run --project .\tool\telegram-cache-smoke\TelegramCacheSmoke.csproj --configuration Release
+
+      - name: Verify P3 media metadata and multipart archive status (offline only)
+        shell: powershell
+        run: dotnet run --project .\tool\telegram-media-list-smoke\TelegramMediaListSmoke.csproj --configuration Release
+
+      - name: R5/P4.16 adaptive nav, Home hero and Google Shared Drives guard
+        shell: powershell
+        run: .\tool\verify-r5-p416-home-shared-drive.ps1
+      - name: Smoke-test local-only audio and SRT export safeguards
+        shell: pwsh
+        run: dotnet run --project .\tool\embedded-track-export-smoke\EmbeddedTrackExportSmoke.csproj --configuration Release
+      - name: Verify R5/P4.16.9 autoplay and local export progress
+        shell: pwsh
+        run: .\tool\verify-r5-p4169-autoplay-export-progress.ps1
+      - name: Verify R5/P4.17.7 Telegram final login and artwork UX
+        shell: pwsh
+        run: .\tool\verify-r5-p4177-telegram-final-ux.ps1
+      - name: Verify R5/P4.17.8 Telegram favorite stars and new Hub feed
+        shell: pwsh
+        run: .\tool\verify-r5-p4178-telegram-favorites-hub.ps1
+      - name: Verify R5/P4.17.0 URL dialog readability
+        shell: pwsh
+        run: .\tool\verify-r5-p4170-url-dialog-only.ps1
+      - name: Check R5/P4.17.1 remote media filename wiring
+        shell: pwsh
+        run: .\tool\verify-r5-p4171-remote-metadata.ps1
+      - name: Verify R5/P4.17.2 connected cloud resume recovery
+        shell: pwsh
+        run: .\tool\verify-r5-p4172-cloud-resume.ps1
+      - name: Smoke-test remote metadata filename parsing
+        shell: pwsh
+        run: dotnet run --project .\tool\remote-media-name-smoke\RemoteMediaNameSmoke.csproj --configuration Release
+      - name: Smoke-test Drive anonymous POST confirmation through local Range proxy
+        shell: pwsh
+        run: dotnet run --project .\tool\drive-post-smoke\DrivePostSmoke.csproj --configuration Release
+      - name: Verify isolated Drive preview filename and playback session separation
+        shell: pwsh
+        run: dotnet run --project .\tool\drive-filename-smoke\DriveFilenameSmoke.csproj --configuration Release
+
+      - name: Restore NuGet packages
+        shell: powershell
+        run: dotnet restore .\AltyaziDB.Player.Windows.sln --configfile .\NuGet.Config -p:Platform=x64
+
+      - name: Build Windows Release x64
+        shell: powershell
+        run: dotnet build .\AltyaziDB.Player.Windows.sln --configuration Release --no-restore -p:Platform=x64
+
+      - name: Validate preview runtime payload and SHA-256
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          . .\tool\common.ps1
+          $root = (Get-Location).Path
+          $bin = Join-Path $root 'src\AltyaziDB.Player.App\bin\x64\Release\net10.0-windows\win-x64'
+          $exe = Join-Path $bin 'ADB.Player.exe'
+          if (!(Test-Path -LiteralPath $exe)) { throw 'Release EXE missing.' }
+          Copy-LibMpvNativeRuntime -Destination $bin -Required | Out-Null
+          $mpv = Get-ChildItem -LiteralPath $bin -File | Where-Object { $_.Name -in @('libmpv-2.dll','mpv-2.dll','libmpv.dll') } | Select-Object -First 1
+          if (!$mpv) { throw 'libmpv runtime missing in preview build.' }
+          $hash = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash
+          Set-Content -LiteralPath (Join-Path $bin 'ADB.Player.exe.sha256.txt') -Value "$hash  ADB.Player.exe" -Encoding Ascii
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "### ADB Player R5 P4.1-P4.3 Cinematic Pages Release x64 source build"
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value ("- Commit: " + $env:GITHUB_SHA)
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "- Configuration: Release x64, win-x64, framework dependent"
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "- libmpv: $($mpv.Name)"
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value ("- SHA-256: " + $hash)
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "- Test mode: source build only; CI cannot verify interactive video playback or on-screen WPF layout."
+
+      - name: Upload private test build (not a public release)
+        # GitHub artifact quota was exhausted in R5/P4.13g. Run source
+        # verification on this branch without repeatedly failing uploads.
+        if: github.ref != 'refs/heads/feature/v1.0.2-r5-p413h-telegram-all-attachments' && github.ref != 'refs/heads/feature/v1.0.2-r5-p413i-telegram-generic-split-store' && github.ref != 'refs/heads/feature/v1.0.2-r5-p413j-telegram-7z-store-direct-range' && github.ref != 'refs/heads/feature/v1.0.2-r5-p414-telegram-cache-management' && github.ref != 'refs/heads/feature/v1.0.2-r5-p4141-settings-ux-i18n' && github.ref != 'refs/heads/feature/v1.0.2-r5-p415-feedback-telegram-playback' && github.ref != 'refs/heads/feature/v1.0.2-r5-p4152-telegram-ux-p1-information-architecture' && github.ref != 'refs/heads/feature/v1.0.2-r5-p4152-telegram-ux-p2-chat-list' && github.ref != 'refs/heads/feature/v1.0.2-r5-p4152-telegram-ux-p3-media-list' && github.ref != 'refs/heads/feature/v1.0.2-r5-p4152-telegram-ux-p4-visual-polish' && github.ref != 'refs/heads/feature/v1.0.2-r5-p4152-telegram-ux-p5-hub' && github.ref != 'refs/heads/feature/v1.0.2-r5-p4152-live-crash-fix' && github.ref != 'refs/heads/feature/v1.0.2-r5-p4153-telegram-ui-refinement' && github.ref != 'refs/heads/feature/v1.0.2-r5-p4153a-telegram-icons-status' && github.ref != 'refs/heads/feature/v1.0.2-r5-p4153b-favorite-star-padding' && github.ref != 'refs/heads/feature/v1.0.2-r5-p4154-unified-continue-watching' && github.ref != 'refs/heads/feature/v1.0.2-r5-p4155-audio-playback' && github.ref != 'refs/heads/feature/v1.0.2-r5-p4155a-audio-only-visual-ux' && github.ref != 'refs/heads/release/v1.0.2-rc1' && github.ref != 'refs/heads/release/v1.0.2-rc2' && github.ref != 'refs/heads/release/v1.0.2-rc3' && github.ref != 'refs/heads/feature/v1.0.2-rc3-p4177-telegram-final-ux' && github.ref != 'refs/heads/feature/v1.0.2-rc2-final-release-archive-gate' && github.ref != 'refs/heads/feature/v1.0.2-rc2-p4175-isolated-drive-filename' && github.ref != 'refs/heads/feature/v1.0.2-rc2-p4174-drive-form-method' && github.ref != 'refs/heads/feature/v1.0.2-rc2-p4173-drive-session-regression' && github.ref != 'refs/heads/feature/v1.0.2-rc2-p4171-remote-metadata-filenames' && github.ref != 'refs/heads/feature/v1.0.2-rc2-p4170-url-only' && github.ref != 'refs/heads/feature/v1.0.2-r5-p4169-autoplay-export-progress' && github.ref != 'refs/heads/feature/v1.0.2-rc2-p4172-cloud-resume-recovery'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ADB-Player-R5-P413g-TelegramCompleteTopic-Release-x64-test
+          path: src/AltyaziDB.Player.App/bin/x64/Release/net10.0-windows/win-x64/
+          if-no-files-found: error
+          retention-days: 7

@@ -11,34 +11,45 @@ internal static class TelegramArchiveStreamingEngine
     public static Task<TelegramArchiveInspection> InspectAsync(
         SplitArchiveVolumeMap map,
         TelegramArchiveFormat format,
-        CancellationToken cancellationToken) => Task.Run(() =>
+        CancellationToken cancellationToken) => Task.Run(async () =>
     {
         cancellationToken.ThrowIfCancellationRequested();
         var streams = map.CreateArchiveStreams(format, cancellationToken);
         try
         {
             using var archive = OpenArchive(streams, format);
-            var entries = archive.Entries
+            var sourceEntries = archive.Entries
                 .Where(entry => !entry.IsDirectory && !string.IsNullOrWhiteSpace(entry.Key))
-                .Select(entry => new TelegramArchiveEntry(
+                .ToArray();
+            var entries = new List<TelegramArchiveEntry>();
+            foreach (var entry in sourceEntries)
+            {
+                if (!IsPlayable(entry.Key!)) continue;
+                long dataOffset = -1;
+                if (format is TelegramArchiveFormat.Split7Zip or TelegramArchiveFormat.GenericSplit)
+                {
+                    dataOffset = await TelegramSevenZipStoredRangeResolver.TryResolveAsync(
+                        archive, entry, map, cancellationToken).ConfigureAwait(false) ?? -1;
+                }
+                entries.Add(new TelegramArchiveEntry(
                     entry.Key!,
                     entry.Size,
                     entry.CompressedSize,
                     entry.CompressionType == CompressionType.None ? 0 : 1,
-                    -1,
+                    dataOffset,
                     entry.IsEncrypted,
-                    IsPlayable(entry.Key!)))
-                .Where(entry => entry.IsPlayable)
-                .OrderByDescending(entry => entry.UncompressedSize)
-                .ThenBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-
-            var status = entries.Length == 0
+                    true));
+            }
+            var ordered = entries.OrderByDescending(entry => entry.UncompressedSize)
+                .ThenBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase).ToArray();
+            var status = ordered.Length == 0
                 ? "Arşivde oynatılabilir video veya ses bulunamadı."
-                : archive.IsEncrypted || entries.All(entry => entry.IsEncrypted)
+                : archive.IsEncrypted || ordered.All(entry => entry.IsEncrypted)
                     ? "Arşivdeki medya şifreli. Parola desteği henüz etkin değil."
-                    : $"{entries.Length} oynatılabilir medya bulundu. Sıkıştırılmış içerik oynatma sırasında çözülecek.";
-            return new TelegramArchiveInspection(format, entries, archive.IsComplete, status);
+                    : ordered.Any(entry => entry.UsesDirectRange)
+                        ? "Store arşiv: videoya diske çıkarmadan doğrudan erişilebilir."
+                        : $"{ordered.Length} oynatılabilir medya bulundu. Sıkıştırılmış içerik oynatma sırasında çözülecek.";
+            return new TelegramArchiveInspection(format, ordered, archive.IsComplete, status);
         }
         catch (OperationCanceledException)
         {
@@ -232,6 +243,8 @@ internal sealed class TelegramArchiveCacheSession : IAsyncDisposable
         _sessionDirectory = Path.Combine(cacheRoot, Guid.NewGuid().ToString("N"));
         _cachePath = Path.Combine(_sessionDirectory, SanitizeFileName(Path.GetFileName(entry.Name)));
     }
+
+    internal string SessionDirectory => _sessionDirectory;
 
     public long Length => _entry.UncompressedSize;
 

@@ -10,5 +10,6 @@
     <PackageVersion Include="tdlib.native.win-x64" Version="1.8.66" />
     <PackageVersion Include="MonoTorrent" Version="3.0.2" />
     <PackageVersion Include="SharpCompress" Version="0.50.1" />
+    <PackageVersion Include="TagLibSharp2" Version="0.6.0" />
   </ItemGroup>
 </Project>

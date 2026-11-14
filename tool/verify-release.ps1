@@ -11,6 +11,20 @@ $portableZip = Join-Path $root "artifacts\release\ADB-Player-Portable-v$version-
 $installer = Join-Path $root "artifacts\installer\ADB-Player-Setup-v$version-x64.exe"
 $errors = New-Object System.Collections.Generic.List[string]
 
+# Fail closed: official installers/portable packages may NOT contain a
+# maintainer-provided Telegram application identity. Users set it at runtime.
+$telegramGenerated = Join-Path $root "src\AltyaziDB.Player.Telegram\Generated\GeneratedTelegramCredentials.g.cs"
+if (-not (Test-Path -LiteralPath $telegramGenerated -PathType Leaf)) {
+    $errors.Add("Telegram BYOC kaynak dosyasi eksik.")
+} else {
+    $telegramText = [IO.File]::ReadAllText($telegramGenerated)
+    if (-not $telegramText.Contains('public const int ApiId = 0;') -or
+        -not $telegramText.Contains('public const string ApiHash = "";')) {
+        $errors.Add("Telegram API kimligi release derlemesine gomulmus olabilir; BYOC kontrolu basarisiz.")
+    }
+}
+
+
 foreach ($required in @(
     (Join-Path $portableDir "ADB.Player.exe"),
     (Join-Path $portableDir "portable.flag"),
@@ -19,8 +33,9 @@ foreach ($required in @(
     (Join-Path $portableDir "PRIVACY.md"),
     (Join-Path $portableDir "SECURITY.md"),
     (Join-Path $portableDir "THIRD_PARTY_NOTICES.md"),
+    (Join-Path $portableDir "TagLibSharp2-LICENSE.txt"),
     (Join-Path $portableDir "LICENSE"),
-    (Join-Path $portableDir "RELEASE_NOTES_v1.0.1.md"),
+    (Join-Path $portableDir "RELEASE_NOTES_v1.0.2.md"),
     $portableZip
 )) {
     if (-not (Test-Path -LiteralPath $required)) { $errors.Add("Eksik: $required") }
@@ -59,6 +74,7 @@ if (Test-Path -LiteralPath $portableZip) {
     try {
         if (-not ($zip.Entries | Where-Object { $_.FullName -eq "ADB.Player.exe" })) { $errors.Add("Portable ZIP içinde EXE yok.") }
         if (-not ($zip.Entries | Where-Object { $_.FullName -eq "portable.flag" })) { $errors.Add("Portable ZIP içinde portable.flag yok.") }
+        if (-not ($zip.Entries | Where-Object { $_.FullName -eq "TagLibSharp2-LICENSE.txt" })) { $errors.Add("Portable ZIP içinde audio metadata MIT lisans metni yok.") }
         if (-not ($zip.Entries | Where-Object { $_.FullName -eq "native/rclone/rclone.exe" -or $_.FullName -eq "native\rclone\rclone.exe" })) { $errors.Add("Portable ZIP içinde rclone.exe yok.") }
         if (-not ($zip.Entries | Where-Object { $_.FullName -eq "native/ffmpeg/bin/ffmpeg.exe" -or $_.FullName -eq "native\ffmpeg\bin\ffmpeg.exe" })) { $errors.Add("Portable ZIP içinde ffmpeg.exe yok.") }
         if (-not ($zip.Entries | Where-Object { $_.FullName -eq "native/ffmpeg/bin/ffprobe.exe" -or $_.FullName -eq "native\ffmpeg\bin\ffprobe.exe" })) { $errors.Add("Portable ZIP içinde ffprobe.exe yok.") }

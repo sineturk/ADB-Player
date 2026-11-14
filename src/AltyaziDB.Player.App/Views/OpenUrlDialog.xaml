@@ -3,17 +3,18 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="{DynamicResource Dialog.OpenUrlTitle}"
         Width="640"
-        Height="220"
         MinWidth="520"
-        MinHeight="200"
+        MinHeight="255"
+        MaxHeight="420"
+        SizeToContent="Height"
         WindowStartupLocation="CenterOwner"
-        ResizeMode="CanResizeWithGrip"
+        ResizeMode="NoResize"
         ShowInTaskbar="False">
-  <Grid Margin="22">
+  <Grid Margin="22,20,22,20">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
-      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
 
@@ -21,11 +22,17 @@
     <TextBlock Grid.Row="1"
                Margin="0,7,0,14"
                Foreground="{StaticResource MutedTextBrush}"
+               TextWrapping="Wrap"
                Text="{DynamicResource Dialog.OpenUrlHelp}" />
     <TextBox x:Name="UrlTextBox"
              Grid.Row="2"
-             MinHeight="42"
-             VerticalContentAlignment="Center"
+             Height="88" MinHeight="88"
+             VerticalContentAlignment="Top"
+             TextWrapping="Wrap"
+             AcceptsReturn="False"
+             VerticalScrollBarVisibility="Auto"
+             HorizontalScrollBarVisibility="Disabled"
+             Foreground="{StaticResource TextBrush}"
              KeyDown="UrlTextBox_OnKeyDown" />
 
     <StackPanel Grid.Row="3" Margin="0,16,0,0" Orientation="Horizontal" HorizontalAlignment="Right">

@@ -8,31 +8,31 @@
              Loaded="SettingsView_OnLoaded"
              Unloaded="SettingsView_OnUnloaded">
   <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-    <Grid Margin="20,18,22,24" MaxWidth="1120" HorizontalAlignment="Left">
-      <Grid.RowDefinitions>
-        <RowDefinition Height="Auto"/>
-        <RowDefinition Height="Auto"/>
-        <RowDefinition Height="Auto"/>
-        <RowDefinition Height="Auto"/>
-        <RowDefinition Height="Auto"/>
-        <RowDefinition Height="Auto"/>
-        <RowDefinition Height="Auto"/>
-      </Grid.RowDefinitions>
-
-      <StackPanel>
+    <!-- Flow layout: measured card height prevents advanced panel collisions. -->
+    <StackPanel Margin="22,20,24,36" MaxWidth="1120" HorizontalAlignment="Stretch">
+      <StackPanel Margin="0,0,0,2">
         <TextBlock Text="{DynamicResource Tab.Settings}" Style="{StaticResource R23PageHeading}"/>
         <TextBlock Text="{DynamicResource Settings.Api.Subtitle}"
-                   Style="{StaticResource R23SecondaryText}"
-                   Margin="0,4,0,0" TextWrapping="Wrap"/>
+                   Style="{StaticResource R23SecondaryText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
       </StackPanel>
 
-      <Border Grid.Row="1" Style="{StaticResource R24WorkspacePanel}" Margin="0,16,0,0">
+      <StackPanel Margin="0,18,0,11">
+        <TextBlock Text="{DynamicResource Settings.Sections.Account}" FontSize="17" FontWeight="SemiBold"
+                   Foreground="{StaticResource R23TextBrush}"/>
+        <TextBlock Text="{DynamicResource Settings.Sections.AccountHelp}" Margin="0,3,0,0"
+                   Style="{StaticResource R23SecondaryText}" TextWrapping="Wrap"/>
+      </StackPanel>
+
+      <Border Style="{StaticResource R24WorkspacePanel}" Margin="0,0,0,0">
         <Grid>
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto"/>
             <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="Auto"/>
           </Grid.ColumnDefinitions>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+          </Grid.RowDefinitions>
           <Border Width="46" Height="46" CornerRadius="13"
                   Background="#112B3A" BorderBrush="#285B73" BorderThickness="1">
             <TextBlock Text="&#xE895;" FontFamily="Segoe MDL2 Assets" FontSize="20"
@@ -52,19 +52,304 @@
                        Style="{StaticResource R23SecondaryText}" FontSize="11.5"
                        Margin="0,2,0,0"/>
           </StackPanel>
-          <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+          <WrapPanel Grid.Row="1" Grid.ColumnSpan="2" HorizontalAlignment="Right"
+                     Margin="0,15,0,0">
             <Button Style="{StaticResource R23ToolbarButton}"
                     Content="{DynamicResource Cloud.Preferences.UseCloud}"
                     Command="{Binding LoadCloudPreferencesCommand}"
-                    Margin="0,0,6,0"/>
+                    Margin="0,0,8,6"/>
             <Button Style="{StaticResource R23ToolbarPrimaryButton}"
                     Content="{DynamicResource Cloud.Preferences.SaveDevice}"
-                    Command="{Binding UploadCloudPreferencesCommand}"/>
-          </StackPanel>
+                    Command="{Binding UploadCloudPreferencesCommand}"
+                    Margin="0,0,0,6"/>
+          </WrapPanel>
         </Grid>
       </Border>
 
-      <Border Grid.Row="2" Style="{StaticResource R24InsetPanel}" Margin="0,14,0,14">
+      <StackPanel Margin="0,21,0,11">
+        <TextBlock Text="{DynamicResource Settings.Sections.Connections}" FontSize="17" FontWeight="SemiBold"
+                   Foreground="{StaticResource R23TextBrush}"/>
+        <TextBlock Text="{DynamicResource Settings.Sections.ConnectionsHelp}" Margin="0,3,0,0"
+                   Style="{StaticResource R23SecondaryText}" TextWrapping="Wrap"/>
+      </StackPanel>
+
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="14"/>
+          <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <Border Grid.Column="0" Style="{StaticResource R24WorkspacePanel}">
+          <StackPanel>
+            <TextBlock Text="{DynamicResource Settings.Telegram.Title}"
+                       Style="{StaticResource R23SectionHeading}"/>
+            <TextBlock Text="{DynamicResource Settings.Telegram.Help}"
+                       Style="{StaticResource R23SecondaryText}" Margin="0,4,0,14"
+                       TextWrapping="Wrap"/>
+
+            <Expander Margin="0,5,0,0" IsExpanded="False">
+              <Expander.Header>
+                <TextBlock Text="{DynamicResource Settings.Sections.Credentials}"
+                           Style="{StaticResource R23SecondaryText}" FontWeight="SemiBold"/>
+              </Expander.Header>
+              <StackPanel Margin="0,12,0,0">
+                <TextBlock Text="{DynamicResource Settings.Telegram.ApiId}"
+                       Style="{StaticResource R23SecondaryText}"/>
+            <TextBox Text="{Binding ApiSettings.TelegramApiIdText, UpdateSourceTrigger=PropertyChanged}"
+                     Margin="0,4,0,11" MinHeight="40"/>
+
+            <TextBlock Text="{DynamicResource Settings.Telegram.ApiHash}"
+                       Style="{StaticResource R23SecondaryText}"/>
+            <PasswordBox x:Name="TelegramApiHashBox"
+                         PasswordChanged="TelegramApiHashBox_OnPasswordChanged"
+                         Margin="0,4,0,8" MinHeight="40"/>
+
+            <TextBlock Text="{DynamicResource Settings.Api.AutoSaveHint}"
+                       Style="{StaticResource R23SecondaryText}" FontSize="12"
+                       TextWrapping="Wrap"/>
+              </StackPanel>
+            </Expander>
+          </StackPanel>
+        </Border>
+
+        <Border Grid.Column="2" Style="{StaticResource R24WorkspacePanel}">
+          <StackPanel>
+            <TextBlock Text="{DynamicResource Settings.AltyaziDb.Title}"
+                       Style="{StaticResource R23SectionHeading}"/>
+            <TextBlock Text="{DynamicResource Settings.AltyaziDb.Help}"
+                       Style="{StaticResource R23SecondaryText}" Margin="0,4,0,14"
+                       TextWrapping="Wrap"/>
+
+            <Expander Margin="0,5,0,0" IsExpanded="False">
+              <Expander.Header>
+                <TextBlock Text="{DynamicResource Settings.Sections.Credentials}"
+                           Style="{StaticResource R23SecondaryText}" FontWeight="SemiBold"/>
+              </Expander.Header>
+              <StackPanel Margin="0,12,0,0">
+                <TextBlock Text="{DynamicResource Settings.AltyaziDb.ApiUrl}"
+                       Style="{StaticResource R23SecondaryText}"/>
+            <TextBox Text="{Binding ApiSettings.AltyaziDbApiUrl, UpdateSourceTrigger=PropertyChanged}"
+                     Margin="0,4,0,11" MinHeight="40"/>
+
+            <TextBlock Text="{DynamicResource Settings.AltyaziDb.ApiKey}"
+                       Style="{StaticResource R23SecondaryText}"/>
+            <PasswordBox x:Name="AltyaziDbApiKeyBox"
+                         PasswordChanged="AltyaziDbApiKeyBox_OnPasswordChanged"
+                         Margin="0,4,0,8" MinHeight="40"/>
+
+            <TextBlock Text="{DynamicResource Settings.Api.OptionalDefaultHint}"
+                       Style="{StaticResource R23SecondaryText}" FontSize="12"
+                       TextWrapping="Wrap"/>
+              </StackPanel>
+            </Expander>
+          </StackPanel>
+        </Border>
+      </Grid>
+
+      <!-- R5/P4.11.1: Download location. Deliberately separate from cloud/API settings. -->
+
+      <StackPanel Margin="0,21,0,11">
+        <TextBlock Text="{DynamicResource Settings.Sections.Storage}" FontSize="17" FontWeight="SemiBold"
+                   Foreground="{StaticResource R23TextBrush}"/>
+        <TextBlock Text="{DynamicResource Settings.Sections.StorageHelp}" Margin="0,3,0,0"
+                   Style="{StaticResource R23SecondaryText}" TextWrapping="Wrap"/>
+      </StackPanel>
+
+      <Border Style="{StaticResource R24WorkspacePanel}" Margin="0,0,0,0">
+        <StackPanel>
+          <TextBlock Text="{DynamicResource Settings.TorrentStorage.Title}"
+                     Style="{StaticResource R23SectionHeading}"/>
+          <TextBlock Text="{DynamicResource Settings.TorrentStorage.Help}"
+                     Style="{StaticResource R23SecondaryText}" Margin="0,4,0,13"
+                     TextWrapping="Wrap"/>
+
+          <TextBlock Text="{DynamicResource Settings.TorrentStorage.Folder}"
+                     Style="{StaticResource R23SecondaryText}" Margin="0,0,0,5"/>
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBox x:Name="TorrentDownloadDirectoryDisplay"
+                     Text="{Binding TorrentDownloadDirectory, Mode=OneWay}"
+                     IsReadOnly="True" MinHeight="42"
+                     ToolTip="{DynamicResource Settings.TorrentStorage.Help}"
+                     AutomationProperties.Name="{DynamicResource Settings.TorrentStorage.Folder}"/>
+            <Button Grid.Column="1" Content="{DynamicResource Settings.TorrentStorage.Choose}"
+                    Style="{StaticResource R23ToolbarPrimaryButton}" Margin="9,0,0,0"
+                    Click="ChooseTorrentDownloadDirectory_Click"
+                    AutomationProperties.Name="{DynamicResource Settings.TorrentStorage.Choose}"/>
+          </Grid>
+
+          <StackPanel Margin="0,13,0,0">
+            <TextBlock Text="{Binding TorrentStorageFreeSpace}"
+                       Style="{StaticResource R23SecondaryText}"/>
+            <TextBlock Text="{Binding TorrentStorageStatus, Converter={StaticResource UserFacingTextConverter}}"
+                       Foreground="{StaticResource R23CyanBrush}"
+                       FontSize="12" Margin="0,4,0,0" TextWrapping="Wrap"/>
+            <WrapPanel HorizontalAlignment="Right" Margin="0,11,0,0">
+              <Button Content="{DynamicResource Settings.TorrentStorage.Open}"
+                      Command="{Binding OpenTorrentDownloadFolderCommand}"
+                      Style="{StaticResource R23ToolbarButton}" Margin="0,0,7,0"/>
+              <Button Content="{DynamicResource Settings.TorrentStorage.Default}"
+                      Style="{StaticResource R23ToolbarButton}"
+                      Click="ResetTorrentDownloadDirectory_Click"/>
+            </WrapPanel>
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <!-- R5/P4.14: TDLib file cache only. Never delete Telegram database or an active stream. -->
+
+      <Border Style="{StaticResource R24WorkspacePanel}" Margin="0,12,0,0">
+        <StackPanel>
+          <TextBlock Text="{DynamicResource Settings.TelegramCache.Title}"
+                     Style="{StaticResource R23SectionHeading}"/>
+          <TextBlock Text="{DynamicResource Settings.TelegramCache.Help}"
+                     Style="{StaticResource R23SecondaryText}" TextWrapping="Wrap" Margin="0,4,0,14"/>
+
+          <WrapPanel Margin="0,0,0,2">
+            <Border Background="#102437" BorderBrush="#24465C" BorderThickness="1"
+                    Padding="14,12" CornerRadius="11" MinWidth="220" Margin="0,0,9,8">
+              <TextBlock Text="{Binding Telegram.CacheUsageLabel}"
+                         Foreground="{StaticResource R23TextBrush}" TextWrapping="Wrap"
+                         FontWeight="SemiBold" FontSize="13"/>
+            </Border>
+            <Border Background="#101D2D" BorderBrush="#243C51" BorderThickness="1"
+                    Padding="14,12" CornerRadius="11" MinWidth="205" Margin="0,0,9,8">
+              <TextBlock Text="{Binding Telegram.CacheArchiveLabel}"
+                         Style="{StaticResource R23SecondaryText}" TextWrapping="Wrap"/>
+            </Border>
+            <Border Background="#101D2D" BorderBrush="#243C51" BorderThickness="1"
+                    Padding="14,12" CornerRadius="11" MinWidth="205" Margin="0,0,0,8">
+              <TextBlock Text="{Binding Telegram.CacheDatabaseLabel}"
+                         Style="{StaticResource R23SecondaryText}" TextWrapping="Wrap"/>
+            </Border>
+          </WrapPanel>
+
+          <WrapPanel Margin="0,13,0,0" VerticalAlignment="Center">
+            <TextBlock Text="{DynamicResource Settings.TelegramCache.Quota}" VerticalAlignment="Center"
+                       Style="{StaticResource R23SecondaryText}" Margin="0,0,9,0"/>
+            <ComboBox Width="100" MinHeight="35" ItemsSource="{Binding Telegram.CacheLimitOptions}"
+                      SelectedItem="{Binding Telegram.CacheLimitGiB, Mode=TwoWay}"
+                      AutomationProperties.Name="{DynamicResource Settings.TelegramCache.Quota}"/>
+            <CheckBox Content="{DynamicResource Settings.TelegramCache.Automatic}"
+                      IsChecked="{Binding Telegram.CacheAutoCleanup, Mode=TwoWay}"
+                      Margin="17,0,0,0" VerticalAlignment="Center"/>
+          </WrapPanel>
+
+          <TextBlock Text="{DynamicResource Settings.TelegramCache.QuotaHint}"
+                     Style="{StaticResource R23SecondaryText}" TextWrapping="Wrap"
+                     FontSize="11.5" Margin="0,8,0,0"/>
+
+          <TextBlock Text="{DynamicResource Settings.TelegramCache.Folder}"
+                     Style="{StaticResource R23SecondaryText}" Margin="0,15,0,5"/>
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBox Text="{Binding Telegram.CacheDirectoryDisplay, Mode=OneWay}"
+                     IsReadOnly="True" MinHeight="42"
+                     AutomationProperties.Name="{DynamicResource Settings.TelegramCache.Folder}"/>
+            <Button Grid.Column="1" Content="{DynamicResource Settings.TelegramCache.Choose}"
+                    Style="{StaticResource R23ToolbarPrimaryButton}" Margin="9,0,0,0"
+                    Click="ChooseTelegramCacheDirectory_Click"/>
+          </Grid>
+          <TextBlock Text="{Binding Telegram.CacheLocationHint}"
+                     Style="{StaticResource R23SecondaryText}" TextWrapping="Wrap" Margin="0,7,0,0"/>
+
+          <StackPanel Margin="0,14,0,0">
+            <TextBlock Text="{Binding Telegram.CacheStatus}"
+                       Style="{StaticResource R23SecondaryText}"
+                       TextWrapping="Wrap" Margin="0,0,0,10"/>
+            <WrapPanel HorizontalAlignment="Right">
+              <Button Content="{DynamicResource Settings.TelegramCache.Refresh}"
+                      Command="{Binding Telegram.RefreshCacheUsageCommand}"
+                      Style="{StaticResource R23ToolbarButton}" Margin="0,0,5,0"/>
+              <Button Content="{DynamicResource Settings.TelegramCache.Open}"
+                      Command="{Binding Telegram.OpenCacheDirectoryCommand}"
+                      Style="{StaticResource R23ToolbarButton}" Margin="0,0,5,0"/>
+              <Button Content="{DynamicResource Settings.TelegramCache.Default}"
+                      Click="ResetTelegramCacheDirectory_Click"
+                      Style="{StaticResource R23ToolbarButton}" Margin="0,0,5,0"/>
+              <Button Content="{DynamicResource Settings.TelegramCache.Clear}"
+                      Command="{Binding Telegram.ClearCacheCommand}"
+                      Style="{StaticResource R23ToolbarPrimaryButton}"/>
+            </WrapPanel>
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <!-- R5/P4.16.6: only rclone/cache is cleanup-managed.
+           Attached remote-cache media, OAuth runtime and tokens are protected. -->
+      <Border Style="{StaticResource R24WorkspacePanel}" Margin="0,12,0,0">
+        <StackPanel>
+          <TextBlock Text="{DynamicResource Settings.CloudCache.Title}"
+                     Style="{StaticResource R23SectionHeading}"/>
+          <TextBlock Text="{DynamicResource Settings.CloudCache.Help}"
+                     Style="{StaticResource R23SecondaryText}" TextWrapping="Wrap"
+                     Margin="0,4,0,12"/>
+          <Border Background="#102437" BorderBrush="#24465C" BorderThickness="1"
+                  CornerRadius="10" Padding="12,10" HorizontalAlignment="Left">
+            <TextBlock Text="{Binding CloudCache.UsageLabel}" FontWeight="SemiBold"/>
+          </Border>
+          <WrapPanel Margin="0,13,0,0" VerticalAlignment="Center">
+            <TextBlock Text="{DynamicResource Settings.CloudCache.Quota}"
+                       Style="{StaticResource R23SecondaryText}" VerticalAlignment="Center"
+                       Margin="0,0,9,0"/>
+            <ComboBox Width="100" MinHeight="35"
+                      ItemsSource="{Binding CloudCache.LimitOptions}"
+                      SelectedItem="{Binding CloudCache.LimitGiB, Mode=TwoWay}"/>
+            <CheckBox Content="{DynamicResource Settings.CloudCache.Automatic}"
+                      IsChecked="{Binding CloudCache.AutoCleanup, Mode=TwoWay}"
+                      Margin="16,0,0,0" VerticalAlignment="Center"/>
+          </WrapPanel>
+          <TextBlock Text="{DynamicResource Settings.CloudCache.SafeNote}"
+                     Style="{StaticResource R23SecondaryText}" TextWrapping="Wrap"
+                     Margin="0,9,0,12"/>
+          <TextBlock Text="{DynamicResource Settings.CloudCache.Folder}"
+                     Style="{StaticResource R23SecondaryText}" Margin="0,0,0,5"/>
+          <Grid>
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <TextBox Grid.Column="0" Text="{Binding CloudCache.DirectoryDisplay, Mode=OneWay}"
+                     IsReadOnly="True" MinHeight="42"/>
+            <Button Grid.Column="1" Style="{StaticResource R23ToolbarPrimaryButton}"
+                    Content="{DynamicResource Settings.CloudCache.Choose}"
+                    Click="ChooseCloudCacheDirectory_Click" Margin="8,0,0,0"/>
+          </Grid>
+          <Button Content="{DynamicResource Settings.CloudCache.Default}"
+                  Style="{StaticResource R23ToolbarButton}"
+                  Click="ResetCloudCacheDirectory_Click" HorizontalAlignment="Right"
+                  Margin="0,9,0,0"/>
+          <TextBlock Text="{DynamicResource Settings.CloudCache.ExtraNote}"
+                     Style="{StaticResource R23SecondaryText}" TextWrapping="Wrap"
+                     Margin="0,9,0,0"/>
+          <TextBlock Text="{Binding CloudCache.Status}" Foreground="{StaticResource R23CyanBrush}"
+                     TextWrapping="Wrap" Margin="0,10,0,0"/>
+          <WrapPanel HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button Style="{StaticResource R23ToolbarButton}"
+                    Content="{DynamicResource Settings.CloudCache.Refresh}"
+                    Command="{Binding CloudCache.RefreshCommand}" Margin="0,0,6,0"/>
+            <Button Style="{StaticResource R23ToolbarButton}"
+                    Content="{DynamicResource Settings.CloudCache.Open}"
+                    Command="{Binding CloudCache.OpenCommand}" Margin="0,0,6,0"/>
+            <Button Style="{StaticResource R23ToolbarPrimaryButton}"
+                    Content="{DynamicResource Settings.CloudCache.Clear}"
+                    Command="{Binding CloudCache.ClearCommand}"/>
+          </WrapPanel>
+        </StackPanel>
+      </Border>
+
+      <StackPanel Margin="0,21,0,11">
+        <TextBlock Text="{DynamicResource Settings.Sections.Privacy}" FontSize="17" FontWeight="SemiBold"
+                   Foreground="{StaticResource R23TextBrush}"/>
+        <TextBlock Text="{DynamicResource Settings.Sections.PrivacyHelp}" Margin="0,3,0,0"
+                   Style="{StaticResource R23SecondaryText}" TextWrapping="Wrap"/>
+      </StackPanel>
+
+      <Border Style="{StaticResource R24InsetPanel}" Margin="0,0,0,0">
         <Grid>
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto"/>
@@ -85,65 +370,14 @@
         </Grid>
       </Border>
 
-      <Grid Grid.Row="3">
-        <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="*"/>
-          <ColumnDefinition Width="14"/>
-          <ColumnDefinition Width="*"/>
-        </Grid.ColumnDefinitions>
+      <StackPanel Margin="0,21,0,11">
+        <TextBlock Text="{DynamicResource Settings.Sections.Advanced}" FontSize="17" FontWeight="SemiBold"
+                   Foreground="{StaticResource R23TextBrush}"/>
+        <TextBlock Text="{DynamicResource Settings.Sections.AdvancedHelp}" Margin="0,3,0,0"
+                   Style="{StaticResource R23SecondaryText}" TextWrapping="Wrap"/>
+      </StackPanel>
 
-        <Border Grid.Column="0" Style="{StaticResource R24WorkspacePanel}">
-          <StackPanel>
-            <TextBlock Text="{DynamicResource Settings.Telegram.Title}"
-                       Style="{StaticResource R23SectionHeading}"/>
-            <TextBlock Text="{DynamicResource Settings.Telegram.Help}"
-                       Style="{StaticResource R23SecondaryText}" Margin="0,4,0,14"
-                       TextWrapping="Wrap"/>
-
-            <TextBlock Text="{DynamicResource Settings.Telegram.ApiId}"
-                       Style="{StaticResource R23SecondaryText}"/>
-            <TextBox Text="{Binding ApiSettings.TelegramApiIdText, UpdateSourceTrigger=PropertyChanged}"
-                     Margin="0,4,0,11" MinHeight="40"/>
-
-            <TextBlock Text="{DynamicResource Settings.Telegram.ApiHash}"
-                       Style="{StaticResource R23SecondaryText}"/>
-            <PasswordBox x:Name="TelegramApiHashBox"
-                         PasswordChanged="TelegramApiHashBox_OnPasswordChanged"
-                         Margin="0,4,0,8" MinHeight="40"/>
-
-            <TextBlock Text="{DynamicResource Settings.Api.AutoSaveHint}"
-                       Style="{StaticResource R23SecondaryText}" FontSize="12"
-                       TextWrapping="Wrap"/>
-          </StackPanel>
-        </Border>
-
-        <Border Grid.Column="2" Style="{StaticResource R24WorkspacePanel}">
-          <StackPanel>
-            <TextBlock Text="{DynamicResource Settings.AltyaziDb.Title}"
-                       Style="{StaticResource R23SectionHeading}"/>
-            <TextBlock Text="{DynamicResource Settings.AltyaziDb.Help}"
-                       Style="{StaticResource R23SecondaryText}" Margin="0,4,0,14"
-                       TextWrapping="Wrap"/>
-
-            <TextBlock Text="{DynamicResource Settings.AltyaziDb.ApiUrl}"
-                       Style="{StaticResource R23SecondaryText}"/>
-            <TextBox Text="{Binding ApiSettings.AltyaziDbApiUrl, UpdateSourceTrigger=PropertyChanged}"
-                     Margin="0,4,0,11" MinHeight="40"/>
-
-            <TextBlock Text="{DynamicResource Settings.AltyaziDb.ApiKey}"
-                       Style="{StaticResource R23SecondaryText}"/>
-            <PasswordBox x:Name="AltyaziDbApiKeyBox"
-                         PasswordChanged="AltyaziDbApiKeyBox_OnPasswordChanged"
-                         Margin="0,4,0,8" MinHeight="40"/>
-
-            <TextBlock Text="{DynamicResource Settings.Api.OptionalDefaultHint}"
-                       Style="{StaticResource R23SecondaryText}" FontSize="12"
-                       TextWrapping="Wrap"/>
-          </StackPanel>
-        </Border>
-      </Grid>
-
-      <Expander Grid.Row="4" Margin="0,14,0,0" IsExpanded="False">
+      <Expander Margin="0,10,0,0" IsExpanded="False">
         <Expander.Header>
           <StackPanel>
             <TextBlock Text="{DynamicResource Settings.OptionalServices.Title}"
@@ -235,7 +469,7 @@
         </Border>
       </Expander>
 
-      <Expander Grid.Row="5" Margin="0,14,0,0" IsExpanded="False">
+      <Expander Margin="0,10,0,0" IsExpanded="False">
         <Expander.Header>
           <StackPanel>
             <TextBlock Text="{DynamicResource Settings.Cloud.Title}"
@@ -300,15 +534,19 @@
         </Border>
       </Expander>
 
-      <Border Grid.Row="6" Style="{StaticResource R23Toolbar}" Margin="0,16,0,0">
+      <Border Style="{StaticResource R23Toolbar}" Margin="0,18,0,0">
         <Grid>
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*"/>
             <ColumnDefinition Width="Auto"/>
           </Grid.ColumnDefinitions>
-          <TextBlock Text="{Binding ApiSettings.StatusText, Converter={StaticResource UserFacingTextConverter}}"
-                     Style="{StaticResource R23SecondaryText}"
-                     VerticalAlignment="Center" Margin="8,0,12,0"/>
+          <StackPanel Margin="8,0,12,0" VerticalAlignment="Center">
+            <TextBlock Text="{DynamicResource Settings.Api.SaveNote}"
+                       Style="{StaticResource R23SecondaryText}" TextWrapping="Wrap"/>
+            <TextBlock Text="{Binding ApiSettings.StatusText, Converter={StaticResource UserFacingTextConverter}}"
+                       Foreground="{StaticResource R23CyanBrush}" FontSize="11.5"
+                       TextWrapping="Wrap" Margin="0,3,0,0"/>
+          </StackPanel>
           <StackPanel Grid.Column="1" Orientation="Horizontal">
             <Button Style="{StaticResource R23ToolbarButton}"
                     Content="{DynamicResource Action.Refresh}"
@@ -319,6 +557,6 @@
           </StackPanel>
         </Grid>
       </Border>
-    </Grid>
+    </StackPanel>
   </ScrollViewer>
 </UserControl>

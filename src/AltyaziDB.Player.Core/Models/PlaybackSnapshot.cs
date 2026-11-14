@@ -11,7 +11,11 @@ public sealed record PlaybackSnapshot(
     bool IsIdle,
     bool IsBuffering,
     bool HasVideo,
-    bool HasAudio)
+    bool HasAudio,
+    string? AudioCodecName = null,
+    int? AudioSampleRateHz = null,
+    int? AudioChannelCount = null,
+    int? AudioBitrateKbps = null)
 {
     public static PlaybackSnapshot Empty { get; } = new(
         null,

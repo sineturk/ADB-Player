@@ -35,6 +35,26 @@ public sealed class PlayerSettings
     public string ShortcutFullscreen { get; set; } = "F";
     public string ShortcutMiniPlayer { get; set; } = "M";
     public string ShortcutPlaylist { get; set; } = "P";
+    public string ShortcutSubtitleDelayDecrease { get; set; } = "Z";
+    public string ShortcutSubtitleDelayIncrease { get; set; } = "X";
+    public string ShortcutAudioDelayDecrease { get; set; } = "Shift+Z";
+    public string ShortcutAudioDelayIncrease { get; set; } = "Shift+X";
+    // R4.1.1: All additional playback keys are user-editable (set to "None"
+    // to disable). Existing primary shortcuts remain unchanged.
+    public string ShortcutSpeedIncrease { get; set; } = "OemPlus";
+    public string ShortcutSpeedDecrease { get; set; } = "OemMinus";
+    public string ShortcutSpeedReset { get; set; } = "Ctrl+D0";
+    public string ShortcutNextMedia { get; set; } = "N";
+    public string ShortcutCycleAudioTrack { get; set; } = "B";
+    public string ShortcutCycleSubtitleTrack { get; set; } = "V";
+    public string ShortcutMute { get; set; } = "Ctrl+M";
+    public string ShortcutVolumeIncrease { get; set; } = "Ctrl+Up";
+    public string ShortcutVolumeDecrease { get; set; } = "Ctrl+Down";
+    public string ShortcutScreenshotAlternate { get; set; } = "Shift+S";
+    public string ShortcutSubtitleDelayDecreaseAlternate { get; set; } = "G";
+    public string ShortcutSubtitleDelayIncreaseAlternate { get; set; } = "H";
+    public string ShortcutAudioDelayDecreaseAlternate { get; set; } = "J";
+    public string ShortcutAudioDelayIncreaseAlternate { get; set; } = "K";
     public bool AutoExternalAudioSync { get; set; } = false;
     public int AudioSyncMaxSearchSeconds { get; set; } = 45;
     public bool AutoSubtitleSync { get; set; } = false;
@@ -77,10 +97,39 @@ public sealed class PlayerSettings
     // Telegram telefon bilgisi ve torrent tercihleri. Telegram uygulama kimliği .env.local üzerinden derlemeye eklenir.
     public int TelegramApiId { get; set; }
     public string TelegramPhoneNumber { get; set; } = string.Empty;
+    // P4.14: limited to TDLib file cache; database location and encryption key never move.
+    public int TelegramCacheLimitGiB { get; set; } = 10;
+    public bool TelegramCacheAutoCleanup { get; set; } = true;
+    // Empty means the normal AppPaths.TelegramFilesDirectory.
+    // New directory is applied only on the next application startup.
+    public string TelegramCacheDirectory { get; set; } = string.Empty;
+    // P4.16.6: bounded rclone cache cleanup, never OAuth runtime/config or user downloads.
+    public int CloudCacheLimitGiB { get; set; } = 2;
+    public bool CloudCacheAutoCleanup { get; set; } = true;
+    // Optional parent directory; app uses a dedicated marked child on restart.
+    public string CloudCacheDirectory { get; set; } = string.Empty;
+    // P4.15: favorites belong to this device and never contain authentication secrets.
+    public List<long> TelegramFavoriteChatIds { get; set; } = new();
+    // P4.15.4: source ownership is local-only metadata, never ADB Cloud auth.
+    // Keys are persistent Telegram media identities; no API token or TDLib database is stored.
+    public Dictionary<string, long> TelegramResumeSourceOwners { get; set; } =
+        new(StringComparer.OrdinalIgnoreCase);
+    // Legacy P5 resumes did not carry account IDs. Claim once for the first
+    // verified TDLib identity; never silently reassign on a later account switch.
+    public bool TelegramLegacyResumeOwnershipMigrated { get; set; }
     public int TorrentDownloadLimitKiB { get; set; }
     public int TorrentUploadLimitKiB { get; set; } = 512;
     public int TorrentCacheLimitGiB { get; set; } = 20;
     public bool TorrentLegalNoticeAccepted { get; set; }
+    // R5/P4.11 qBittorrent handoff. Password is NEVER stored in JSON settings;
+    // it is kept separately in the DPAPI-backed ISecretStore.
+    // Optional user-managed download location. Empty keeps the existing cache directory.
+    // This changes the target of new torrent sessions; existing downloaded data is not moved.
+    public string TorrentDownloadDirectory { get; set; } = string.Empty;
+    public string QBittorrentWebUiUrl { get; set; } = "http://127.0.0.1:8080";
+    public string QBittorrentUsername { get; set; } = string.Empty;
+    public bool QBittorrentAutoHandoff { get; set; }
+
 
     // W5 yayın ve güncelleme ayarları. Güncelleme manifesti yalnız HTTPS üzerinden okunur.
     public bool CheckUpdatesOnStartup { get; set; } = true;

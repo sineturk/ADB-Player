@@ -16,7 +16,8 @@ public sealed record TorrentEngineConfiguration(
     string CacheDirectory,
     int DownloadLimitKiB = 0,
     int UploadLimitKiB = 512,
-    int CacheLimitGiB = 20);
+    int CacheLimitGiB = 20,
+    bool UsePartialFiles = true);
 
 public sealed record TorrentFileItem(
     int Index,

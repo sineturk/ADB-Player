@@ -1,5 +1,6 @@
 ﻿param(
-    [string]$EnvFile
+    [string]$EnvFile,
+    [switch]$OmitTelegramCredentials
 )
 
 . "$PSScriptRoot\common.ps1"
@@ -127,16 +128,21 @@ $subtitleLines.Add("    public const string ApiUrl = `"$subtitleApiUrl`";")
 $subtitleLines.Add("    public const string ApiKey = `"$subtitleApiKey`";")
 $subtitleLines.Add('}')
 
+# Release packages ALWAYS use bring-your-own-credentials (BYOC).
+# In this mode never read Telegram keys from .env or machine environment.
 $telegramApiId = 0
-$telegramApiIdText = Get-EnvValue 'TELEGRAM_API_ID'
-if (-not [string]::IsNullOrWhiteSpace($telegramApiIdText)) {
-    $parsedApiId = 0
-    if (-not [int]::TryParse($telegramApiIdText, [ref]$parsedApiId) -or $parsedApiId -le 0) {
-        throw "TELEGRAM_API_ID pozitif bir tam sayı olmalıdır."
+$telegramApiHash = ''
+if (-not $OmitTelegramCredentials) {
+    $telegramApiIdText = Get-EnvValue 'TELEGRAM_API_ID'
+    if (-not [string]::IsNullOrWhiteSpace($telegramApiIdText)) {
+        $parsedApiId = 0
+        if (-not [int]::TryParse($telegramApiIdText, [ref]$parsedApiId) -or $parsedApiId -le 0) {
+            throw "TELEGRAM_API_ID pozitif bir tam sayı olmalıdır."
+        }
+        $telegramApiId = $parsedApiId
     }
-    $telegramApiId = $parsedApiId
+    $telegramApiHash = Escape-CSharp (Get-EnvValue 'TELEGRAM_API_HASH')
 }
-$telegramApiHash = Escape-CSharp (Get-EnvValue 'TELEGRAM_API_HASH')
 
 $telegramLines = New-Object System.Collections.Generic.List[string]
 $telegramLines.Add('// Bu dosya otomatik üretilmiştir. Gerçek değerleri kaynak kontrolüne eklemeyin.')
@@ -177,10 +183,12 @@ if (Test-Path -LiteralPath $EnvFile) {
     Write-Host ".env.local veya .env bulunamadı; varsa Windows/Process ortam değişkenleri kullanılacak." -ForegroundColor Yellow
 }
 
-if ($telegramApiId -gt 0 -and -not [string]::IsNullOrWhiteSpace($telegramApiHash)) {
-    Write-Host "Telegram uygulama kimliği: hazır" -ForegroundColor Green
+if ($OmitTelegramCredentials) {
+    Write-Host "Telegram BYOC: paket kimlikleri bos; kullanici API ID/HASH degerlerini uygulamada girer." -ForegroundColor Green
+} elseif ($telegramApiId -gt 0 -and -not [string]::IsNullOrWhiteSpace($telegramApiHash)) {
+    Write-Host "Telegram uygulama kimliği: hazir (gelistirme)" -ForegroundColor Green
 } else {
-    Write-Host "Telegram uygulama kimliği eksik: TELEGRAM_API_ID ve TELEGRAM_API_HASH tanımlanmalı." -ForegroundColor Yellow
+    Write-Host "Telegram uygulama kimliği: gelistirme icin istege bagli; kullanici uygulamada girebilir." -ForegroundColor Yellow
 }
 Write-Host "Bulut kimlik dosyası: $cloudOutput" -ForegroundColor DarkGray
 Write-Host "Telegram kimlik dosyası: $telegramOutput" -ForegroundColor DarkGray

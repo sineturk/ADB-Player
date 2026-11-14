@@ -4,66 +4,166 @@
              Background="{StaticResource R23AppBrush}"
              Foreground="{StaticResource R23TextBrush}"
              FontFamily="Segoe UI Variable Text, Segoe UI"
-             FontSize="14">
-  <Grid Margin="20,18,22,20">
+             FontSize="14" SizeChanged="Library_OnSizeChanged"
+              UseLayoutRounding="True" SnapsToDevicePixels="True">
+  <Grid x:Name="LibraryRootLayout" Margin="20,16,22,20">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto"/>
       <RowDefinition Height="*"/>
     </Grid.RowDefinitions>
 
-    <Grid Margin="0,0,0,17">
-      <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="*"/>
-        <ColumnDefinition Width="Auto"/>
-      </Grid.ColumnDefinitions>
-      <StackPanel>
-        <TextBlock Text="{DynamicResource R23.Page.Library.Title}" Style="{StaticResource R23PageHeading}"/>
-        <TextBlock Text="{DynamicResource R23.Page.Library.Help}"
-                   Style="{StaticResource R23SecondaryText}" Margin="0,5,0,0"/>
-      </StackPanel>
-      <Button Grid.Column="1"
-              Style="{StaticResource R23ToolbarButton}"
-              Content="{DynamicResource Account.CloudCollections.OpenLists}"
-              Command="{Binding ShowCloudListsCommand}"
-              VerticalAlignment="Top"/>
-    </Grid>
+    <!-- R5/P4.4: replace decorative hero with a compact operational header. -->
+    <Border Grid.Row="0" x:Name="LibraryHero" Height="94" Margin="0,0,0,11"
+            Style="{StaticResource R5LibraryFolderPanel}">
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        <StackPanel x:Name="LibraryHeroCopy" VerticalAlignment="Center"
+                    Margin="4,0,16,0">
+          <TextBlock Text="{DynamicResource R23.Page.Library.Title}"
+                     FontFamily="Segoe UI Variable Display, Segoe UI"
+                     FontSize="23" FontWeight="SemiBold"
+                     Foreground="{StaticResource R23TextBrush}"/>
+          <StackPanel Orientation="Horizontal" Margin="0,7,0,0">
+            <Border Style="{StaticResource R24StatusPill}" Margin="0,0,8,0">
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="{Binding Library.DisplayItemCount}"
+                           Foreground="{StaticResource R23CyanBrush}"
+                           FontWeight="SemiBold" Margin="0,0,5,0"/>
+                <TextBlock Text="{DynamicResource R5.Library.MediaCountLabel}"
+                           Foreground="{StaticResource R23MutedBrush}"/>
+              </StackPanel>
+            </Border>
+            <Border Style="{StaticResource R24StatusPill}">
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="{Binding Library.Folders.Count}"
+                           Foreground="{StaticResource R23CyanBrush}"
+                           FontWeight="SemiBold" Margin="0,0,5,0"/>
+                <TextBlock Text="{DynamicResource R5.Library.FolderCountLabel}"
+                           Foreground="{StaticResource R23MutedBrush}"/>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </StackPanel>
+        <WrapPanel x:Name="LibraryHeaderActions" Grid.Column="1"
+                   VerticalAlignment="Center" HorizontalAlignment="Right">
+          <Button Content="{DynamicResource Action.AddFolder}"
+                  Style="{StaticResource R23ToolbarButton}"
+                  Command="{Binding Library.AddFolderCommand}"
+                  MinHeight="35" Padding="12,6" Margin="0,0,8,0"/>
+          <Button Content="{DynamicResource Action.ScanAll}"
+                  Style="{StaticResource R23ToolbarButton}"
+                  Command="{Binding Library.ScanAllCommand}"
+                  MinHeight="35" Padding="12,6" Margin="0,0,8,0"/>
+          <Button Content="{DynamicResource Account.CloudCollections.OpenLists}"
+                  Style="{StaticResource R23ToolbarButton}"
+                  Command="{Binding ShowCloudListsCommand}"
+                  MinHeight="35" Padding="12,6"/>
+        </WrapPanel>
+      </Grid>
+    </Border>
 
-    <Grid Grid.Row="1" DataContext="{Binding Library}">
+    <Grid x:Name="LibraryWorkspace" Grid.Row="1" DataContext="{Binding Library}">
       <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="250"/>
-        <ColumnDefinition Width="14"/>
+        <ColumnDefinition x:Name="LibraryFolderColumn" Width="240"/>
+        <ColumnDefinition x:Name="LibraryColumnGap" Width="14"/>
         <ColumnDefinition Width="*"/>
       </Grid.ColumnDefinitions>
 
-      <Border Style="{StaticResource R23Panel}">
+      <Border x:Name="LibraryFolderPanel" Style="{StaticResource R5LibraryFolderPanel}"
+              Grid.Column="0">
         <DockPanel LastChildFill="True">
           <StackPanel DockPanel.Dock="Top">
-            <TextBlock Text="{DynamicResource R23.Library.Folders}"
-                       Style="{StaticResource R23SectionHeading}"/>
-            <TextBlock Text="{Binding Summary}"
-                       Style="{StaticResource R23SecondaryText}" Margin="0,5,0,12"/>
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="&#xE8B7;" FontFamily="Segoe MDL2 Assets"
+                         FontSize="18" Foreground="{StaticResource R23CyanBrush}"
+                         VerticalAlignment="Center" Margin="0,0,9,0"/>
+              <TextBlock Text="{DynamicResource R23.Library.Folders}"
+                         Style="{StaticResource R23SectionHeading}"/>
+            </StackPanel>
+            <Border Style="{StaticResource R24StatusPill}" Margin="0,12,0,14"
+                    HorizontalAlignment="Stretch">
+              <TextBlock Text="{Binding Summary}" FontSize="12"
+                         Foreground="{StaticResource R23MutedBrush}" TextWrapping="Wrap"/>
+            </Border>
+            <TextBlock Text="{DynamicResource R5.Library.FolderHint}"
+                       Style="{StaticResource R23SecondaryText}" Margin="1,0,0,9"
+                       FontSize="11.5"/>
           </StackPanel>
 
-          <StackPanel DockPanel.Dock="Bottom">
+          <StackPanel DockPanel.Dock="Bottom" Margin="0,14,0,0">
             <Button Style="{StaticResource R23PrimaryButton}"
                     Content="{DynamicResource Action.AddFolder}"
-                    Command="{Binding AddFolderCommand}" Margin="0,0,8,8"/>
+                    Command="{Binding AddFolderCommand}" MinHeight="39"
+                    HorizontalAlignment="Stretch" Margin="0,0,0,8"/>
             <Button Style="{StaticResource R23Button}"
                     Content="{DynamicResource Action.ScanAll}"
-                    Command="{Binding ScanAllCommand}" Margin="0,0,8,8"/>
+                    Command="{Binding ScanAllCommand}" MinHeight="38"
+                    HorizontalAlignment="Stretch" Margin="0,0,0,8"/>
             <Button Style="{StaticResource R23Button}"
                     Content="{DynamicResource Action.Remove}"
-                    Command="{Binding RemoveFolderCommand}" Margin="0,0,8,8"/>
+                    Command="{Binding RemoveFolderCommand}" MinHeight="38"
+                    HorizontalAlignment="Stretch"/>
           </StackPanel>
 
-          <ListBox ItemsSource="{Binding Folders}"
+          <ListBox x:Name="LibraryFolders"
+                   ItemsSource="{Binding Folders}"
                    SelectedItem="{Binding SelectedFolder, Mode=TwoWay}"
-                   DisplayMemberPath="Name"
-                   ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>
+                   Background="Transparent" BorderThickness="0"
+                   ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                   ScrollViewer.VerticalScrollBarVisibility="Auto">
+            <ListBox.ItemContainerStyle>
+              <Style TargetType="ListBoxItem">
+                <Setter Property="Margin" Value="0,0,0,6"/>
+                <Setter Property="Padding" Value="0"/>
+                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                <Setter Property="ToolTip" Value="{Binding Path}"/>
+                <Setter Property="Template">
+                  <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                      <Border x:Name="FolderSurface" Background="#122337"
+                              BorderBrush="#25455F" BorderThickness="1"
+                              CornerRadius="9" Padding="10,10">
+                        <ContentPresenter/>
+                      </Border>
+                      <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                          <Setter TargetName="FolderSurface" Property="Background" Value="#1B354B"/>
+                          <Setter TargetName="FolderSurface" Property="BorderBrush" Value="#588AA8"/>
+                        </Trigger>
+                        <Trigger Property="IsSelected" Value="True">
+                          <Setter TargetName="FolderSurface" Property="Background" Value="#1B4662"/>
+                          <Setter TargetName="FolderSurface" Property="BorderBrush"
+                                  Value="{StaticResource R23CyanBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                          <Setter TargetName="FolderSurface" Property="BorderBrush" Value="White"/>
+                          <Setter TargetName="FolderSurface" Property="BorderThickness" Value="2"/>
+                        </Trigger>
+                      </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                  </Setter.Value>
+                </Setter>
+              </Style>
+            </ListBox.ItemContainerStyle>
+            <ListBox.ItemTemplate>
+              <DataTemplate>
+                <StackPanel Orientation="Horizontal">
+                  <TextBlock Text="&#xE8B7;" FontFamily="Segoe MDL2 Assets"
+                             Foreground="{StaticResource R23CyanBrush}" FontSize="16"
+                             VerticalAlignment="Center" Margin="0,0,10,0"/>
+                  <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="12.5"
+                             VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                </StackPanel>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
         </DockPanel>
       </Border>
 
-      <Grid Grid.Column="2">
+      <Grid x:Name="LibraryMainWorkspace" Grid.Column="2">
         <Grid.RowDefinitions>
           <RowDefinition Height="Auto"/>
           <RowDefinition Height="Auto"/>
@@ -71,78 +171,141 @@
           <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <Grid Margin="0,0,0,10">
-          <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="150"/>
-            <ColumnDefinition Width="190"/>
-            <ColumnDefinition Width="Auto"/>
-            <ColumnDefinition Width="Auto"/>
-          </Grid.ColumnDefinitions>
-
-          <TextBox Grid.Column="0"
-                   Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                   MinHeight="44"
-                   ToolTip="{DynamicResource Library.Search.SmartHelp}"/>
-
-          <ComboBox Grid.Column="1"
-                    Margin="10,0,0,0"
-                    ItemsSource="{Binding Filters}"
-                    SelectedItem="{Binding SelectedFilter, Mode=TwoWay}">
-            <ComboBox.ItemTemplate>
-              <DataTemplate>
-                <TextBlock Text="{Binding Label, Converter={StaticResource LocalizedTextConverter}}"/>
-              </DataTemplate>
-            </ComboBox.ItemTemplate>
-          </ComboBox>
-
-          <ComboBox Grid.Column="2"
-                    Margin="10,0"
-                    ItemsSource="{Binding SortChoices}"
-                    SelectedItem="{Binding SelectedSort, Mode=TwoWay}">
-            <ComboBox.ItemTemplate>
-              <DataTemplate>
-                <TextBlock Text="{Binding Label, Converter={StaticResource LocalizedTextConverter}}"/>
-              </DataTemplate>
-            </ComboBox.ItemTemplate>
-          </ComboBox>
-
-          <Border Grid.Column="3"
-                  Style="{StaticResource R23Toolbar}"
-                  Margin="0,0,10,0"
-                  VerticalAlignment="Stretch">
-            <StackPanel Orientation="Horizontal">
-              <Button Style="{StaticResource R23ToolbarButton}"
-                      Command="{Binding ShowListViewCommand}"
-                      IsEnabled="{Binding IsGridView}"
-                      Margin="0,0,4,0">
-                <StackPanel Orientation="Horizontal">
-                  <TextBlock Text="&#xE8FD;"
-                             FontFamily="Segoe MDL2 Assets"
-                             Margin="0,0,6,0"/>
-                  <TextBlock Text="{DynamicResource Library.View.List}"/>
-                </StackPanel>
+        <!-- Compact on narrow windows; retains original search/filter/sort/view/refresh bindings. -->
+        <Border Style="{StaticResource R5LibraryToolbar}" Margin="0,0,0,10">
+          <Grid x:Name="LibraryFilterLayout">
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto"/>
+              <RowDefinition x:Name="LibraryFilterSecondRow" Height="0"/>
+              <RowDefinition x:Name="LibraryFilterThirdRow" Height="0"/>
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition x:Name="LibraryFilterTypeColumn" Width="155"/>
+              <ColumnDefinition x:Name="LibraryFilterSortColumn" Width="190"/>
+              <ColumnDefinition x:Name="LibraryFilterViewColumn" Width="Auto"/>
+              <ColumnDefinition x:Name="LibraryFilterRefreshColumn" Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Grid x:Name="LibrarySearchHost" Grid.Column="0" Margin="0,0,8,0">
+              <TextBox x:Name="LibrarySearchBox"
+                       MinHeight="44" Padding="42,7,40,7"
+                       Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                       ToolTip="{DynamicResource Library.Search.SmartHelp}"
+                       AutomationProperties.Name="{DynamicResource R5.Library.SearchLabel}"/>
+              <TextBlock Text="&#xE721;" FontFamily="Segoe MDL2 Assets" FontSize="18"
+                         Foreground="{StaticResource R23CyanBrush}" IsHitTestVisible="False"
+                         VerticalAlignment="Center" HorizontalAlignment="Left" Margin="13,0,0,0"/>
+              <TextBlock Text="{DynamicResource R5.Library.SearchPlaceholder}"
+                         Foreground="{StaticResource R23MutedBrush}" FontSize="13"
+                         VerticalAlignment="Center" IsHitTestVisible="False" Margin="42,0,40,0"
+                         TextTrimming="CharacterEllipsis">
+                <TextBlock.Style>
+                  <Style TargetType="TextBlock">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding Text, ElementName=LibrarySearchBox}" Value="">
+                        <Setter Property="Visibility" Value="Visible"/>
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </TextBlock.Style>
+              </TextBlock>
+              <Button HorizontalAlignment="Right" VerticalAlignment="Center"
+                      Content="&#xE711;" FontFamily="Segoe MDL2 Assets"
+                      Margin="0,0,5,0" Padding="8,5"
+                      Click="LibraryClearSearch_Click"
+                      ToolTip="{DynamicResource R5.Library.ClearSearch}"
+                      AutomationProperties.Name="{DynamicResource R5.Library.ClearSearch}">
+                <Button.Style>
+                  <Style TargetType="Button" BasedOn="{StaticResource R23ToolbarButton}">
+                    <Setter Property="Visibility" Value="Visible"/>
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding SearchText}" Value="">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </Button.Style>
               </Button>
-              <Button Style="{StaticResource R23ToolbarButton}"
-                      Command="{Binding ShowGridViewCommand}"
-                      IsEnabled="{Binding IsListView}">
-                <StackPanel Orientation="Horizontal">
-                  <TextBlock Text="&#xF0E2;"
-                             FontFamily="Segoe MDL2 Assets"
-                             Margin="0,0,6,0"/>
-                  <TextBlock Text="{DynamicResource Library.View.Grid}"/>
-                </StackPanel>
-              </Button>
-            </StackPanel>
-          </Border>
+            </Grid>
+            <ComboBox x:Name="LibraryTypeFilter" Grid.Column="1" Margin="0,0,8,0"
+                      MinHeight="44" ItemsSource="{Binding Filters}"
+                      SelectedItem="{Binding SelectedFilter, Mode=TwoWay}"
+                      AutomationProperties.Name="{DynamicResource R5.Library.FilterLabel}">
+              <ComboBox.ItemTemplate>
+                <DataTemplate>
+                  <TextBlock Text="{Binding Label, Converter={StaticResource LocalizedTextConverter}}"/>
+                </DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox>
+            <ComboBox x:Name="LibrarySortFilter" Grid.Column="2" Margin="0,0,8,0"
+                      MinHeight="44" ItemsSource="{Binding SortChoices}"
+                      SelectedItem="{Binding SelectedSort, Mode=TwoWay}"
+                      AutomationProperties.Name="{DynamicResource R5.Library.SortLabel}">
+              <ComboBox.ItemTemplate>
+                <DataTemplate>
+                  <TextBlock Text="{Binding Label, Converter={StaticResource LocalizedTextConverter}}"/>
+                </DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox>
+            <Border x:Name="LibraryViewSwitch" Grid.Column="3"
+                    Style="{StaticResource R23Toolbar}" Margin="0,0,8,0"
+                    VerticalAlignment="Stretch">
+              <StackPanel Orientation="Horizontal">
+                <Button Command="{Binding ShowListViewCommand}"
+                        ToolTip="{DynamicResource Library.View.List}"
+                        AutomationProperties.Name="{DynamicResource Library.View.List}"
+                        MinHeight="40" Margin="0,0,3,0">
+                  <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource R23ToolbarButton}">
+                      <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsListView}" Value="True">
+                          <Setter Property="Background" Value="#1B4969"/>
+                          <Setter Property="BorderBrush" Value="{StaticResource R23CyanBrush}"/>
+                          <Setter Property="FontWeight" Value="SemiBold"/>
+                        </DataTrigger>
+                      </Style.Triggers>
+                    </Style>
+                  </Button.Style>
+                  <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="&#xE8FD;" FontFamily="Segoe MDL2 Assets" Margin="0,0,6,0"/>
+                    <TextBlock Text="{DynamicResource Library.View.List}"/>
+                  </StackPanel>
+                </Button>
+                <Button Command="{Binding ShowGridViewCommand}"
+                        ToolTip="{DynamicResource Library.View.Grid}"
+                        AutomationProperties.Name="{DynamicResource Library.View.Grid}"
+                        MinHeight="40">
+                  <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource R23ToolbarButton}">
+                      <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsGridView}" Value="True">
+                          <Setter Property="Background" Value="#1B4969"/>
+                          <Setter Property="BorderBrush" Value="{StaticResource R23CyanBrush}"/>
+                          <Setter Property="FontWeight" Value="SemiBold"/>
+                        </DataTrigger>
+                      </Style.Triggers>
+                    </Style>
+                  </Button.Style>
+                  <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="&#xF0E2;" FontFamily="Segoe MDL2 Assets" Margin="0,0,6,0"/>
+                    <TextBlock Text="{DynamicResource Library.View.Grid}"/>
+                  </StackPanel>
+                </Button>
+              </StackPanel>
+            </Border>
+            <Button x:Name="LibraryRefreshButton" Grid.Column="4"
+                    Style="{StaticResource R23ToolbarButton}"
+                    Content="{DynamicResource Action.Refresh}"
+                    Command="{Binding RefreshCommand}"
+                    MinHeight="44" Padding="12,7"
+                    AutomationProperties.Name="{DynamicResource Action.Refresh}"/>
+          </Grid>
+        </Border>
 
-          <Button Grid.Column="4"
-                  Style="{StaticResource R23Button}"
-                  Content="{DynamicResource Action.Refresh}"
-                  Command="{Binding RefreshCommand}"/>
-        </Grid>
-
-        <Grid Grid.Row="1" Margin="0,0,0,8">
+        <Border Grid.Row="1" Style="{StaticResource R24InsetPanel}"
+                Padding="8,6" Margin="0,0,0,10">
+          <Grid x:Name="LibrarySecondaryToolbar">
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto"/>
             <ColumnDefinition Width="Auto"/>
@@ -182,20 +345,21 @@
             </ComboBox.ItemTemplate>
           </ComboBox>
 
-          <TextBlock Grid.Column="2"
-                     Text="{DynamicResource Library.Search.SmartHelp}"
+          <TextBlock x:Name="LibrarySmartSearchHint" Grid.Column="2"
+                      Text="{DynamicResource Library.Search.SmartHelp}"
                      Style="{StaticResource R23SecondaryText}"
                      VerticalAlignment="Center"
                      HorizontalAlignment="Right"
                      TextTrimming="CharacterEllipsis"
                      Margin="14,0,0,0"/>
-        </Grid>
+          </Grid>
+        </Border>
 
-        <Border Grid.Row="2" Style="{StaticResource R24WorkspacePanel}">
-          <Grid>
+        <Border x:Name="LibraryMediaStage" Grid.Row="2" Style="{StaticResource R5LibraryStage}">
+          <Grid x:Name="LibraryMediaContentGrid">
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="*"/>
-              <ColumnDefinition Width="Auto"/>
+              <ColumnDefinition x:Name="LibraryDetailsColumn" Width="Auto"/>
             </Grid.ColumnDefinitions>
 
             <ListBox x:Name="LibraryItems"
@@ -224,7 +388,7 @@
               <ListBox.ItemContainerStyle>
                 <Style TargetType="ListBoxItem">
                   <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                  <Setter Property="Margin" Value="0,0,0,9"/>
+                  <Setter Property="Margin" Value="0,0,0,10"/>
                   <Setter Property="Padding" Value="0"/>
                   <Setter Property="Background" Value="Transparent"/>
                   <Setter Property="BorderBrush" Value="Transparent"/>
@@ -239,18 +403,22 @@
                           CornerRadius="12">
                     <Border.Style>
                       <Style TargetType="Border">
-                        <Setter Property="Background" Value="{StaticResource R23RaisedBrush}"/>
-                        <Setter Property="BorderBrush" Value="{StaticResource R23StrokeBrush}"/>
+                        <Setter Property="Background" Value="#142638"/>
+                        <Setter Property="BorderBrush" Value="#304C64"/>
                         <Style.Triggers>
                           <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsMouseOver}" Value="True">
-                            <Setter Property="Background" Value="#18283B"/>
-                            <Setter Property="BorderBrush" Value="#31556F"/>
+                            <Setter Property="Background" Value="#1B3549"/>
+                            <Setter Property="BorderBrush" Value="#5F8BA8"/>
                           </DataTrigger>
                           <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsSelected}" Value="True">
-                            <Setter Property="Background" Value="#1B2D43"/>
-                            <Setter Property="BorderBrush" Value="#49CFF5"/>
+                            <Setter Property="Background" Value="#1D405A"/>
+                            <Setter Property="BorderBrush" Value="{StaticResource R23CyanBrush}"/>
                           </DataTrigger>
-                        </Style.Triggers>
+                        <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsKeyboardFocusWithin}" Value="True">
+                             <Setter Property="BorderBrush" Value="#E5F7FF"/>
+                             <Setter Property="BorderThickness" Value="2"/>
+                           </DataTrigger>
+                         </Style.Triggers>
                       </Style>
                     </Border.Style>
                     <Grid>
@@ -368,15 +536,20 @@
               </ListBox.ItemsPanel>
               <ListBox.ItemContainerStyle>
                 <Style TargetType="ListBoxItem">
-                  <Setter Property="Width" Value="184"/>
-                  <Setter Property="Height" Value="308"/>
-                  <Setter Property="Margin" Value="0,0,10,12"/>
+                  <Setter Property="Width" Value="190"/>
+                  <Setter Property="Height" Value="320"/>
+                  <Setter Property="Margin" Value="0,0,12,14"/>
                   <Setter Property="Padding" Value="0"/>
                   <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                   <Setter Property="VerticalContentAlignment" Value="Stretch"/>
                   <Setter Property="Background" Value="Transparent"/>
                   <Setter Property="BorderBrush" Value="Transparent"/>
                   <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                   <Setter Property="ToolTip" Value="{Binding DisplayTitle}"/>
+                   <Setter Property="AutomationProperties.Name" Value="{Binding DisplayTitle}"/>
+                   <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+                   <EventSetter Event="MouseEnter" Handler="LibraryPoster_OnMouseEnter"/>
+                   <EventSetter Event="MouseLeave" Handler="LibraryPoster_OnMouseLeave"/>
                 </Style>
               </ListBox.ItemContainerStyle>
               <ListBox.ItemTemplate>
@@ -386,23 +559,27 @@
                           CornerRadius="13">
                     <Border.Style>
                       <Style TargetType="Border">
-                        <Setter Property="Background" Value="{StaticResource R23RaisedBrush}"/>
-                        <Setter Property="BorderBrush" Value="{StaticResource R23StrokeBrush}"/>
+                        <Setter Property="Background" Value="#14283B"/>
+                        <Setter Property="BorderBrush" Value="#345571"/>
                         <Style.Triggers>
                           <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsMouseOver}" Value="True">
-                            <Setter Property="Background" Value="#18283B"/>
-                            <Setter Property="BorderBrush" Value="#31556F"/>
+                            <Setter Property="Background" Value="#1A3449"/>
+                            <Setter Property="BorderBrush" Value="#6597B4"/>
                           </DataTrigger>
                           <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsSelected}" Value="True">
-                            <Setter Property="Background" Value="#1B2D43"/>
-                            <Setter Property="BorderBrush" Value="#49CFF5"/>
+                            <Setter Property="Background" Value="#214461"/>
+                            <Setter Property="BorderBrush" Value="{StaticResource R23CyanBrush}"/>
                           </DataTrigger>
-                        </Style.Triggers>
+                        <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsKeyboardFocusWithin}" Value="True">
+                             <Setter Property="BorderBrush" Value="#E5F7FF"/>
+                             <Setter Property="BorderThickness" Value="2"/>
+                           </DataTrigger>
+                         </Style.Triggers>
                       </Style>
                     </Border.Style>
                     <Grid>
                       <Grid.RowDefinitions>
-                        <RowDefinition Height="226"/>
+                        <RowDefinition Height="232"/>
                         <RowDefinition Height="*"/>
                       </Grid.RowDefinitions>
                       <Border CornerRadius="9"
@@ -440,7 +617,15 @@
                               </Style>
                             </TextBlock.Style>
                           </TextBlock>
-                          <ProgressBar Value="{Binding ProgressPercent, Mode=OneWay}"
+                          <Border Background="#DA0A1B2B" BorderBrush="#55758B"
+                                   BorderThickness="1" CornerRadius="6" Padding="7,3"
+                                   HorizontalAlignment="Left" VerticalAlignment="Top"
+                                   Margin="8" IsHitTestVisible="False">
+                             <TextBlock Text="{Binding MediaType, Converter={StaticResource CloudMetadataTextConverter}, ConverterParameter=mediaType}"
+                                        Foreground="{StaticResource R23CyanBrush}"
+                                        FontWeight="SemiBold" FontSize="10.5"/>
+                           </Border>
+                           <ProgressBar Value="{Binding ProgressPercent, Mode=OneWay}"
                                        Maximum="100"
                                        VerticalAlignment="Bottom"
                                        Height="4"
@@ -480,11 +665,11 @@
               </ListBox.ItemTemplate>
             </ListBox>
 
-            <Border Grid.Column="1"
+            <Border x:Name="LibrarySeriesDetails" Grid.Column="1"
                     Width="420"
                     Margin="14,0,0,0"
-                    Background="#101B2A"
-                    BorderBrush="{StaticResource R23StrokeBrush}"
+                    Background="#111F30"
+                    BorderBrush="#37607C"
                     BorderThickness="1"
                     CornerRadius="14"
                     ClipToBounds="True">
@@ -776,11 +961,11 @@
               </Grid>
             </Border>
 
-            <Border Grid.Column="1"
+            <Border x:Name="LibraryItemDetails" Grid.Column="1"
                     Width="390"
                     Margin="14,0,0,0"
-                    Background="#101B2A"
-                    BorderBrush="{StaticResource R23StrokeBrush}"
+                    Background="#111F30"
+                    BorderBrush="#37607C"
                     BorderThickness="1"
                     CornerRadius="14"
                     ClipToBounds="True">
@@ -863,7 +1048,7 @@
                               VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled">
                   <StackPanel Margin="16,14,16,16">
-                    <TextBlock Text="{Binding SelectedDetailStatusText}"
+                    <TextBlock Text="{Binding SelectedDetailStatusText, Converter={StaticResource UserFacingTextConverter}}"
                                Foreground="{StaticResource R23CyanBrush}"
                                FontSize="12"
                                TextWrapping="Wrap"
@@ -978,6 +1163,37 @@
               </Grid>
             </Border>
 
+            <!-- Distinguish active scanning from an actually empty catalog. -->
+            <StackPanel Grid.ColumnSpan="2" VerticalAlignment="Center"
+                        HorizontalAlignment="Center" MaxWidth="350"
+                        IsHitTestVisible="False">
+              <StackPanel.Style>
+                <Style TargetType="StackPanel">
+                  <Setter Property="Visibility" Value="Collapsed"/>
+                  <Style.Triggers>
+                    <MultiDataTrigger>
+                      <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding Items.Count}" Value="0"/>
+                        <Condition Binding="{Binding IsBusy}" Value="True"/>
+                      </MultiDataTrigger.Conditions>
+                      <Setter Property="Visibility" Value="Visible"/>
+                    </MultiDataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </StackPanel.Style>
+              <Border Style="{StaticResource R24EmptyIcon}" HorizontalAlignment="Center">
+                <TextBlock Text="&#xE895;" FontFamily="Segoe MDL2 Assets"
+                           Foreground="{StaticResource R23CyanBrush}" FontSize="26"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+              </Border>
+              <TextBlock Text="{DynamicResource R5.Library.Loading}"
+                         Style="{StaticResource R23SectionHeading}"
+                         TextAlignment="Center" Margin="0,13,0,4"/>
+              <TextBlock Text="{Binding StatusText, Converter={StaticResource UserFacingTextConverter}}"
+                         Style="{StaticResource R23SecondaryText}"
+                         TextWrapping="Wrap" TextAlignment="Center"/>
+            </StackPanel>
+
             <StackPanel Grid.ColumnSpan="2"
                         VerticalAlignment="Center"
                         HorizontalAlignment="Center"
@@ -986,9 +1202,13 @@
                 <Style TargetType="StackPanel">
                   <Setter Property="Visibility" Value="Collapsed"/>
                   <Style.Triggers>
-                    <DataTrigger Binding="{Binding Items.Count}" Value="0">
+                    <MultiDataTrigger>
+                      <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding Items.Count}" Value="0"/>
+                        <Condition Binding="{Binding IsBusy}" Value="False"/>
+                      </MultiDataTrigger.Conditions>
                       <Setter Property="Visibility" Value="Visible"/>
-                    </DataTrigger>
+                    </MultiDataTrigger>
                   </Style.Triggers>
                 </Style>
               </StackPanel.Style>
@@ -1009,27 +1229,62 @@
                          Style="{StaticResource R23SecondaryText}"
                          TextWrapping="Wrap"
                          TextAlignment="Center"/>
-              <Button Style="{StaticResource R23PrimaryButton}"
-                      Content="{DynamicResource Action.AddFolder}"
+              <Button Content="{DynamicResource Action.AddFolder}"
                       Command="{Binding AddFolderCommand}"
-                      HorizontalAlignment="Center"
-                      Margin="0,16,0,0"
-                      MinWidth="150"/>
+                      HorizontalAlignment="Center" Margin="0,16,0,0" MinWidth="150">
+                <Button.Style>
+                  <Style TargetType="Button" BasedOn="{StaticResource R23PrimaryButton}">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding Folders.Count}" Value="0">
+                        <Setter Property="Visibility" Value="Visible"/>
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </Button.Style>
+              </Button>
+              <Button Content="{DynamicResource R5.Library.ResetFilters}"
+                      Click="LibraryResetFilters_Click"
+                      HorizontalAlignment="Center" Margin="0,12,0,0" MinWidth="150">
+                <Button.Style>
+                  <Style TargetType="Button" BasedOn="{StaticResource R23ToolbarButton}">
+                    <Setter Property="Visibility" Value="Visible"/>
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding Folders.Count}" Value="0">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </Button.Style>
+              </Button>
             </StackPanel>
           </Grid>
         </Border>
 
-        <DockPanel Grid.Row="3" Margin="0,12,0,0">
-          <TextBlock Text="{Binding StatusText, Converter={StaticResource UserFacingTextConverter}}"
-                     Style="{StaticResource R23SecondaryText}"
-                     VerticalAlignment="Center"/>
-          <Button DockPanel.Dock="Right"
-                  Style="{StaticResource R23PrimaryButton}"
-                  Content="{DynamicResource Action.PlaySelected}"
-                  Command="{Binding PlaySelectedCommand}"
-                  HorizontalAlignment="Right"
-                  Margin="12,0,0,0"/>
-        </DockPanel>
+        <Border Grid.Row="3" Style="{StaticResource R5LibraryStatus}" Margin="0,10,0,0">
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="3,0,12,0">
+              <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+                <TextBlock Text="{Binding DisplayItemCount}" FontSize="12"
+                           FontWeight="SemiBold" Foreground="{StaticResource R23CyanBrush}"
+                           Margin="0,0,5,0"/>
+                <TextBlock Text="{DynamicResource R5.Library.MediaCountLabel}"
+                           Style="{StaticResource R23SecondaryText}"/>
+              </StackPanel>
+              <TextBlock Text="{Binding StatusText, Converter={StaticResource UserFacingTextConverter}}"
+                         Foreground="{StaticResource R23MutedBrush}" FontSize="11.5"
+                         TextTrimming="CharacterEllipsis"/>
+            </StackPanel>
+            <Button Grid.Column="1" Style="{StaticResource R23PrimaryButton}"
+                    Content="{DynamicResource Action.PlaySelected}"
+                    Command="{Binding PlaySelectedCommand}" MinHeight="40"
+                    HorizontalAlignment="Right"/>
+          </Grid>
+        </Border>
       </Grid>
     </Grid>
   </Grid>

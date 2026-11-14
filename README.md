@@ -6,7 +6,8 @@ V1.0 focuses on one place for local playback, user-connected sources, subtitles,
 
 ## Highlights
 
-- Local video playback with libmpv.
+- Local video and standalone audio playback (MP3, FLAC, WAV and more) with libmpv.
+- Cinematic Media Hub, Telegram media browsing, local audio cover artwork and unified device-local resume.
 - Direct URL, WebDAV/NAS and supported cloud-source workflows.
 - Optional Telegram integration.
 - User-configured Stremio-compatible add-ons and external indexer/source connections.
@@ -31,8 +32,8 @@ ADB Player does **not** ship media catalogs, torrent indexers, copyrighted media
 
 Public releases are distributed as:
 
-- `ADB-Player-Setup-v1.0.1.0-x64.exe`
-- `ADB-Player-Portable-v1.0.1.0-x64.zip`
+- `ADB-Player-Setup-v1.0.2.0-x64.exe`
+- `ADB-Player-Portable-v1.0.2.0-x64.zip`
 - `SHA256SUMS.txt`
 
 Verify release hashes before installation. When a signed build is provided, Windows signature verification should also succeed.
@@ -98,4 +99,4 @@ The public V1.0 source snapshot contains the product source and build/release to
 
 ## Release
 
-See [ADB Player V1.0.1 release notes](RELEASE_NOTES_v1.0.1.md).
+See [ADB Player v1.0.2 release notes](RELEASE_NOTES_v1.0.2.md).

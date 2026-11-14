@@ -35,12 +35,12 @@ public partial class OpenUrlDialog : Window
         if (!Uri.TryCreate(candidate, UriKind.Absolute, out var uri) ||
             (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
         {
-            System.Windows.MessageBox.Show(
-                this,
-                LocalizationManager.Get("Dialog.InvalidUrl"),
+            var dialog = new AppDialog(
                 LocalizationManager.Get("Dialog.OpenUrlFailed"),
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
+                LocalizationManager.Get("Dialog.InvalidUrl"),
+                AppDialogKind.Warning);
+            dialog.Owner = this;
+            dialog.ShowDialog();
             return;
         }
 
@@ -57,7 +57,10 @@ public partial class OpenUrlDialog : Window
                 (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
             {
                 UrlTextBox.Text = text;
-                UrlTextBox.SelectAll();
+                // Highlighting a long URL immediately on paste makes selected
+                // text look faint and hides most of the address in the single-line view.
+                UrlTextBox.Select(0, 0);
+                UrlTextBox.ScrollToHome();
             }
         }
         catch

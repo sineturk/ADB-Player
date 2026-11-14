@@ -17,11 +17,45 @@
         DragOver="Window_OnDragOver"
         PreviewKeyDown="Window_OnKeyDown"
         PreviewMouseMove="Window_OnPreviewMouseMove"
+        Deactivated="Window_OnDeactivated"
         SizeChanged="Window_OnSizeChanged"
         Background="#05080D"
         UseLayoutRounding="True">
 
   <Window.Resources>
+    <!-- Cinematic Dark Glass P1: no visual-effects sampling of native libmpv.
+         Low-cost frosted appearance, readable contrast, alpha compositing. -->
+    <LinearGradientBrush x:Key="PlayerGlassShellBrush" StartPoint="0,0" EndPoint="0,1">
+      <GradientStop Color="#E0142635" Offset="0"/>
+      <GradientStop Color="#F008131D" Offset="1"/>
+    </LinearGradientBrush>
+    <!-- R4 translucent-on-video surface: dock fallback retains the denser shell. -->
+    <LinearGradientBrush x:Key="PlayerOverlayGlassBrush" StartPoint="0,0" EndPoint="0,1">
+      <GradientStop Color="#C2193346" Offset="0"/>
+      <GradientStop Color="#DF07131F" Offset="1"/>
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="PlayerGlassPopupBrush" StartPoint="0,0" EndPoint="1,1">
+      <GradientStop Color="#F1203446" Offset="0"/>
+      <GradientStop Color="#F40C1927" Offset="0.6"/>
+      <GradientStop Color="#F7081420" Offset="1"/>
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="PlayerGlassChipBrush" StartPoint="0,0" EndPoint="0,1">
+      <GradientStop Color="#AD294054" Offset="0"/>
+      <GradientStop Color="#A3112334" Offset="1"/>
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="PlayerGlassTransportBrush" StartPoint="0,0" EndPoint="1,1">
+      <GradientStop Color="#BB1C3547" Offset="0"/>
+      <GradientStop Color="#D50A1B2C" Offset="1"/>
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="PlayerGlassToastBrush" StartPoint="0,0" EndPoint="0,1">
+      <GradientStop Color="#E6203447" Offset="0"/>
+      <GradientStop Color="#F30B1825" Offset="1"/>
+    </LinearGradientBrush>
+    <SolidColorBrush x:Key="PlayerGlassStrokeBrush" Color="#6387A2B7"/>
+    <SolidColorBrush x:Key="PlayerGlassMutedStrokeBrush" Color="#3B7895A9"/>
+    <SolidColorBrush x:Key="PlayerGlassAccentBrush" Color="#3DD0EE"/>
+    <SolidColorBrush x:Key="PlayerGlassTextBrush" Color="#EBF6FC"/>
+
     <!-- R2.4 Rev6: player-only calm sci-fi visual layer.
          Kept local to MainWindow so Media Center pages remain unchanged. -->
     <LinearGradientBrush x:Key="PlayerSciFiHeaderBrush" StartPoint="0,0" EndPoint="1,0">
@@ -97,17 +131,17 @@
     </Style>
 
     <Style x:Key="PlayerTransportButtonStyle" TargetType="Button">
-      <Setter Property="Width" Value="42"/>
-      <Setter Property="Height" Value="42"/>
-      <Setter Property="MinWidth" Value="42"/>
+      <Setter Property="Width" Value="38"/>
+      <Setter Property="Height" Value="38"/>
+      <Setter Property="MinWidth" Value="38"/>
       <Setter Property="Padding" Value="0"/>
-      <Setter Property="Margin" Value="3,1"/>
+      <Setter Property="Margin" Value="2,0"/>
       <Setter Property="FontSize" Value="15"/>
       <Setter Property="FontWeight" Value="SemiBold"/>
       <Setter Property="Foreground" Value="#DDEAF0"/>
-      <Setter Property="Background" Value="#0D1822"/>
-      <Setter Property="BorderBrush" Value="#294153"/>
-      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
       <Setter Property="Cursor" Value="Hand"/>
       <Setter Property="Template">
         <Setter.Value>
@@ -121,8 +155,8 @@
             </Border>
             <ControlTemplate.Triggers>
               <Trigger Property="IsMouseOver" Value="True">
-                <Setter TargetName="TransportBorder" Property="Background" Value="#142431"/>
-                <Setter TargetName="TransportBorder" Property="BorderBrush" Value="#3B708B"/>
+                <Setter TargetName="TransportBorder" Property="Background" Value="#87446880"/>
+                <Setter TargetName="TransportBorder" Property="BorderBrush" Value="{StaticResource PlayerGlassStrokeBrush}"/>
                 <Setter Property="Foreground" Value="#F5FCFF"/>
               </Trigger>
               <Trigger Property="IsPressed" Value="True">
@@ -141,35 +175,24 @@
     </Style>
 
     <Style x:Key="PlayerPrimaryTransportButtonStyle" TargetType="Button" BasedOn="{StaticResource PlayerTransportButtonStyle}">
-      <Setter Property="Width" Value="58"/>
-      <Setter Property="Height" Value="58"/>
-      <Setter Property="MinWidth" Value="58"/>
+      <Setter Property="Width" Value="50"/>
+      <Setter Property="Height" Value="50"/>
+      <Setter Property="MinWidth" Value="50"/>
       <Setter Property="Background" Value="{StaticResource PlayerSciFiPrimaryBrush}"/>
       <Setter Property="Foreground" Value="#04121B"/>
-      <Setter Property="BorderBrush" Value="#79DFF8"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
       <Setter Property="FontSize" Value="20"/>
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="Button">
-            <Grid>
-              <Border x:Name="OuterRing"
-                      Background="#0C1720"
-                      BorderBrush="#2D5E76"
-                      BorderThickness="1"
-                      CornerRadius="31"
-                      Margin="-4"/>
-              <Border x:Name="PrimaryTransportBorder"
-                      Background="{TemplateBinding Background}"
-                      BorderBrush="{TemplateBinding BorderBrush}"
-                      BorderThickness="1"
-                      CornerRadius="29">
-                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-              </Border>
-            </Grid>
+            <Border x:Name="PrimaryTransportBorder"
+                    Background="{TemplateBinding Background}"
+                    CornerRadius="25">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
             <ControlTemplate.Triggers>
               <Trigger Property="IsMouseOver" Value="True">
-                <Setter TargetName="OuterRing" Property="BorderBrush" Value="#4C92AE"/>
-                <Setter TargetName="PrimaryTransportBorder" Property="BorderBrush" Value="#A7F2FF"/>
+                <Setter TargetName="PrimaryTransportBorder" Property="Background" Value="#52D6F6"/>
               </Trigger>
               <Trigger Property="IsPressed" Value="True">
                 <Setter TargetName="PrimaryTransportBorder" Property="RenderTransform">
@@ -187,8 +210,8 @@
     </Style>
 
     <Style x:Key="PlayerSeekSliderStyle" TargetType="Slider">
-      <Setter Property="Height" Value="24"/>
-      <Setter Property="Margin" Value="10,0"/>
+      <Setter Property="Height" Value="20"/>
+      <Setter Property="Margin" Value="9,0"/>
       <Setter Property="IsMoveToPointEnabled" Value="False"/>
       <Setter Property="Template">
         <Setter.Value>
@@ -199,7 +222,7 @@
                   <RepeatButton Command="{x:Static Slider.DecreaseLarge}">
                     <RepeatButton.Template>
                       <ControlTemplate TargetType="RepeatButton">
-                        <Border Height="3" Background="{StaticResource PlayerSciFiAccentBrush}" CornerRadius="2"/>
+                        <Border Height="2" Background="{StaticResource PlayerSciFiAccentBrush}" CornerRadius="2"/>
                       </ControlTemplate>
                     </RepeatButton.Template>
                   </RepeatButton>
@@ -208,18 +231,18 @@
                   <RepeatButton Command="{x:Static Slider.IncreaseLarge}">
                     <RepeatButton.Template>
                       <ControlTemplate TargetType="RepeatButton">
-                        <Border Height="3" Background="#263746" CornerRadius="2"/>
+                        <Border Height="2" Background="#263746" CornerRadius="2"/>
                       </ControlTemplate>
                     </RepeatButton.Template>
                   </RepeatButton>
                 </Track.IncreaseRepeatButton>
                 <Track.Thumb>
-                  <Thumb x:Name="SeekThumb" Width="12" Height="12">
+                  <Thumb x:Name="SeekThumb" Width="10" Height="10">
                     <Thumb.Template>
                       <ControlTemplate TargetType="Thumb">
-                        <Ellipse Fill="#D9F6FC"
-                                 Stroke="{StaticResource PlayerSciFiAccentBrush}"
-                                 StrokeThickness="1.5"/>
+                        <Ellipse Fill="{StaticResource PlayerSciFiAccentBrush}"
+                                 Stroke="#B3F1FE"
+                                 StrokeThickness="0.75"/>
                       </ControlTemplate>
                     </Thumb.Template>
                   </Thumb>
@@ -228,12 +251,12 @@
             </Grid>
             <ControlTemplate.Triggers>
               <Trigger Property="IsMouseOver" Value="True">
-                <Setter TargetName="SeekThumb" Property="Width" Value="14"/>
-                <Setter TargetName="SeekThumb" Property="Height" Value="14"/>
+                <Setter TargetName="SeekThumb" Property="Width" Value="13"/>
+                <Setter TargetName="SeekThumb" Property="Height" Value="13"/>
               </Trigger>
               <Trigger Property="IsKeyboardFocusWithin" Value="True">
-                <Setter TargetName="SeekThumb" Property="Width" Value="14"/>
-                <Setter TargetName="SeekThumb" Property="Height" Value="14"/>
+                <Setter TargetName="SeekThumb" Property="Width" Value="13"/>
+                <Setter TargetName="SeekThumb" Property="Height" Value="13"/>
               </Trigger>
               <Trigger Property="IsEnabled" Value="False">
                 <Setter Property="Opacity" Value="0.45"/>
@@ -286,29 +309,81 @@
       </Setter>
     </Style>
 
+    <!-- R4: Android-inspired subtitle studio with legible cyan sliders. -->
+    <Style x:Key="PlayerStudioColumnStyle" TargetType="Border">
+      <Setter Property="Background" Value="{StaticResource PlayerGlassChipBrush}"/>
+      <Setter Property="BorderBrush" Value="{StaticResource PlayerGlassMutedStrokeBrush}"/>
+      <Setter Property="BorderThickness" Value="0.7"/>
+      <Setter Property="CornerRadius" Value="15"/>
+      <Setter Property="Padding" Value="12,11"/>
+    </Style>
+    <Style x:Key="PlayerStudioSliderStyle" TargetType="Slider">
+      <Setter Property="Height" Value="28"/>
+      <Setter Property="Margin" Value="0,1,0,7"/>
+      <Setter Property="IsMoveToPointEnabled" Value="True"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Slider">
+            <Grid Background="Transparent">
+              <Track x:Name="PART_Track" VerticalAlignment="Center">
+                <Track.DecreaseRepeatButton>
+                  <RepeatButton Command="{x:Static Slider.DecreaseLarge}" Focusable="False">
+                    <RepeatButton.Template>
+                      <ControlTemplate TargetType="RepeatButton">
+                        <Border Height="4" Background="{StaticResource PlayerGlassAccentBrush}" CornerRadius="3"/>
+                      </ControlTemplate>
+                    </RepeatButton.Template>
+                  </RepeatButton>
+                </Track.DecreaseRepeatButton>
+                <Track.IncreaseRepeatButton>
+                  <RepeatButton Command="{x:Static Slider.IncreaseLarge}" Focusable="False">
+                    <RepeatButton.Template>
+                      <ControlTemplate TargetType="RepeatButton">
+                        <Border Height="4" Background="#345067" CornerRadius="3"/>
+                      </ControlTemplate>
+                    </RepeatButton.Template>
+                  </RepeatButton>
+                </Track.IncreaseRepeatButton>
+                <Track.Thumb>
+                  <Thumb Width="16" Height="16">
+                    <Thumb.Template>
+                      <ControlTemplate TargetType="Thumb">
+                        <Ellipse Fill="{StaticResource PlayerGlassAccentBrush}"
+                                 Stroke="#C0F5FF" StrokeThickness="1"/>
+                      </ControlTemplate>
+                    </Thumb.Template>
+                  </Thumb>
+                </Track.Thumb>
+              </Track>
+            </Grid>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
     <Style x:Key="PlayerTimePillStyle" TargetType="Border">
-      <Setter Property="Background" Value="#0B151F"/>
-      <Setter Property="BorderBrush" Value="#253C4E"/>
-      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
       <Setter Property="CornerRadius" Value="9"/>
-      <Setter Property="Padding" Value="8,4"/>
+      <Setter Property="Padding" Value="7,3"/>
     </Style>
 
     <Style x:Key="PlayerUtilityButtonStyle" TargetType="Button" BasedOn="{StaticResource PlayerHeaderButtonStyle}">
-      <Setter Property="MinHeight" Value="34"/>
-      <Setter Property="Padding" Value="11,5"/>
+      <Setter Property="MinHeight" Value="30"/>
+      <Setter Property="Padding" Value="9,4"/>
       <Setter Property="Margin" Value="2,0"/>
-      <Setter Property="Background" Value="#0B151F"/>
-      <Setter Property="BorderBrush" Value="#233A4B"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
     </Style>
     <Style x:Key="PlayerUtilityToggleStyle" TargetType="ToggleButton">
-      <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
-      <Setter Property="Background" Value="#0B151F"/>
-      <Setter Property="BorderBrush" Value="#233A4B"/>
-      <Setter Property="BorderThickness" Value="1"/>
-      <Setter Property="MinHeight" Value="34"/>
-      <Setter Property="Padding" Value="11,5"/>
-      <Setter Property="Margin" Value="3,0"/>
+      <Setter Property="Foreground" Value="{StaticResource PlayerGlassTextBrush}"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="MinHeight" Value="30"/>
+      <Setter Property="Padding" Value="9,4"/>
+      <Setter Property="Margin" Value="2,0"/>
       <Setter Property="Cursor" Value="Hand"/>
       <Setter Property="Template">
         <Setter.Value>
@@ -317,8 +392,8 @@
               <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
             </Border>
             <ControlTemplate.Triggers>
-              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="ToggleBorder" Property="Background" Value="#12222E"/><Setter TargetName="ToggleBorder" Property="BorderBrush" Value="#3A6178"/></Trigger>
-              <Trigger Property="IsChecked" Value="True"><Setter TargetName="ToggleBorder" Property="Background" Value="#123044"/><Setter TargetName="ToggleBorder" Property="BorderBrush" Value="{StaticResource PlayerSciFiAccentBrush}"/><Setter Property="Foreground" Value="#DFF9FF"/></Trigger>
+              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="ToggleBorder" Property="Background" Value="#9C2B4659"/><Setter TargetName="ToggleBorder" Property="BorderBrush" Value="{StaticResource PlayerGlassMutedStrokeBrush}"/></Trigger>
+              <Trigger Property="IsChecked" Value="True"><Setter TargetName="ToggleBorder" Property="Background" Value="#BE1A536E"/><Setter TargetName="ToggleBorder" Property="BorderBrush" Value="{StaticResource PlayerGlassStrokeBrush}"/><Setter Property="Foreground" Value="#DFF9FF"/></Trigger>
               <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.45"/></Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>
@@ -343,41 +418,46 @@
       <Setter Property="ToolTip" Value="{DynamicResource Player.AudioSync.Details.Title}"/>
     </Style>
     <Style x:Key="PlayerCompactComboStyle" TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
-      <Setter Property="MinHeight" Value="34"/>
+      <Setter Property="MinHeight" Value="30"/>
       <Setter Property="Margin" Value="3,0"/>
+      <Setter Property="Background" Value="{StaticResource PlayerGlassChipBrush}"/>
+      <Setter Property="BorderBrush" Value="{StaticResource PlayerGlassMutedStrokeBrush}"/>
+      <Setter Property="BorderThickness" Value="0.6"/>
+      <Setter Property="Foreground" Value="{StaticResource PlayerGlassTextBrush}"/>
     </Style>
 
     <Style x:Key="PlayerCommandDeckStyle" TargetType="Border">
-      <Setter Property="Background" Value="{StaticResource PlayerSciFiDeckBrush}"/>
-      <Setter Property="BorderBrush" Value="#20384A"/>
-      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="Background" Value="{StaticResource PlayerGlassChipBrush}"/>
+      <Setter Property="BorderBrush" Value="{StaticResource PlayerGlassMutedStrokeBrush}"/>
+      <Setter Property="BorderThickness" Value="0.6"/>
       <Setter Property="CornerRadius" Value="11"/>
-      <Setter Property="Padding" Value="4,3"/>
+      <Setter Property="Padding" Value="4,2"/>
     </Style>
     <Style x:Key="PlayerTransportDeckStyle" TargetType="Border" BasedOn="{StaticResource PlayerCommandDeckStyle}">
-      <Setter Property="CornerRadius" Value="30"/>
-      <Setter Property="Padding" Value="5,2"/>
-      <Setter Property="Background" Value="#F00A141E"/>
-      <Setter Property="BorderBrush" Value="#2A5268"/>
+      <Setter Property="CornerRadius" Value="28"/>
+      <Setter Property="Padding" Value="6,3"/>
+      <Setter Property="Background" Value="{StaticResource PlayerGlassTransportBrush}"/>
+      <Setter Property="BorderBrush" Value="{StaticResource PlayerGlassStrokeBrush}"/>
+      <Setter Property="BorderThickness" Value="0.7"/>
     </Style>
 
     <Style x:Key="PlayerSettingsCardStyle" TargetType="Border">
-      <Setter Property="Background" Value="#0A141E"/>
-      <Setter Property="BorderBrush" Value="#223B4D"/>
-      <Setter Property="BorderThickness" Value="1"/>
-      <Setter Property="CornerRadius" Value="11"/>
-      <Setter Property="Padding" Value="11"/>
-      <Setter Property="Margin" Value="0,0,0,8"/>
-    </Style>
-    <Style x:Key="PlayerSettingsSectionTitleStyle" TargetType="TextBlock">
-      <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
-      <Setter Property="FontSize" Value="12.5"/>
-      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="Background" Value="{StaticResource PlayerGlassChipBrush}"/>
+      <Setter Property="BorderBrush" Value="{StaticResource PlayerGlassMutedStrokeBrush}"/>
+      <Setter Property="BorderThickness" Value="0.6"/>
+      <Setter Property="CornerRadius" Value="13"/>
+      <Setter Property="Padding" Value="12"/>
       <Setter Property="Margin" Value="0,0,0,9"/>
     </Style>
+    <Style x:Key="PlayerSettingsSectionTitleStyle" TargetType="TextBlock">
+      <Setter Property="Foreground" Value="{StaticResource PlayerGlassTextBrush}"/>
+      <Setter Property="FontSize" Value="14"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="Margin" Value="0,0,0,11"/>
+    </Style>
     <Style x:Key="PlayerSettingsFieldLabelStyle" TargetType="TextBlock">
-      <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}"/>
-      <Setter Property="FontSize" Value="11.5"/>
+      <Setter Property="Foreground" Value="#B5C8D6"/>
+      <Setter Property="FontSize" Value="12"/>
       <Setter Property="VerticalAlignment" Value="Center"/>
     </Style>
     <Style x:Key="PlayerSettingsExpanderStyle" TargetType="Expander">
@@ -386,7 +466,7 @@
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="Expander">
-            <Border Background="#0A141E" BorderBrush="#223B4D" BorderThickness="1" CornerRadius="11">
+            <Border Background="{StaticResource PlayerGlassChipBrush}" BorderBrush="{StaticResource PlayerGlassMutedStrokeBrush}" BorderThickness="0.6" CornerRadius="13">
               <StackPanel>
                 <Grid>
                   <ToggleButton x:Name="HeaderButton"
@@ -476,9 +556,9 @@
     </Style>
   </Window.Resources>
 
-  <Grid>
+  <Grid x:Name="RootLayoutGrid">
     <Grid.RowDefinitions>
-      <RowDefinition x:Name="HeaderRow" Height="76" />
+      <RowDefinition x:Name="HeaderRow" Height="64" />
       <RowDefinition Height="*" />
       <RowDefinition x:Name="ControlsRow" Height="Auto" />
     </Grid.RowDefinitions>
@@ -531,7 +611,7 @@
       </Grid>
     </Border>
 
-    <Grid x:Name="PlayerContentGrid" Grid.Row="1" Margin="16,14,16,0">
+    <Grid x:Name="PlayerContentGrid" Grid.Row="1" Margin="8,6,8,0">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="*" />
         <ColumnDefinition x:Name="MediaCenterToggleColumn" Width="30" />
@@ -542,13 +622,160 @@
               Grid.Column="0"
               Margin="0"
               Background="Black"
-              BorderBrush="#24475C"
+              BorderBrush="#182B3A"
               BorderThickness="1"
-              CornerRadius="14"
+              CornerRadius="9"
               MouseLeftButtonDown="VideoBorder_OnMouseLeftButtonDown"
-              MouseWheel="VideoBorder_OnMouseWheel">
+              MouseWheel="VideoBorder_OnMouseWheel"
+              SizeChanged="VideoBorder_OnSizeChanged">
         <Grid ClipToBounds="True">
           <playback:MpvVideoHost x:Name="VideoHost" Focusable="False" />
+
+          <!-- P4.15.5a: The native HwndHost must be hidden while audio-only
+               WPF art is shown; WPF cannot paint over a visible HWND. -->
+          <Border x:Name="AudioOnlySurface"
+                  Panel.ZIndex="8"
+                  Visibility="Collapsed"
+                  IsHitTestVisible="False"
+                  Background="#07121F"
+                  AutomationProperties.Name="{DynamicResource Player.AudioOnly.Title}">
+            <Grid ClipToBounds="True">
+              <Grid.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                  <GradientStop Color="#050C16" Offset="0"/>
+                  <GradientStop Color="#0A2337" Offset="0.48"/>
+                  <GradientStop Color="#060F1C" Offset="1"/>
+                </LinearGradientBrush>
+              </Grid.Background>
+              <Ellipse Width="650" Height="650" HorizontalAlignment="Center"
+                       VerticalAlignment="Center" Opacity="0.23">
+                <Ellipse.Fill>
+                  <RadialGradientBrush>
+                    <GradientStop Color="#257BBA" Offset="0"/>
+                    <GradientStop Color="#0A243A" Offset="0.64"/>
+                    <GradientStop Color="#00081A2B" Offset="1"/>
+                  </RadialGradientBrush>
+                </Ellipse.Fill>
+              </Ellipse>
+              <Ellipse Width="300" Height="300" HorizontalAlignment="Center"
+                       VerticalAlignment="Center" Opacity="0.11"
+                       Stroke="#4ED0EF" StrokeThickness="1.2"/>
+              <Viewbox Stretch="Uniform" StretchDirection="DownOnly"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                       MaxWidth="720" MaxHeight="660" Margin="24,20,24,72">
+                <StackPanel Width="600" HorizontalAlignment="Center">
+                  <Border Width="208" Height="208" HorizontalAlignment="Center"
+                          Background="#142C42" BorderBrush="#4A8DAD"
+                          BorderThickness="1.2" CornerRadius="18"
+                          Margin="0,0,0,22" ClipToBounds="True">
+                    <Grid>
+                      <Image Source="Assets/app_icon.png" Stretch="Uniform"
+                             Width="166" Height="166" HorizontalAlignment="Center"
+                             VerticalAlignment="Center">
+                        <Image.Style>
+                          <Style TargetType="Image">
+                            <Setter Property="Visibility" Value="Visible"/>
+                            <Style.Triggers>
+                              <DataTrigger Binding="{Binding HasAudioOnlyCover}" Value="True">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                              </DataTrigger>
+                            </Style.Triggers>
+                          </Style>
+                        </Image.Style>
+                      </Image>
+                      <Image Source="{Binding AudioOnlyCover}" Stretch="UniformToFill"
+                             Width="206" Height="206" HorizontalAlignment="Center"
+                             VerticalAlignment="Center">
+                        <Image.Style>
+                          <Style TargetType="Image">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                              <DataTrigger Binding="{Binding HasAudioOnlyCover}" Value="True">
+                                <Setter Property="Visibility" Value="Visible"/>
+                              </DataTrigger>
+                            </Style.Triggers>
+                          </Style>
+                        </Image.Style>
+                      </Image>
+                    </Grid>
+                  </Border>
+                  <TextBlock Text="{DynamicResource Player.AudioOnly.Title}" FontSize="12"
+                             FontWeight="SemiBold" Foreground="#73C7E8"
+                             TextAlignment="Center" Margin="0,0,0,9"/>
+                  <TextBlock Text="{Binding AudioOnlyTitle}" FontSize="23"
+                             FontWeight="SemiBold" Foreground="#F0F8FF"
+                             TextAlignment="Center" TextTrimming="CharacterEllipsis"
+                             Margin="8,0,8,5" MaxWidth="590"/>
+                  <TextBlock Text="{Binding AudioOnlySubtitle}" FontSize="13.5"
+                             Foreground="#B3CBD9" TextAlignment="Center"
+                             TextTrimming="CharacterEllipsis" MaxWidth="550">
+                    <TextBlock.Style>
+                      <Style TargetType="TextBlock">
+                        <Setter Property="Visibility" Value="Visible"/>
+                        <Style.Triggers>
+                          <DataTrigger Binding="{Binding AudioOnlySubtitle}" Value="">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                          </DataTrigger>
+                        </Style.Triggers>
+                      </Style>
+                    </TextBlock.Style>
+                  </TextBlock>
+                  <StackPanel Orientation="Horizontal" HorizontalAlignment="Center"
+                              Margin="0,17,0,0">
+                    <Border Background="#25455D" BorderBrush="#477B9C"
+                            BorderThickness="1" CornerRadius="12"
+                            Padding="12,5" Margin="4,0">
+                      <TextBlock Text="{Binding AudioOnlyCodecLabel}"
+                                 Foreground="#D7F4FF" FontSize="12"
+                                 FontWeight="SemiBold"/>
+                    </Border>
+                    <Border Background="#142B3C" BorderBrush="#36566D"
+                            BorderThickness="1" CornerRadius="12"
+                            Padding="12,5" Margin="4,0">
+                      <Border.Style>
+                        <Style TargetType="Border">
+                          <Setter Property="Visibility" Value="Visible"/>
+                          <Style.Triggers>
+                            <DataTrigger Binding="{Binding AudioOnlyQualityLabel}" Value="">
+                              <Setter Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                          </Style.Triggers>
+                        </Style>
+                      </Border.Style>
+                      <TextBlock Text="{Binding AudioOnlyQualityLabel}"
+                                 Foreground="#BED7E5" FontSize="12"/>
+                    </Border>
+                  </StackPanel>
+                  <!-- Gentle ambient motion, not a fabricated FFT spectrum. -->
+                  <StackPanel Orientation="Horizontal" HorizontalAlignment="Center"
+                              Height="27" Margin="0,16,0,4">
+                    <Rectangle x:Name="AudioMeterBar1" Width="4" Height="21" Fill="#55B4DA"
+                               RadiusX="2" RadiusY="2" Margin="3,0"
+                               RenderTransformOrigin="0.5,1">
+                      <Rectangle.RenderTransform><ScaleTransform ScaleY="0.48"/></Rectangle.RenderTransform>
+                    </Rectangle>
+                    <Rectangle x:Name="AudioMeterBar2" Width="4" Height="21" Fill="#75D4EF"
+                               RadiusX="2" RadiusY="2" Margin="3,0"
+                               RenderTransformOrigin="0.5,1">
+                      <Rectangle.RenderTransform><ScaleTransform ScaleY="0.68"/></Rectangle.RenderTransform>
+                    </Rectangle>
+                    <Rectangle x:Name="AudioMeterBar3" Width="4" Height="21" Fill="#75D4EF"
+                               RadiusX="2" RadiusY="2" Margin="3,0"
+                               RenderTransformOrigin="0.5,1">
+                      <Rectangle.RenderTransform><ScaleTransform ScaleY="0.38"/></Rectangle.RenderTransform>
+                    </Rectangle>
+                    <Rectangle x:Name="AudioMeterBar4" Width="4" Height="21" Fill="#55B4DA"
+                               RadiusX="2" RadiusY="2" Margin="3,0"
+                               RenderTransformOrigin="0.5,1">
+                      <Rectangle.RenderTransform><ScaleTransform ScaleY="0.55"/></Rectangle.RenderTransform>
+                    </Rectangle>
+                  </StackPanel>
+                  <TextBlock Text="{Binding AudioOnlyPlaybackStatusKey, Converter={StaticResource LocalizedTextConverter}}"
+                             FontSize="11" Foreground="#8FB6CB" TextAlignment="Center"/>
+                </StackPanel>
+              </Viewbox>
+            </Grid>
+          </Border>
 
           <Border x:Name="MediaCenterDashboard"
                   Background="#0B1624"
@@ -963,7 +1190,7 @@
                   </Border>
                 </Grid>
 
-                <Grid Grid.Row="2" Margin="7,8,7,2"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="{Binding StatusText, Converter={StaticResource UserFacingTextConverter}}" Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap"/><TextBlock Text="{Binding WarningsText}" Foreground="#D6A85F" FontSize="11" TextWrapping="Wrap"/></StackPanel><ProgressBar Grid.Column="1" Width="130" Height="5" IsIndeterminate="True"><ProgressBar.Style><Style TargetType="ProgressBar"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding IsBusy}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></ProgressBar.Style></ProgressBar></Grid>
+                <Grid Grid.Row="2" Margin="7,8,7,2"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="{Binding StatusText, Converter={StaticResource UserFacingTextConverter}}" Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap"/><TextBlock Text="{Binding WarningsText, Converter={StaticResource UserFacingTextConverter}}" Foreground="#D6A85F" FontSize="11" TextWrapping="Wrap"/></StackPanel><ProgressBar Grid.Column="1" Width="130" Height="5" IsIndeterminate="True"><ProgressBar.Style><Style TargetType="ProgressBar"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding IsBusy}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></ProgressBar.Style></ProgressBar></Grid>
               </Grid>
             </TabItem>
 
@@ -1114,13 +1341,13 @@
                               <StackPanel Grid.Column="1">
                                 <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
                                 <TextBlock Text="{Binding Type}" Foreground="{StaticResource BrandBrush}" FontSize="11.5"/>
-                                <TextBlock Text="{Binding LastMessage}" Foreground="{StaticResource MutedTextBrush}" FontSize="11" TextTrimming="CharacterEllipsis"/>
+                                <TextBlock Text="{Binding LastMessage, Converter={StaticResource UserFacingTextConverter}}" Foreground="{StaticResource MutedTextBrush}" FontSize="11" TextTrimming="CharacterEllipsis"/>
                               </StackPanel>
                             </Grid>
                           </DataTemplate>
                         </ListBox.ItemTemplate>
                       </ListBox>
-                      <TextBlock Grid.Row="2" Margin="2,2,2,7" Text="{Binding SelectedProfileStatusText}" Foreground="{StaticResource MutedTextBrush}" FontSize="11.5" TextWrapping="Wrap"/>
+                      <TextBlock Grid.Row="2" Margin="2,2,2,7" Text="{Binding SelectedProfileStatusText, Converter={StaticResource UserFacingTextConverter}}" Foreground="{StaticResource MutedTextBrush}" FontSize="11.5" TextWrapping="Wrap"/>
                       <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Center">
                         <Button Content="{DynamicResource Connections.Action.Toggle}" Command="{Binding ToggleConnectionCommand}"/>
                         <Button Content="{DynamicResource Action.Remove}" Command="{Binding RemoveConnectionCommand}"/>
@@ -1220,7 +1447,7 @@
                 </Grid>
 
                 <Grid Grid.Row="2" Margin="7,8,7,2"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                  <StackPanel><TextBlock Text="{Binding StatusText, Converter={StaticResource UserFacingTextConverter}}" Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap"/><TextBlock Text="{Binding WarningsText}" Foreground="#D6A85F" FontSize="11" TextWrapping="Wrap"/></StackPanel>
+                  <StackPanel><TextBlock Text="{Binding StatusText, Converter={StaticResource UserFacingTextConverter}}" Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap"/><TextBlock Text="{Binding WarningsText, Converter={StaticResource UserFacingTextConverter}}" Foreground="#D6A85F" FontSize="11" TextWrapping="Wrap"/></StackPanel>
                   <ProgressBar Grid.Column="1" Width="130" Height="5" IsIndeterminate="True"><ProgressBar.Style><Style TargetType="ProgressBar"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding IsBusy}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></ProgressBar.Style></ProgressBar>
                 </Grid>
               </Grid>
@@ -1258,7 +1485,7 @@
                       <ListBox Grid.Row="1" Margin="0,9,0,8" ItemsSource="{Binding Addons}" SelectedItem="{Binding SelectedAddon, Mode=TwoWay}">
                         <ListBox.ItemTemplate><DataTemplate><Border Margin="1,2" Padding="10" Background="#0F1E30" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14"/><TextBlock Margin="0,3,0,0" Text="{Binding SafeManifestUrl}" Foreground="{StaticResource MutedTextBrush}" FontSize="11" TextTrimming="CharacterEllipsis"/></StackPanel><TextBlock Grid.Column="1" Text="●" Margin="10,0,2,0" VerticalAlignment="Center"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Foreground" Value="#7D8B81"/><Style.Triggers><DataTrigger Binding="{Binding IsEnabled}" Value="True"><Setter Property="Foreground" Value="{StaticResource BrandBrush}"/></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock></Grid></Border></DataTemplate></ListBox.ItemTemplate>
                       </ListBox>
-                      <Grid Grid.Row="2"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="{Binding SelectedAddonStateText}" Foreground="{StaticResource MutedTextBrush}" VerticalAlignment="Center"/><StackPanel Grid.Column="1" Orientation="Horizontal"><Button Content="{DynamicResource Addons.Action.Toggle}" Command="{Binding ToggleAddonCommand}"/><Button Content="{DynamicResource Action.Remove}" Command="{Binding RemoveAddonCommand}"/></StackPanel></Grid>
+                      <Grid Grid.Row="2"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="{Binding SelectedAddonStateText, Converter={StaticResource UserFacingTextConverter}}" Foreground="{StaticResource MutedTextBrush}" VerticalAlignment="Center"/><StackPanel Grid.Column="1" Orientation="Horizontal"><Button Content="{DynamicResource Addons.Action.Toggle}" Command="{Binding ToggleAddonCommand}"/><Button Content="{DynamicResource Action.Remove}" Command="{Binding RemoveAddonCommand}"/></StackPanel></Grid>
                     </Grid>
                   </Border>
                 </Grid>
@@ -1275,6 +1502,14 @@
                   <TextBox Margin="3" Text="{Binding MagnetUri, UpdateSourceTrigger=PropertyChanged}" ToolTip="{DynamicResource Tooltip.Magnet}"/>
                   <StackPanel Orientation="Horizontal" HorizontalAlignment="Center"><Button Content="{DynamicResource Action.PrepareMagnet}" Style="{StaticResource PrimaryButtonStyle}" Command="{Binding PrepareMagnetCommand}"/><Button Content="{DynamicResource Action.OpenTorrentFile}" Command="{Binding PrepareTorrentFileCommand}"/><Button Content="{DynamicResource Action.OpenCache}" Command="{Binding OpenCacheCommand}"/></StackPanel>
                   <CheckBox Content="{DynamicResource Panel.TorrentLegal}" IsChecked="{Binding LegalNoticeAccepted, Mode=TwoWay}"/>
+                  <!-- Keep the player's legacy Torrent side panel in sync with modern Torrent status. -->
+                  <TextBlock Text="{Binding DiscoverSourceTitle}"
+                             FontSize="11.5" FontWeight="SemiBold"
+                             Foreground="{StaticResource BrandBrush}"
+                             TextWrapping="Wrap" Margin="3,6,3,2"/>
+                  <TextBlock Text="{Binding DiscoverSourceStatusText}"
+                             FontSize="11.5" Foreground="{StaticResource MutedTextBrush}"
+                             TextWrapping="Wrap" Margin="3,0,3,5"/>
                 </StackPanel>
                 <Grid Grid.Row="1" Margin="3,5"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="{Binding SessionTitle, Converter={StaticResource LocalizedTextConverter}}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/><TextBlock Grid.Column="1" Text="{Binding ProgressPercent, StringFormat={}{0:0.0}%}" Foreground="{StaticResource BrandBrush}"/></Grid>
                 <ProgressBar Grid.Row="2" Margin="3" Height="6" Maximum="100" Value="{Binding ProgressPercent, Mode=OneWay}"/>
@@ -1327,17 +1562,215 @@
       </Border>
     </Grid>
 
-    <Border Grid.Row="2" Margin="12,7,12,10" Background="{StaticResource PlayerSciFiDeckBrush}" BorderBrush="#23465A" BorderThickness="1" CornerRadius="16">
-      <Grid Margin="16,9,16,9">
+    <Border x:Name="PlaybackControlDeck"
+            SizeChanged="PlaybackControlDeck_OnSizeChanged"
+            Grid.Row="2"
+            Margin="8,1,8,4"
+            Background="{StaticResource PlayerGlassShellBrush}"
+            BorderBrush="{StaticResource PlayerGlassStrokeBrush}"
+            BorderThickness="0.8"
+            CornerRadius="18">
+      <Border.Effect>
+        <DropShadowEffect BlurRadius="17" ShadowDepth="2" Opacity="0.22" Color="#000000"/>
+      </Border.Effect>
+      <Grid Margin="10,3,10,3">
         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
 
-        <Grid Grid.Row="0" Margin="0,0,0,3">
+        <Grid Grid.Row="0" Margin="0,0,0,1">
           <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
           <Border Style="{StaticResource PlayerTimePillStyle}" Cursor="Hand" MouseLeftButtonDown="TimePill_OnMouseLeftButtonDown" ToolTip="{DynamicResource Player.Time.Precision.Help}"><TextBlock MinWidth="92" Text="{Binding PositionText}" TextAlignment="Center" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold"/></Border>
           <Slider x:Name="SeekSlider" Grid.Column="1" Style="{StaticResource PlayerSeekSliderStyle}" Minimum="0" Maximum="{Binding DurationSeconds}" Value="{Binding PositionSeconds, Mode=OneWay}" PreviewMouseLeftButtonDown="SeekSlider_OnPreviewMouseLeftButtonDown" PreviewMouseMove="SeekSlider_OnPreviewMouseMove" PreviewMouseLeftButtonUp="SeekSlider_OnPreviewMouseLeftButtonUp" LostMouseCapture="SeekSlider_OnLostMouseCapture" PreviewMouseWheel="SeekSlider_OnMouseWheel" MouseLeave="SeekSlider_OnMouseLeave" ToolTip="{DynamicResource Player.Seek.Help}"/>
           <Border Grid.Column="2" Style="{StaticResource PlayerTimePillStyle}" Cursor="Hand" MouseLeftButtonDown="TimePill_OnMouseLeftButtonDown" ToolTip="{DynamicResource Player.Time.Precision.Help}"><TextBlock MinWidth="92" Text="{Binding DurationText}" TextAlignment="Center" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold"/></Border>
         </Grid>
 
+
+
+        <Grid Grid.Row="1" Margin="0,1,0,2">
+          <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+          <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+            <Border Style="{StaticResource PlayerCommandDeckStyle}" VerticalAlignment="Center">
+              <ComboBox x:Name="PlaybackSpeedComboBox" Width="68"
+                        Style="{StaticResource PlayerCompactComboStyle}"
+                        Margin="0"
+                        ItemsSource="{Binding SpeedOptions}"
+                        SelectedItem="{Binding SelectedSpeed, Mode=TwoWay}"
+                        ToolTip="{DynamicResource Player.Speed.Quick.Help}">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate><TextBlock Text="{Binding StringFormat={}{0:0.##}×}" TextAlignment="Center"/></DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+            </Border>
+            <!-- Compact status stays by the speed control instead of taking up the entire lower row. -->
+            <TextBlock x:Name="CompactPlaybackStatus"
+                       Margin="11,0,0,0"
+                       VerticalAlignment="Center"
+                       MaxWidth="195"
+                       FontSize="11"
+                       Foreground="{StaticResource MutedTextBrush}"
+                       Text="{Binding StatusMessage, Converter={StaticResource UserFacingTextConverter}}"
+                       ToolTip="{Binding StatusMessage, Converter={StaticResource UserFacingTextConverter}}"
+                       TextTrimming="CharacterEllipsis"/>
+          </StackPanel>
+          <Border Grid.Column="1" Style="{StaticResource PlayerTransportDeckStyle}" VerticalAlignment="Center">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+              <Button Content="⏮" Style="{StaticResource PlayerTransportButtonStyle}" Command="{Binding PreviousCommand}" ToolTip="{DynamicResource Tooltip.Previous}"/>
+              <Button Content="{Binding SeekBackwardLabel}" Style="{StaticResource PlayerTransportButtonStyle}" Command="{Binding SeekBackwardCommand}" ToolTip="{DynamicResource Player.Seek.Backward}"/>
+              <Button Width="44" Height="44" MinWidth="44" Content="{Binding PlayPauseText}" Style="{StaticResource PlayerPrimaryTransportButtonStyle}" Command="{Binding PlayPauseCommand}" ToolTip="{DynamicResource Tooltip.PlayPause}"/>
+              <Button Content="{Binding SeekForwardLabel}" Style="{StaticResource PlayerTransportButtonStyle}" Command="{Binding SeekForwardCommand}" ToolTip="{DynamicResource Player.Seek.Forward}"/>
+              <Button Content="⏭" Style="{StaticResource PlayerTransportButtonStyle}" Command="{Binding NextCommand}" ToolTip="{DynamicResource Tooltip.Next}"/>
+            </StackPanel>
+          </Border>
+          <Border Grid.Column="2" Style="{StaticResource PlayerCommandDeckStyle}" HorizontalAlignment="Right" VerticalAlignment="Center">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+              <TextBlock Margin="5,0,7,0" Text="🔊" FontSize="14" VerticalAlignment="Center"/>
+              <Slider Width="128" Margin="0,0,5,0" Style="{StaticResource PlayerVolumeSliderStyle}" Minimum="0" Maximum="{Binding VolumeBoostLimit}" Value="{Binding Volume, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" ToolTip="{DynamicResource Tooltip.Volume}"/>
+              <ToggleButton x:Name="OverlayControlsPinToggle"
+                            Width="34" Height="31"
+                            Margin="6,0,0,0"
+                            Style="{StaticResource PlayerUtilityToggleStyle}"
+                            Content="📌"
+                            Checked="OverlayControlsPin_OnChanged"
+                            Unchecked="OverlayControlsPin_OnChanged"
+                            Visibility="Collapsed"
+                            ToolTip="{DynamicResource Player.Overlay.Pin}"
+                            AutomationProperties.Name="{DynamicResource Player.Overlay.Pin}"/>
+            </StackPanel>
+          </Border>
+        </Grid>
+
+        <Grid Grid.Row="2" Margin="0,0,0,0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+          </Grid.ColumnDefinitions>
+
+          <!-- v1.0.2: Android-inspired quick tools. Detailed sync/settings live in popups. -->
+          <Border Grid.Column="0"
+                  Style="{StaticResource PlayerCommandDeckStyle}"
+                  VerticalAlignment="Center">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+              <ToggleButton x:Name="SubtitleSearchToggle"
+                            Width="42"
+                            Style="{StaticResource PlayerUtilityToggleStyle}"
+                            Content="CC+"
+                            ToolTip="{DynamicResource Player.SubtitleSearch}"
+                            AutomationProperties.Name="{DynamicResource Player.SubtitleSearch}"/>
+              <Button Width="42"
+                      Style="{StaticResource PlayerUtilityButtonStyle}"
+                      Content="CC"
+                      ToolTip="{DynamicResource Action.AttachSubtitle}"
+                      AutomationProperties.Name="{DynamicResource Action.AttachSubtitle}"
+                      Command="{Binding AttachSubtitleCommand}"/>
+              <Button x:Name="ExternalAudioButton"
+                      Width="42"
+                      Style="{StaticResource PlayerUtilityButtonStyle}"
+                      Content="♫+"
+                      ToolTip="{DynamicResource Action.AttachAudio}"
+                      AutomationProperties.Name="{DynamicResource Action.AttachAudio}"
+                      Click="ExternalAudioButton_OnClick">
+                <Button.ContextMenu>
+                  <ContextMenu>
+                    <MenuItem Header="{DynamicResource Player.AudioSource.Local}" Tag="Local" Click="ExternalAudioSourceMenuItem_OnClick"/>
+                    <MenuItem Header="{DynamicResource Player.AudioSource.Remote}" Tag="Remote" Click="ExternalAudioSourceMenuItem_OnClick"/>
+                    <MenuItem Header="{DynamicResource Player.AudioSource.Telegram}" Tag="Telegram" Click="ExternalAudioSourceMenuItem_OnClick"/>
+                  </ContextMenu>
+                </Button.ContextMenu>
+              </Button>
+              <ToggleButton x:Name="SyncControlsToggle"
+                            Width="42"
+                            Content="↔"
+                            ToolTip="{DynamicResource Player.Sync.QuickHelp}"
+                            AutomationProperties.Name="{DynamicResource Player.Sync.Quick}">
+                <ToggleButton.Style>
+                  <Style TargetType="ToggleButton" BasedOn="{StaticResource PlayerUtilityToggleStyle}">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding IsSubtitleSyncVisible}" Value="True">
+                        <Setter Property="Visibility" Value="Visible"/>
+                      </DataTrigger>
+                      <DataTrigger Binding="{Binding CanAdjustSubtitleDelay}" Value="True">
+                        <Setter Property="Visibility" Value="Visible"/>
+                      </DataTrigger>
+                      <DataTrigger Binding="{Binding HasExternalAudio}" Value="True">
+                        <Setter Property="Visibility" Value="Visible"/>
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </ToggleButton.Style>
+              </ToggleButton>
+            </StackPanel>
+          </Border>
+
+          <Border Grid.Column="2"
+                  Style="{StaticResource PlayerCommandDeckStyle}"
+                  VerticalAlignment="Center">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+              <ComboBox x:Name="PlaybackAudioTrackComboBox" Width="126"
+                        Style="{StaticResource PlayerCompactComboStyle}"
+                        ToolTip="{DynamicResource Tooltip.AudioTrack}"
+                        ItemsSource="{Binding AudioTracks}"
+                        DisplayMemberPath="DisplayName"
+                        SelectedItem="{Binding SelectedAudioTrack, Mode=TwoWay}"/>
+              <ComboBox x:Name="PlaybackSubtitleTrackComboBox" Width="142"
+                        Style="{StaticResource PlayerCompactComboStyle}"
+                        ToolTip="{DynamicResource Tooltip.SubtitleTrack}"
+                        ItemsSource="{Binding SubtitleTracks}"
+                        DisplayMemberPath="DisplayName"
+                        SelectedItem="{Binding SelectedSubtitleTrack, Mode=TwoWay}"/>
+              <ToggleButton x:Name="SubtitleSettingsToggle"
+                            Checked="CenterSheetToggle_OnChecked"
+                            Unchecked="CenterSheetToggle_OnUnchecked"
+                            Width="42"
+                            Style="{StaticResource PlayerUtilityToggleStyle}"
+                            Content="CC²"
+                            ToolTip="{DynamicResource Player.SubtitlePower.Title}"/>
+              <ToggleButton x:Name="PlaybackSettingsToggle"
+                            Checked="CenterSheetToggle_OnChecked"
+                            Unchecked="CenterSheetToggle_OnUnchecked"
+                            Width="42"
+                            Style="{StaticResource PlayerCompactIconToggleStyle}"
+                            Content="⚙"
+                            ToolTip="{DynamicResource Player.Controls.Settings}"
+                            AutomationProperties.Name="{DynamicResource Player.Controls.Settings}"/>
+              <Button Width="40" Style="{StaticResource PlayerUtilityButtonStyle}"
+                      Content="⤢" Click="VideoLayoutButton_OnClick"
+                      ToolTip="{DynamicResource Player.VideoLayout.Title}">
+                <Button.ContextMenu>
+                  <ContextMenu>
+                    <MenuItem Header="{DynamicResource Player.VideoLayout.Fit}"
+                              Tag="fit" Click="VideoLayoutOption_OnClick"/>
+                    <MenuItem Header="{DynamicResource Player.VideoLayout.Fill}"
+                              Tag="fill" Click="VideoLayoutOption_OnClick"/>
+                  </ContextMenu>
+                </Button.ContextMenu>
+              </Button>
+              <Button Width="42"
+                      Style="{StaticResource PlayerUtilityButtonStyle}"
+                      Content="⛶"
+                      Click="FullscreenButton_OnClick"
+                      ToolTip="{DynamicResource Action.Fullscreen}"/>
+            </StackPanel>
+          </Border>
+        </Grid>
+
+      </Grid>
+    </Border>
+
+        <!-- R4: reparent the EXISTING transport deck into this native Popup
+             during focused playback. Sibling sheets remain in RootLayoutGrid,
+             so fullscreen, CC2, subtitle search and settings stay independent. -->
+        <Popup x:Name="OverlayPlaybackControlsPopup"
+               PlacementTarget="{Binding ElementName=VideoBorder}"
+               Placement="Relative"
+               AllowsTransparency="True"
+               StaysOpen="True"
+               PopupAnimation="Fade"
+               Opened="OverlayPlaybackControls_OnOpened"
+               IsOpen="False"/>
+
+        <!-- Seek preview remains on the root visual tree so its native mpv
+             HWND is never reparented with the transport controls. -->
         <Popup x:Name="SeekPreviewPopup" PlacementTarget="{Binding ElementName=SeekSlider}" Placement="Relative" AllowsTransparency="False" StaysOpen="True" IsHitTestVisible="False">
           <Border Width="240" Height="140" Padding="3" Background="#F00A111D" BorderBrush="#3C728C" BorderThickness="1" CornerRadius="12">
             <Grid ClipToBounds="True">
@@ -1347,226 +1780,284 @@
           </Border>
         </Popup>
 
-        <Grid Grid.Row="1" Margin="0,2,0,5">
-          <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-          <Border Grid.Column="0" Style="{StaticResource PlayerCommandDeckStyle}" HorizontalAlignment="Left" VerticalAlignment="Center">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-              <TextBlock Text="{DynamicResource Control.Speed}" Foreground="{StaticResource MutedTextBrush}" VerticalAlignment="Center" Margin="6,0,7,0"/>
-              <ComboBox Width="88" Style="{StaticResource PlayerCompactComboStyle}" Margin="0"
-                        ItemsSource="{Binding SpeedOptions}" SelectedItem="{Binding SelectedSpeed, Mode=TwoWay}" ToolTip="{DynamicResource Player.Speed.Quick.Help}">
-                <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding StringFormat={}{0:0.##}×}"/></DataTemplate></ComboBox.ItemTemplate>
-              </ComboBox>
-            </StackPanel>
-          </Border>
-          <Border Grid.Column="1" Style="{StaticResource PlayerTransportDeckStyle}" VerticalAlignment="Center">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-              <Button Content="⏮" Style="{StaticResource PlayerTransportButtonStyle}" Command="{Binding PreviousCommand}" ToolTip="{DynamicResource Tooltip.Previous}"/>
-              <Button Content="{Binding SeekBackwardLabel}" Style="{StaticResource PlayerTransportButtonStyle}" Command="{Binding SeekBackwardCommand}" ToolTip="{DynamicResource Player.Seek.Backward}"/>
-              <Button Width="58" Height="58" MinWidth="58" Content="{Binding PlayPauseText}" Style="{StaticResource PlayerPrimaryTransportButtonStyle}" Command="{Binding PlayPauseCommand}" ToolTip="{DynamicResource Tooltip.PlayPause}"/>
-              <Button Content="{Binding SeekForwardLabel}" Style="{StaticResource PlayerTransportButtonStyle}" Command="{Binding SeekForwardCommand}" ToolTip="{DynamicResource Player.Seek.Forward}"/>
-              <Button Content="⏭" Style="{StaticResource PlayerTransportButtonStyle}" Command="{Binding NextCommand}" ToolTip="{DynamicResource Tooltip.Next}"/>
-            </StackPanel>
-          </Border>
-          <Border Grid.Column="2" Style="{StaticResource PlayerCommandDeckStyle}" HorizontalAlignment="Right" VerticalAlignment="Center">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-              <TextBlock Margin="5,0,7,0" Text="🔊" FontSize="14" VerticalAlignment="Center"/>
-              <Slider Width="128" Margin="0,0,5,0" Style="{StaticResource PlayerVolumeSliderStyle}" Minimum="0" Maximum="{Binding VolumeBoostLimit}" Value="{Binding Volume, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" ToolTip="{DynamicResource Tooltip.Volume}"/>
-            </StackPanel>
-          </Border>
-        </Grid>
+        <!-- R3 P1: one lean timing sheet for subtitle and external audio. -->
+        <Popup PlacementTarget="{Binding ElementName=SyncControlsToggle}"
+               Placement="Top"
+               StaysOpen="False"
+               AllowsTransparency="True"
+               PopupAnimation="Fade"
+               Opened="GlassPopup_OnOpened"
+               IsOpen="{Binding IsChecked, ElementName=SyncControlsToggle, Mode=TwoWay}">
+          <Border Width="390"
+                  Margin="0,0,0,9"
+                  Padding="14"
+                  Background="{StaticResource PlayerGlassPopupBrush}"
+                  BorderBrush="{StaticResource PlayerGlassStrokeBrush}"
+                  BorderThickness="0.8"
+                  CornerRadius="17">
+            <Border.Effect>
+              <DropShadowEffect BlurRadius="22" ShadowDepth="2" Opacity="0.28" Color="#000000"/>
+            </Border.Effect>
+            <StackPanel>
+              <TextBlock Text="{DynamicResource Player.Sync.Title}"
+                         FontSize="16"
+                         FontWeight="SemiBold"/>
+              <TextBlock Margin="0,3,0,13"
+                         Text="{DynamicResource Player.Sync.QuickHelp}"
+                         Foreground="{StaticResource MutedTextBrush}"
+                         FontSize="11"
+                         TextWrapping="Wrap"/>
 
-        <Grid Grid.Row="2" Margin="0,4,0,2">
-          <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-          <Border Grid.Column="0" Style="{StaticResource PlayerCommandDeckStyle}" VerticalAlignment="Center">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-            <ToggleButton x:Name="SubtitleSearchToggle" Style="{StaticResource PlayerUtilityToggleStyle}" Content="{DynamicResource Player.SubtitleSearch}"/>
-            <Button Style="{StaticResource PlayerUtilityButtonStyle}" Content="{DynamicResource Action.AttachSubtitle}" Command="{Binding AttachSubtitleCommand}"/>
-            <Button x:Name="ExternalAudioButton" Style="{StaticResource PlayerUtilityButtonStyle}" Content="{DynamicResource Action.AttachAudio}" Click="ExternalAudioButton_OnClick">
-              <Button.ContextMenu>
-                <ContextMenu>
-                  <MenuItem Header="{DynamicResource Player.AudioSource.Local}" Tag="Local" Click="ExternalAudioSourceMenuItem_OnClick"/>
-                  <MenuItem Header="{DynamicResource Player.AudioSource.Remote}" Tag="Remote" Click="ExternalAudioSourceMenuItem_OnClick"/>
-                  <MenuItem Header="{DynamicResource Player.AudioSource.Telegram}" Tag="Telegram" Click="ExternalAudioSourceMenuItem_OnClick"/>
-                </ContextMenu>
-              </Button.ContextMenu>
-            </Button>
-            <Button Margin="7,0,3,0"
-                    Command="{Binding ResyncAudioCommand}"
-                    ToolTip="{DynamicResource Player.AudioSync.Manual}"
-                    AutomationProperties.Name="{DynamicResource Player.AudioSync.Manual}">
-              <Button.Style>
-                <Style TargetType="Button" BasedOn="{StaticResource PlayerUtilityButtonStyle}">
-                  <Setter Property="Visibility" Value="Collapsed"/>
-                  <Setter Property="FontSize" Value="11"/>
-                  <Setter Property="FontWeight" Value="SemiBold"/>
-                  <Setter Property="Background" Value="#102638"/>
-                  <Setter Property="BorderBrush" Value="#2B6078"/>
-                  <Style.Triggers>
-                    <DataTrigger Binding="{Binding HasExternalAudio}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger>
-                    <DataTrigger Binding="{Binding IsAudioSyncBusy}" Value="True"><Setter Property="IsEnabled" Value="False"/></DataTrigger>
-                    <DataTrigger Binding="{Binding IsAudioSyncActionComplete}" Value="True">
-                      <Setter Property="Background" Value="#0B151F"/>
-                      <Setter Property="BorderBrush" Value="#233A4B"/>
-                      <Setter Property="Opacity" Value="0.82"/>
-                    </DataTrigger>
-                    <DataTrigger Binding="{Binding IsAudioSyncActionRetry}" Value="True">
-                      <Setter Property="Background" Value="#211A10"/>
-                      <Setter Property="BorderBrush" Value="#6A5530"/>
-                    </DataTrigger>
-                  </Style.Triggers>
-                </Style>
-              </Button.Style>
-              <StackPanel Orientation="Horizontal">
-                <TextBlock Text="A↔" Foreground="{StaticResource PlayerSciFiAccentBrush}" Margin="0,0,6,0"/>
-                <TextBlock Text="{Binding AudioSyncActionText}"/>
-              </StackPanel>
-            </Button>
-            <Button Margin="3,0"
-                    Command="{Binding ResyncSubtitleCommand}"
-                    ToolTip="{DynamicResource Player.SubtitleSync.Manual}"
-                    AutomationProperties.Name="{DynamicResource Player.SubtitleSync.Manual}">
-              <Button.Style>
-                <Style TargetType="Button" BasedOn="{StaticResource PlayerUtilityButtonStyle}">
-                  <Setter Property="Visibility" Value="Collapsed"/>
-                  <Setter Property="FontSize" Value="11"/>
-                  <Setter Property="FontWeight" Value="SemiBold"/>
-                  <Setter Property="Background" Value="#102638"/>
-                  <Setter Property="BorderBrush" Value="#2B6078"/>
-                  <Style.Triggers>
-                    <DataTrigger Binding="{Binding IsSubtitleSyncVisible}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger>
-                    <DataTrigger Binding="{Binding IsSubtitleSyncBusy}" Value="True"><Setter Property="IsEnabled" Value="False"/></DataTrigger>
-                    <DataTrigger Binding="{Binding IsSubtitleSyncActionComplete}" Value="True">
-                      <Setter Property="Background" Value="#0B151F"/>
-                      <Setter Property="BorderBrush" Value="#233A4B"/>
-                      <Setter Property="Opacity" Value="0.82"/>
-                    </DataTrigger>
-                    <DataTrigger Binding="{Binding IsSubtitleSyncActionRetry}" Value="True">
-                      <Setter Property="Background" Value="#211A10"/>
-                      <Setter Property="BorderBrush" Value="#6A5530"/>
-                    </DataTrigger>
-                  </Style.Triggers>
-                </Style>
-              </Button.Style>
-              <StackPanel Orientation="Horizontal">
-                <TextBlock Text="CC↔" Foreground="{StaticResource PlayerSciFiAccentBrush}" Margin="0,0,6,0"/>
-                <TextBlock Text="{Binding SubtitleSyncActionText}"/>
-              </StackPanel>
-            </Button>
-            </StackPanel>
-          </Border>
-
-          <Grid Grid.Column="1" Margin="10,0">
-            <TextBlock VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="{StaticResource MutedTextBrush}" Text="{Binding StatusMessage, Converter={StaticResource UserFacingTextConverter}}" TextTrimming="CharacterEllipsis">
-              <TextBlock.Style>
-                <Style TargetType="TextBlock">
-                  <Setter Property="Visibility" Value="Visible"/>
-                  <Style.Triggers>
-                    <DataTrigger Binding="{Binding HasExternalAudio}" Value="True"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger>
-                    <DataTrigger Binding="{Binding IsSubtitleSyncVisible}" Value="True"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger>
-                  </Style.Triggers>
-                </Style>
-              </TextBlock.Style>
-            </TextBlock>
-
-            <Border Padding="10,5" Background="#101D27" BorderBrush="#2A4D61" BorderThickness="1" CornerRadius="10" ToolTip="{Binding AudioSyncStatus}">
-              <Border.Style>
-                <Style TargetType="Border">
-                  <Setter Property="Visibility" Value="Collapsed"/>
-                  <Style.Triggers>
-                    <MultiDataTrigger>
-                      <MultiDataTrigger.Conditions>
-                        <Condition Binding="{Binding HasExternalAudio}" Value="True"/>
-                        <Condition Binding="{Binding IsSubtitleSyncVisible}" Value="False"/>
-                      </MultiDataTrigger.Conditions>
-                      <Setter Property="Visibility" Value="Visible"/>
-                    </MultiDataTrigger>
-                  </Style.Triggers>
-                </Style>
-              </Border.Style>
-              <Grid>
-                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                <Grid>
-                  <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                  <Border Width="24" Height="24" Margin="0,0,8,0" Background="#163247" CornerRadius="12">
-                    <TextBlock Text="{Binding AudioSyncGlyphText}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{StaticResource BrandBrush}" FontWeight="Bold" FontSize="11.5"/>
-                  </Border>
-                  <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding AudioSyncProgressSummaryText}" Foreground="{StaticResource TextBrush}" FontSize="11.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-                    <TextBlock Text="{Binding AudioSyncStageText}" Foreground="{StaticResource MutedTextBrush}" FontSize="8.5" TextTrimming="CharacterEllipsis"/>
+              <Border Padding="12"
+                      Margin="0,0,0,9"
+                      Background="{StaticResource PlayerGlassChipBrush}"
+                      BorderBrush="{StaticResource PlayerGlassMutedStrokeBrush}"
+                      BorderThickness="0.6"
+                      CornerRadius="12">
+                <Border.Style>
+                  <Style TargetType="Border">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding IsSubtitleSyncVisible}" Value="True">
+                        <Setter Property="Visibility" Value="Visible"/>
+                      </DataTrigger>
+                      <DataTrigger Binding="{Binding CanAdjustSubtitleDelay}" Value="True">
+                        <Setter Property="Visibility" Value="Visible"/>
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </Border.Style>
+                <StackPanel>
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*"/>
+                      <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{DynamicResource Player.Sync.Subtitle}"
+                               FontWeight="SemiBold"
+                               VerticalAlignment="Center"/>
+                    <Button Grid.Column="1"
+                            Margin="8,0,0,0"
+                            Padding="10,5"
+                            Command="{Binding ResyncSubtitleCommand}"
+                            Content="{DynamicResource Player.Sync.Auto}"
+                            ToolTip="{DynamicResource Player.SubtitleSync.Manual}">
+                      <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                          <Setter Property="Visibility" Value="Collapsed"/>
+                          <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsSubtitleSyncVisible}" Value="True">
+                              <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                          </Style.Triggers>
+                        </Style>
+                      </Button.Style>
+                    </Button>
+                  </Grid>
+                  <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                    <Button Width="36"
+                            Height="34"
+                            Content="−"
+                            Style="{StaticResource PlayerUtilityButtonStyle}"
+                            Command="{Binding PrimarySubtitleDelayDecreaseCommand}"/>
+                    <Border MinWidth="93"
+                            Margin="7,0"
+                            Padding="12,7"
+                            Background="{StaticResource PlayerGlassChipBrush}"
+                            BorderBrush="{StaticResource PlayerGlassMutedStrokeBrush}"
+                            BorderThickness="0.5"
+                            CornerRadius="9">
+                      <TextBlock Text="{Binding PrimarySubtitleDelayText}"
+                                 Foreground="{StaticResource PlayerSciFiAccentBrush}"
+                                 HorizontalAlignment="Center"
+                                 TextAlignment="Center"
+                                 FontWeight="SemiBold"/>
+                    </Border>
+                    <Button Width="36"
+                            Height="34"
+                            Content="+"
+                            Style="{StaticResource PlayerUtilityButtonStyle}"
+                            Command="{Binding PrimarySubtitleDelayIncreaseCommand}"/>
+                    <Button Margin="12,0,0,0"
+                            Padding="10,5"
+                            Content="{DynamicResource Player.Sync.Reset}"
+                            Command="{Binding PrimarySubtitleDelayResetCommand}"/>
                   </StackPanel>
-                  <TextBlock Grid.Column="2" Margin="10,0,7,0" VerticalAlignment="Center" Text="{Binding AudioSyncEtaText}" Foreground="{StaticResource BrandBrush}" FontSize="8.5" FontWeight="SemiBold"/>
-                  <ToggleButton Grid.Column="3" x:Name="AudioSyncDetailsToggle" Style="{StaticResource PlayerSyncDetailsToggleStyle}" Content="{DynamicResource Player.AudioSync.Details}"/>
-                </Grid>
-                <ProgressBar Grid.Row="1" Height="4" Margin="32,5,0,0" Minimum="0" Maximum="100" Value="{Binding AudioSyncProgress, Mode=OneWay}">
-                  <ProgressBar.Style>
-                    <Style TargetType="ProgressBar">
-                      <Setter Property="Visibility" Value="Collapsed"/>
-                      <Style.Triggers>
-                        <DataTrigger Binding="{Binding IsAudioSyncBusy}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger>
-                      </Style.Triggers>
-                    </Style>
-                  </ProgressBar.Style>
-                </ProgressBar>
-              </Grid>
-            </Border>
+                  <TextBlock Margin="3,9,0,0"
+                             Text="{DynamicResource Player.Sync.SubtitleShortcut}"
+                             Foreground="{StaticResource MutedTextBrush}"
+                             FontSize="10.5"/>
+                </StackPanel>
+              </Border>
 
-            <Border Padding="10,5" Background="#0E1A23" BorderBrush="#294859" BorderThickness="1" CornerRadius="10" ToolTip="{Binding SubtitleSyncStatus}">
-              <Border.Style>
-                <Style TargetType="Border">
-                  <Setter Property="Visibility" Value="Collapsed"/>
-                  <Style.Triggers>
-                    <DataTrigger Binding="{Binding IsSubtitleSyncVisible}" Value="True">
-                      <Setter Property="Visibility" Value="Visible"/>
-                    </DataTrigger>
-                  </Style.Triggers>
-                </Style>
-              </Border.Style>
-              <Grid>
-                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                <Grid>
-                  <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                  <Border Width="24" Height="24" Margin="0,0,8,0" Background="#142C3B" CornerRadius="12">
-                    <TextBlock Text="{Binding SubtitleSyncGlyphText}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{StaticResource BrandBrush}" FontWeight="Bold" FontSize="11.5"/>
-                  </Border>
-                  <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding SubtitleSyncProgressSummaryText}" Foreground="{StaticResource TextBrush}" FontSize="11.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-                    <TextBlock Text="{Binding SubtitleSyncStageText}" Foreground="{StaticResource MutedTextBrush}" FontSize="8.5" TextTrimming="CharacterEllipsis"/>
+              <Border Padding="12"
+                      Background="{StaticResource PlayerGlassChipBrush}"
+                      BorderBrush="{StaticResource PlayerGlassMutedStrokeBrush}"
+                      BorderThickness="0.6"
+                      CornerRadius="12">
+                <Border.Style>
+                  <Style TargetType="Border">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding HasExternalAudio}" Value="True">
+                        <Setter Property="Visibility" Value="Visible"/>
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </Border.Style>
+                <StackPanel>
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*"/>
+                      <ColumnDefinition Width="Auto"/>
+                      <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{DynamicResource Player.Sync.Audio}"
+                               FontWeight="SemiBold"
+                               VerticalAlignment="Center"/>
+                    <Button Grid.Column="1"
+                            Margin="8,0,0,0"
+                            Padding="10,5"
+                            Command="{Binding ResyncAudioCommand}"
+                            Content="{DynamicResource Player.Sync.Auto}"
+                            ToolTip="{DynamicResource Player.AudioSync.Manual}"/>
+                    <ToggleButton Grid.Column="2"
+                                  x:Name="AudioSyncDetailsToggle"
+                                  Margin="6,0,0,0"
+                                  Style="{StaticResource PlayerSyncDetailsToggleStyle}"
+                                  Content="{DynamicResource Player.AudioSync.Details}"/>
+                  </Grid>
+                  <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                    <Button Width="36"
+                            Height="34"
+                            Content="−"
+                            Style="{StaticResource PlayerUtilityButtonStyle}"
+                            Command="{Binding AudioDelayDecreaseCommand}"
+                            ToolTip="{DynamicResource Player.AudioSync.DelayBack}"/>
+                    <Border MinWidth="93"
+                            Margin="7,0"
+                            Padding="12,7"
+                            Background="{StaticResource PlayerGlassChipBrush}"
+                            BorderBrush="{StaticResource PlayerGlassMutedStrokeBrush}"
+                            BorderThickness="0.5"
+                            CornerRadius="9">
+                      <TextBlock Text="{Binding AudioSyncOffsetText}"
+                                 Foreground="{StaticResource PlayerSciFiAccentBrush}"
+                                 HorizontalAlignment="Center"
+                                 TextAlignment="Center"
+                                 FontWeight="SemiBold"/>
+                    </Border>
+                    <Button Width="36"
+                            Height="34"
+                            Content="+"
+                            Style="{StaticResource PlayerUtilityButtonStyle}"
+                            Command="{Binding AudioDelayIncreaseCommand}"
+                            ToolTip="{DynamicResource Player.AudioSync.DelayForward}"/>
+                    <Button Margin="12,0,0,0"
+                            Padding="10,5"
+                            Content="{DynamicResource Player.Sync.Reset}"
+                            Command="{Binding AudioDelayResetCommand}"/>
                   </StackPanel>
-                  <TextBlock Grid.Column="2" Margin="10,0,0,0" VerticalAlignment="Center" Text="{Binding SubtitleSyncProgress, StringFormat={}{0}%}" Foreground="{StaticResource BrandBrush}" FontSize="8.5" FontWeight="SemiBold">
-                    <TextBlock.Style>
-                      <Style TargetType="TextBlock">
-                        <Setter Property="Visibility" Value="Collapsed"/>
-                        <Style.Triggers><DataTrigger Binding="{Binding IsSubtitleSyncBusy}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
-                      </Style>
-                    </TextBlock.Style>
-                  </TextBlock>
-                </Grid>
-                <ProgressBar Grid.Row="1" Height="4" Margin="32,5,0,0" Minimum="0" Maximum="100" Value="{Binding SubtitleSyncProgress, Mode=OneWay}">
-                  <ProgressBar.Style>
-                    <Style TargetType="ProgressBar">
-                      <Setter Property="Visibility" Value="Collapsed"/>
-                      <Style.Triggers><DataTrigger Binding="{Binding IsSubtitleSyncBusy}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
-                    </Style>
-                  </ProgressBar.Style>
-                </ProgressBar>
-              </Grid>
-            </Border>
-          </Grid>
-
-          <Border Grid.Column="2" Style="{StaticResource PlayerCommandDeckStyle}" VerticalAlignment="Center">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-            <ComboBox Width="148" Style="{StaticResource PlayerCompactComboStyle}" ToolTip="{DynamicResource Tooltip.AudioTrack}" ItemsSource="{Binding AudioTracks}" DisplayMemberPath="DisplayName" SelectedItem="{Binding SelectedAudioTrack, Mode=TwoWay}"/>
-            <ComboBox Width="164" Style="{StaticResource PlayerCompactComboStyle}" ToolTip="{DynamicResource Tooltip.SubtitleTrack}" ItemsSource="{Binding SubtitleTracks}" DisplayMemberPath="DisplayName" SelectedItem="{Binding SelectedSubtitleTrack, Mode=TwoWay}"/>
-            <ToggleButton x:Name="SubtitleSettingsToggle" Style="{StaticResource PlayerUtilityToggleStyle}" Content="CC²" ToolTip="{DynamicResource Player.SubtitlePower.Title}"/>
-            <ToggleButton x:Name="PlaybackSettingsToggle"
-                          Style="{StaticResource PlayerCompactIconToggleStyle}"
-                          Content="⚙"
-                          ToolTip="{DynamicResource Player.Controls.Settings}"
-                          AutomationProperties.Name="{DynamicResource Player.Controls.Settings}"/>
-            <Button Style="{StaticResource PlayerUtilityButtonStyle}" Content="⛶" Click="FullscreenButton_OnClick" ToolTip="{DynamicResource Action.Fullscreen}"/>
+                  <TextBlock Margin="3,9,0,0"
+                             Text="{DynamicResource Player.Sync.AudioShortcut}"
+                             Foreground="{StaticResource MutedTextBrush}"
+                             FontSize="10.5"/>
+                </StackPanel>
+              </Border>
             </StackPanel>
           </Border>
-        </Grid>
+        </Popup>
+
+        <!-- Focused playback: the full application header disappears while
+             playing, but these actions remain available on video-top hover.
+             Popup is an independent HWND above the native libmpv surface. -->
+        <Popup x:Name="FocusedPlaybackActionsPopup"
+               PlacementTarget="{Binding ElementName=VideoBorder}"
+               Placement="Relative"
+               AllowsTransparency="True"
+               StaysOpen="True"
+               PopupAnimation="Fade"
+               Opened="GlassPopup_OnOpened"
+               Focusable="False"
+               IsOpen="False">
+          <Border x:Name="FocusedPlaybackActionPanel"
+                  Width="580"
+                  Padding="8,7"
+                  Background="{StaticResource PlayerGlassPopupBrush}"
+                  BorderBrush="{StaticResource PlayerGlassStrokeBrush}"
+                  BorderThickness="0.8"
+                  CornerRadius="15"
+                  MouseMove="FocusedPlaybackActions_OnMouseMove">
+            <Border.Effect>
+              <DropShadowEffect BlurRadius="17" ShadowDepth="1" Opacity="0.3"/>
+            </Border.Effect>
+            <WrapPanel HorizontalAlignment="Right" VerticalAlignment="Center">
+              <Button Content="{DynamicResource App.MediaCenter}"
+                      Command="{Binding ShowMediaCenterCommand}"
+                      Style="{StaticResource PlayerUtilityButtonStyle}"/>
+              <Button Content="{DynamicResource Action.OpenFile}"
+                      Command="{Binding OpenFileCommand}"
+                      Style="{StaticResource PlayerUtilityButtonStyle}"/>
+              <Button Content="{DynamicResource Action.OpenUrl}"
+                      Command="{Binding OpenUrlCommand}"
+                      Style="{StaticResource PlayerUtilityButtonStyle}"/>
+              <Button Content="{DynamicResource Action.Playlist}"
+                      Click="PlaylistButton_OnClick"
+                      Style="{StaticResource PlayerUtilityButtonStyle}"/>
+              <Button Content="{DynamicResource Action.Mini}"
+                      Click="MiniPlayerButton_OnClick"
+                      Style="{StaticResource PlayerUtilityButtonStyle}"/>
+              <Button Content="{DynamicResource Action.Screen}"
+                      Click="NextMonitorButton_OnClick"
+                      Style="{StaticResource PlayerUtilityButtonStyle}"/>
+            </WrapPanel>
+          </Border>
+        </Popup>
+
+        <!-- Native libmpv hosts an HWND above WPF elements; a Popup has its own
+             HWND so this non-interactive timing HUD remains visible over video. -->
+        <Popup x:Name="SyncFeedbackPopup"
+               PlacementTarget="{Binding ElementName=VideoBorder}"
+               Placement="Relative"
+               HorizontalOffset="0"
+               VerticalOffset="18"
+               AllowsTransparency="True"
+               StaysOpen="True"
+               IsHitTestVisible="False"
+               Focusable="False"
+               PopupAnimation="Fade"
+               Opened="GlassPopup_OnOpened"
+               IsOpen="False">
+          <Border Width="214"
+                  Padding="12,10"
+                  Background="{StaticResource PlayerGlassToastBrush}"
+                  BorderBrush="{StaticResource PlayerGlassStrokeBrush}"
+                  BorderThickness="0.7"
+                  CornerRadius="14">
+            <Border.Effect>
+              <DropShadowEffect BlurRadius="16" ShadowDepth="2" Opacity="0.28"/>
+            </Border.Effect>
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="3"/>
+                <ColumnDefinition Width="*"/>
+              </Grid.ColumnDefinitions>
+              <Border Background="{StaticResource PlayerGlassAccentBrush}" CornerRadius="2" Margin="0,2,0,2"/>
+              <StackPanel Grid.Column="1" Margin="11,0,0,0">
+                <TextBlock x:Name="SyncFeedbackTitle"
+                           Foreground="#C1D1DE"
+                           FontSize="11"
+                           FontWeight="Medium"
+                           TextTrimming="CharacterEllipsis"/>
+                <TextBlock x:Name="SyncFeedbackValue"
+                           Margin="0,3,0,0"
+                           Foreground="{StaticResource PlayerGlassAccentBrush}"
+                           FontSize="20"
+                           FontWeight="SemiBold"/>
+              </StackPanel>
+            </Grid>
+          </Border>
+        </Popup>
 
         <!-- v1.0.1: native HwndHost video cannot be covered reliably by an in-tree WPF overlay.
              Popup owns a separate HWND, so the fullscreen transport stays visible above libmpv. -->
@@ -1576,18 +2067,19 @@
                AllowsTransparency="True"
                StaysOpen="True"
                PopupAnimation="Fade"
+               Opened="GlassPopup_OnOpened"
                Focusable="False"
                IsOpen="False">
           <Border x:Name="FullscreenControlPanel"
-                  Height="112"
-                  Padding="16,10"
-                  Background="#F20A1119"
-                  BorderBrush="#345F77"
-                  BorderThickness="1"
-                  CornerRadius="16"
+                  Height="100"
+                  Padding="14,8"
+                  Background="{StaticResource PlayerGlassPopupBrush}"
+                  BorderBrush="{StaticResource PlayerGlassStrokeBrush}"
+                  BorderThickness="0.8"
+                  CornerRadius="17"
                   MouseMove="FullscreenControls_OnMouseMove">
             <Border.Effect>
-              <DropShadowEffect BlurRadius="22" ShadowDepth="0" Opacity="0.55"/>
+              <DropShadowEffect BlurRadius="18" ShadowDepth="2" Opacity="0.24" Color="#000000"/>
             </Border.Effect>
             <Grid>
               <Grid.RowDefinitions>
@@ -1616,7 +2108,7 @@
                 <TextBlock Grid.Column="2" Text="{Binding DurationText}" Foreground="#DDEAF0" VerticalAlignment="Center" TextAlignment="Right" FontWeight="SemiBold"/>
               </Grid>
 
-              <Grid Grid.Row="1" Margin="0,7,0,0">
+              <Grid Grid.Row="1" Margin="0,3,0,0">
                 <Grid.ColumnDefinitions>
                   <ColumnDefinition Width="*"/>
                   <ColumnDefinition Width="Auto"/>
@@ -1653,10 +2145,174 @@
           </Border>
         </Popup>
 
-        <Popup PlacementTarget="{Binding ElementName=SubtitleSettingsToggle}" Placement="Top" StaysOpen="False" AllowsTransparency="True" IsOpen="{Binding IsChecked, ElementName=SubtitleSettingsToggle, Mode=TwoWay}">
-          <Border Width="500" Margin="0,0,0,9" Padding="14" Background="{StaticResource PanelRaisedBrush}" BorderBrush="#29465D" BorderThickness="1" CornerRadius="14">
-            <StackPanel>
-              <TextBlock Text="{DynamicResource Player.SubtitlePower.Title}" FontSize="16" FontWeight="SemiBold"/>
+        <!-- R3 P2: mini-player overlay uses native Popup windows above libmpv.
+             Keeping these controls out of the main control row preserves video height. -->
+        <Popup x:Name="MiniPlayerHeaderPopup"
+               PlacementTarget="{Binding ElementName=VideoBorder}"
+               Placement="Relative"
+               AllowsTransparency="True"
+               StaysOpen="True"
+               PopupAnimation="Fade"
+               Opened="GlassPopup_OnOpened"
+               Focusable="False"
+               IsOpen="False">
+          <Border x:Name="MiniPlayerHeaderPanel"
+                  Width="156"
+                  Height="38"
+                  Background="{StaticResource PlayerGlassPopupBrush}"
+                  BorderBrush="{StaticResource PlayerGlassStrokeBrush}"
+                  BorderThickness="0.7"
+                  CornerRadius="13"
+                  MouseMove="MiniPlayerControls_OnMouseMove"
+                  MouseLeftButtonDown="MiniPlayerHeader_OnMouseLeftButtonDown">
+            <Border.Effect>
+              <DropShadowEffect BlurRadius="14" ShadowDepth="1" Opacity="0.19" Color="#000000"/>
+            </Border.Effect>
+            <Grid Margin="10,0,6,0">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+              </Grid.ColumnDefinitions>
+              <TextBlock VerticalAlignment="Center"
+                         Text="{DynamicResource Player.Mini.Mode}"
+                         FontSize="11"
+                         FontWeight="SemiBold"
+                         Foreground="#CFDFEB"/>
+              <Button Grid.Column="1"
+                      Width="39"
+                      Height="29"
+                      Padding="2"
+                      Content="⤢"
+                      Style="{StaticResource PlayerUtilityButtonStyle}"
+                      Click="MiniPlayerRestore_OnClick"
+                      ToolTip="{DynamicResource Player.Mini.Restore}"/>
+            </Grid>
+          </Border>
+        </Popup>
+
+        <Popup x:Name="MiniPlayerControlsPopup"
+               PlacementTarget="{Binding ElementName=VideoBorder}"
+               Placement="Relative"
+               AllowsTransparency="True"
+               StaysOpen="True"
+               PopupAnimation="Fade"
+               Opened="GlassPopup_OnOpened"
+               Focusable="False"
+               IsOpen="False">
+          <Border x:Name="MiniPlayerControlPanel"
+                  Width="420"
+                  Height="88"
+                  Padding="12,9"
+                  Background="{StaticResource PlayerGlassPopupBrush}"
+                  MouseMove="MiniPlayerControls_OnMouseMove"
+                  BorderBrush="{StaticResource PlayerGlassStrokeBrush}"
+                  BorderThickness="0.8"
+                  CornerRadius="15">
+            <Border.Effect>
+              <DropShadowEffect BlurRadius="18" ShadowDepth="2" Opacity="0.25" Color="#000000"/>
+            </Border.Effect>
+            <Grid>
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+              </Grid.RowDefinitions>
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="49"/>
+                  <ColumnDefinition Width="*"/>
+                  <ColumnDefinition Width="49"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="{Binding PositionText}"
+                           FontSize="10"
+                           Foreground="#CBDDE8"
+                           VerticalAlignment="Center"/>
+                <Slider x:Name="MiniPlayerSeekSlider"
+                        Grid.Column="1"
+                        Height="19"
+                        Margin="5,0"
+                        Style="{StaticResource PlayerSeekSliderStyle}"
+                        Minimum="0"
+                        Maximum="{Binding DurationSeconds}"
+                        Value="{Binding PositionSeconds, Mode=OneWay}"
+                        PreviewMouseLeftButtonDown="MiniPlayerSeekSlider_OnPreviewMouseLeftButtonDown"
+                        PreviewMouseMove="MiniPlayerSeekSlider_OnPreviewMouseMove"
+                        PreviewMouseLeftButtonUp="MiniPlayerSeekSlider_OnPreviewMouseLeftButtonUp"
+                        LostMouseCapture="MiniPlayerSeekSlider_OnLostMouseCapture"/>
+                <TextBlock Grid.Column="2"
+                           Text="{Binding DurationText}"
+                           FontSize="10"
+                           Foreground="#CBDDE8"
+                           TextAlignment="Right"
+                           VerticalAlignment="Center"/>
+              </Grid>
+              <Grid Grid.Row="1" Margin="0,2,0,0">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*"/>
+                  <ColumnDefinition Width="Auto"/>
+                  <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                  <TextBlock Text="♪" Foreground="#BFD9E7" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                  <Slider Width="74"
+                          Style="{StaticResource PlayerVolumeSliderStyle}"
+                          Minimum="0"
+                          Maximum="{Binding VolumeBoostLimit}"
+                          Value="{Binding Volume, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                  <Button Content="{Binding SeekBackwardLabel}"
+                          Style="{StaticResource PlayerTransportButtonStyle}"
+                          Command="{Binding SeekBackwardCommand}"
+                          ToolTip="{DynamicResource Player.Seek.Backward}"/>
+                  <Button Content="{Binding PlayPauseText}"
+                          Width="41" Height="41" MinWidth="41"
+                          Style="{StaticResource PlayerPrimaryTransportButtonStyle}"
+                          Command="{Binding PlayPauseCommand}"
+                          ToolTip="{DynamicResource Tooltip.PlayPause}"/>
+                  <Button Content="{Binding SeekForwardLabel}"
+                          Style="{StaticResource PlayerTransportButtonStyle}"
+                          Command="{Binding SeekForwardCommand}"
+                          ToolTip="{DynamicResource Player.Seek.Forward}"/>
+                </StackPanel>
+                <Button Grid.Column="2"
+                        HorizontalAlignment="Right"
+                        Content="⤢"
+                        Style="{StaticResource PlayerUtilityButtonStyle}"
+                        Click="MiniPlayerRestore_OnClick"
+                        ToolTip="{DynamicResource Player.Mini.Restore}"/>
+              </Grid>
+            </Grid>
+          </Border>
+        </Popup>
+
+        <!-- Center sheet is a native Popup HWND so libmpv cannot paint over it. -->
+        <Popup x:Name="DualSubtitleCenterSheet"
+               PlacementTarget="{Binding ElementName=PlayerContentGrid}"
+               Placement="Center"
+               StaysOpen="False"
+               AllowsTransparency="True"
+               PopupAnimation="Fade"
+               Opened="GlassPopup_OnOpened"
+               IsOpen="{Binding IsChecked, ElementName=SubtitleSettingsToggle, Mode=TwoWay}">
+          <Border x:Name="DualSubtitleSheetPanel"
+                  Width="630" MaxHeight="560"
+                  Margin="0" Padding="18"
+                  Background="{StaticResource PlayerGlassPopupBrush}"
+                  BorderBrush="{StaticResource PlayerGlassStrokeBrush}"
+                  BorderThickness="0.8"
+                  CornerRadius="20"
+                  PreviewKeyDown="CenterSheet_OnPreviewKeyDown">
+            <Border.Effect>
+              <DropShadowEffect BlurRadius="26" ShadowDepth="3" Opacity="0.34" Color="#000000"/>
+            </Border.Effect>
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+              <StackPanel>
+              <Grid Margin="0,0,0,6">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <TextBlock Text="{DynamicResource Player.SubtitlePower.Title}" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                <Button Grid.Column="1" Content="✕" Width="32" Height="30" Style="{StaticResource PlayerUtilityButtonStyle}"
+                        Click="CenterSheetClose_OnClick" ToolTip="{DynamicResource Player.Focus.CloseSheet}"/>
+              </Grid>
               <TextBlock Margin="0,3,0,12" Text="{DynamicResource Player.SubtitlePower.Help}" Foreground="{StaticResource MutedTextBrush}" FontSize="11.5" TextWrapping="Wrap"/>
               <Grid Margin="0,0,0,7"><Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                 <TextBlock VerticalAlignment="Center" Text="{DynamicResource Player.SubtitlePower.Primary}" Foreground="{StaticResource MutedTextBrush}"/>
@@ -1671,30 +2327,51 @@
               <Separator Margin="0,0,0,9"/>
               <Grid>
                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <StackPanel Grid.Column="0">
+                <Border Grid.Column="0" Style="{StaticResource PlayerStudioColumnStyle}">
+                  <StackPanel>
                   <TextBlock Text="{DynamicResource Player.SubtitlePower.PrimarySettings}" FontWeight="SemiBold" Margin="0,0,0,7"/>
                   <CheckBox Margin="0,0,0,7" Content="{DynamicResource Player.SubtitlePower.PreserveAss}" IsChecked="{Binding PreservePrimaryAssStyle, Mode=TwoWay}"/>
                   <TextBlock Text="{DynamicResource Player.SubtitlePower.Delay}" Foreground="{StaticResource MutedTextBrush}" FontSize="11.5"/>
-                  <StackPanel Orientation="Horizontal" Margin="0,3,0,7"><Button MinWidth="34" Content="−" Command="{Binding PrimarySubtitleDelayDecreaseCommand}"/><Border Margin="5,0" Padding="9,5" Background="#101A23" CornerRadius="7"><TextBlock MinWidth="74" Text="{Binding PrimarySubtitleDelayText}" TextAlignment="Center"/></Border><Button MinWidth="34" Content="+" Command="{Binding PrimarySubtitleDelayIncreaseCommand}"/><Button Margin="5,0,0,0" Content="0" Command="{Binding PrimarySubtitleDelayResetCommand}"/></StackPanel>
-                  <TextBlock Text="{DynamicResource Player.SubtitlePower.Scale}" Foreground="{StaticResource MutedTextBrush}" FontSize="11.5"/><Slider Minimum="0.5" Maximum="2" TickFrequency="0.05" Value="{Binding PrimarySubtitleScale, Mode=TwoWay}"/>
-                  <TextBlock Text="{DynamicResource Player.SubtitlePower.Position}" Foreground="{StaticResource MutedTextBrush}" FontSize="11.5"/><Slider Minimum="0" Maximum="150" TickFrequency="1" Value="{Binding PrimarySubtitlePosition, Mode=TwoWay}"/>
-                </StackPanel>
-                <StackPanel Grid.Column="2">
+                  <StackPanel Orientation="Horizontal" Margin="0,3,0,7"><Button MinWidth="34" Content="−" Command="{Binding PrimarySubtitleDelayDecreaseCommand}"/><Border Margin="5,0" Padding="9,5" Background="{StaticResource PlayerGlassTransportBrush}" CornerRadius="9"><TextBlock MinWidth="74" Text="{Binding PrimarySubtitleDelayText}" TextAlignment="Center"/></Border><Button MinWidth="34" Content="+" Command="{Binding PrimarySubtitleDelayIncreaseCommand}"/><Button Margin="5,0,0,0" Content="0" Command="{Binding PrimarySubtitleDelayResetCommand}"/></StackPanel>
+                  <TextBlock Text="{DynamicResource Player.SubtitlePower.Scale}" Foreground="{StaticResource MutedTextBrush}" FontSize="11.5"/><Slider Style="{StaticResource PlayerStudioSliderStyle}" Minimum="0.5" Maximum="2" TickFrequency="0.05" Value="{Binding PrimarySubtitleScale, Mode=TwoWay}"/>
+                  <TextBlock Text="{DynamicResource Player.SubtitlePower.Position}" Foreground="{StaticResource MutedTextBrush}" FontSize="11.5"/><Slider Style="{StaticResource PlayerStudioSliderStyle}" Minimum="0" Maximum="150" TickFrequency="1" Value="{Binding PrimarySubtitlePosition, Mode=TwoWay}"/>
+                  </StackPanel>
+                </Border>
+                <Border Grid.Column="2" Style="{StaticResource PlayerStudioColumnStyle}">
+                  <StackPanel>
                   <TextBlock Text="{DynamicResource Player.SubtitlePower.SecondarySettings}" FontWeight="SemiBold" Margin="0,0,0,7"/>
                   <CheckBox Margin="0,0,0,7" Content="{DynamicResource Player.SubtitlePower.PreserveAss}" IsChecked="{Binding PreserveSecondaryAssStyle, Mode=TwoWay}"/>
                   <TextBlock Text="{DynamicResource Player.SubtitlePower.Delay}" Foreground="{StaticResource MutedTextBrush}" FontSize="11.5"/>
-                  <StackPanel Orientation="Horizontal" Margin="0,3,0,7"><Button MinWidth="34" Content="−" Command="{Binding SecondarySubtitleDelayDecreaseCommand}"/><Border Margin="5,0" Padding="9,5" Background="#101A23" CornerRadius="7"><TextBlock MinWidth="74" Text="{Binding SecondarySubtitleDelayText}" TextAlignment="Center"/></Border><Button MinWidth="34" Content="+" Command="{Binding SecondarySubtitleDelayIncreaseCommand}"/><Button Margin="5,0,0,0" Content="0" Command="{Binding SecondarySubtitleDelayResetCommand}"/></StackPanel>
-                  <TextBlock Text="{DynamicResource Player.SubtitlePower.Scale}" Foreground="{StaticResource MutedTextBrush}" FontSize="11.5"/><Slider Minimum="0.5" Maximum="2" TickFrequency="0.05" Value="{Binding SecondarySubtitleScale, Mode=TwoWay}"/>
-                  <TextBlock Text="{DynamicResource Player.SubtitlePower.Position}" Foreground="{StaticResource MutedTextBrush}" FontSize="11.5"/><Slider Minimum="0" Maximum="150" TickFrequency="1" Value="{Binding SecondarySubtitlePosition, Mode=TwoWay}"/>
-                </StackPanel>
+                  <StackPanel Orientation="Horizontal" Margin="0,3,0,7"><Button MinWidth="34" Content="−" Command="{Binding SecondarySubtitleDelayDecreaseCommand}"/><Border Margin="5,0" Padding="9,5" Background="{StaticResource PlayerGlassTransportBrush}" CornerRadius="9"><TextBlock MinWidth="74" Text="{Binding SecondarySubtitleDelayText}" TextAlignment="Center"/></Border><Button MinWidth="34" Content="+" Command="{Binding SecondarySubtitleDelayIncreaseCommand}"/><Button Margin="5,0,0,0" Content="0" Command="{Binding SecondarySubtitleDelayResetCommand}"/></StackPanel>
+                  <TextBlock Text="{DynamicResource Player.SubtitlePower.Scale}" Foreground="{StaticResource MutedTextBrush}" FontSize="11.5"/><Slider Style="{StaticResource PlayerStudioSliderStyle}" Minimum="0.5" Maximum="2" TickFrequency="0.05" Value="{Binding SecondarySubtitleScale, Mode=TwoWay}"/>
+                  <TextBlock Text="{DynamicResource Player.SubtitlePower.Position}" Foreground="{StaticResource MutedTextBrush}" FontSize="11.5"/><Slider Style="{StaticResource PlayerStudioSliderStyle}" Minimum="0" Maximum="150" TickFrequency="1" Value="{Binding SecondarySubtitlePosition, Mode=TwoWay}"/>
+                  </StackPanel>
+                </Border>
               </Grid>
               <TextBlock Margin="0,10,0,0" Text="{DynamicResource Player.SubtitlePower.SecondarySyncNote}" Foreground="{StaticResource MutedTextBrush}" FontSize="11" TextWrapping="Wrap"/>
-            </StackPanel>
+              </StackPanel>
+            </ScrollViewer>
           </Border>
         </Popup>
 
-        <Popup PlacementTarget="{Binding ElementName=PlaybackSettingsToggle}" Placement="Top" StaysOpen="False" AllowsTransparency="True" IsOpen="{Binding IsChecked, ElementName=PlaybackSettingsToggle, Mode=TwoWay}">
-          <Border Width="590" MaxHeight="700" Margin="0,0,0,9" Background="{StaticResource PanelRaisedBrush}" BorderBrush="#294B60" BorderThickness="1" CornerRadius="15">
+        <Popup x:Name="PlaybackCenterSheet"
+               PlacementTarget="{Binding ElementName=PlayerContentGrid}"
+               Placement="Center"
+               StaysOpen="False"
+               AllowsTransparency="True"
+               PopupAnimation="Fade"
+               Opened="GlassPopup_OnOpened"
+               IsOpen="{Binding IsChecked, ElementName=PlaybackSettingsToggle, Mode=TwoWay}">
+          <Border x:Name="PlaybackSettingsSheetPanel"
+                  Width="610" MaxHeight="660"
+                  Background="{StaticResource PlayerGlassPopupBrush}"
+                  BorderBrush="{StaticResource PlayerGlassStrokeBrush}"
+                  BorderThickness="0.8"
+                  CornerRadius="20"
+                  PreviewKeyDown="CenterSheet_OnPreviewKeyDown">
+            <Border.Effect>
+              <DropShadowEffect BlurRadius="26" ShadowDepth="3" Opacity="0.34" Color="#000000"/>
+            </Border.Effect>
             <Grid>
               <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -1704,7 +2381,12 @@
 
               <Border Padding="16,14,16,12" BorderBrush="#213A4C" BorderThickness="0,0,0,1">
                 <StackPanel>
-                  <TextBlock Text="{DynamicResource Player.Controls.Settings}" FontSize="17" FontWeight="SemiBold"/>
+                  <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <TextBlock Text="{DynamicResource Player.Controls.Settings}" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    <Button Grid.Column="1" Content="✕" Width="32" Height="30" Style="{StaticResource PlayerUtilityButtonStyle}"
+                            Click="CenterSheetClose_OnClick" ToolTip="{DynamicResource Player.Focus.CloseSheet}"/>
+                  </Grid>
                   <TextBlock Margin="0,3,0,0" Text="{DynamicResource Player.Controls.Settings.Help}" Foreground="{StaticResource MutedTextBrush}" FontSize="11.5" TextWrapping="Wrap"/>
                 </StackPanel>
               </Border>
@@ -1750,10 +2432,10 @@
                   <Expander Style="{StaticResource PlayerSettingsExpanderStyle}" Header="{DynamicResource Player.VideoAdvanced.Title}">
                     <StackPanel>
                       <TextBlock Margin="0,0,0,8" Text="{DynamicResource Player.VideoAdvanced.Help}" Foreground="{StaticResource MutedTextBrush}" FontSize="10.5" TextWrapping="Wrap"/>
-                      <Grid Margin="0,2"><Grid.ColumnDefinitions><ColumnDefinition Width="105"/><ColumnDefinition Width="*"/><ColumnDefinition Width="44"/></Grid.ColumnDefinitions><TextBlock Style="{StaticResource PlayerSettingsFieldLabelStyle}" Text="{DynamicResource Player.Video.Brightness}"/><Slider Grid.Column="1" Minimum="-100" Maximum="100" TickFrequency="5" Value="{Binding VideoBrightness, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/><TextBlock Grid.Column="2" Text="{Binding VideoBrightness, StringFormat={}{0:0}}" TextAlignment="Right" VerticalAlignment="Center"/></Grid>
-                      <Grid Margin="0,2"><Grid.ColumnDefinitions><ColumnDefinition Width="105"/><ColumnDefinition Width="*"/><ColumnDefinition Width="44"/></Grid.ColumnDefinitions><TextBlock Style="{StaticResource PlayerSettingsFieldLabelStyle}" Text="{DynamicResource Player.Video.Contrast}"/><Slider Grid.Column="1" Minimum="-100" Maximum="100" TickFrequency="5" Value="{Binding VideoContrast, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/><TextBlock Grid.Column="2" Text="{Binding VideoContrast, StringFormat={}{0:0}}" TextAlignment="Right" VerticalAlignment="Center"/></Grid>
-                      <Grid Margin="0,2"><Grid.ColumnDefinitions><ColumnDefinition Width="105"/><ColumnDefinition Width="*"/><ColumnDefinition Width="44"/></Grid.ColumnDefinitions><TextBlock Style="{StaticResource PlayerSettingsFieldLabelStyle}" Text="{DynamicResource Player.Video.Saturation}"/><Slider Grid.Column="1" Minimum="-100" Maximum="100" TickFrequency="5" Value="{Binding VideoSaturation, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/><TextBlock Grid.Column="2" Text="{Binding VideoSaturation, StringFormat={}{0:0}}" TextAlignment="Right" VerticalAlignment="Center"/></Grid>
-                      <Grid Margin="0,2,0,7"><Grid.ColumnDefinitions><ColumnDefinition Width="105"/><ColumnDefinition Width="*"/><ColumnDefinition Width="44"/></Grid.ColumnDefinitions><TextBlock Style="{StaticResource PlayerSettingsFieldLabelStyle}" Text="{DynamicResource Player.Video.Gamma}"/><Slider Grid.Column="1" Minimum="-100" Maximum="100" TickFrequency="5" Value="{Binding VideoGamma, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/><TextBlock Grid.Column="2" Text="{Binding VideoGamma, StringFormat={}{0:0}}" TextAlignment="Right" VerticalAlignment="Center"/></Grid>
+                      <Grid Margin="0,2"><Grid.ColumnDefinitions><ColumnDefinition Width="105"/><ColumnDefinition Width="*"/><ColumnDefinition Width="44"/></Grid.ColumnDefinitions><TextBlock Style="{StaticResource PlayerSettingsFieldLabelStyle}" Text="{DynamicResource Player.Video.Brightness}"/><Slider Grid.Column="1" Style="{StaticResource PlayerStudioSliderStyle}" Minimum="-100" Maximum="100" TickFrequency="5" Value="{Binding VideoBrightness, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/><TextBlock Grid.Column="2" Text="{Binding VideoBrightness, StringFormat={}{0:0}}" TextAlignment="Right" VerticalAlignment="Center"/></Grid>
+                      <Grid Margin="0,2"><Grid.ColumnDefinitions><ColumnDefinition Width="105"/><ColumnDefinition Width="*"/><ColumnDefinition Width="44"/></Grid.ColumnDefinitions><TextBlock Style="{StaticResource PlayerSettingsFieldLabelStyle}" Text="{DynamicResource Player.Video.Contrast}"/><Slider Grid.Column="1" Style="{StaticResource PlayerStudioSliderStyle}" Minimum="-100" Maximum="100" TickFrequency="5" Value="{Binding VideoContrast, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/><TextBlock Grid.Column="2" Text="{Binding VideoContrast, StringFormat={}{0:0}}" TextAlignment="Right" VerticalAlignment="Center"/></Grid>
+                      <Grid Margin="0,2"><Grid.ColumnDefinitions><ColumnDefinition Width="105"/><ColumnDefinition Width="*"/><ColumnDefinition Width="44"/></Grid.ColumnDefinitions><TextBlock Style="{StaticResource PlayerSettingsFieldLabelStyle}" Text="{DynamicResource Player.Video.Saturation}"/><Slider Grid.Column="1" Style="{StaticResource PlayerStudioSliderStyle}" Minimum="-100" Maximum="100" TickFrequency="5" Value="{Binding VideoSaturation, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/><TextBlock Grid.Column="2" Text="{Binding VideoSaturation, StringFormat={}{0:0}}" TextAlignment="Right" VerticalAlignment="Center"/></Grid>
+                      <Grid Margin="0,2,0,7"><Grid.ColumnDefinitions><ColumnDefinition Width="105"/><ColumnDefinition Width="*"/><ColumnDefinition Width="44"/></Grid.ColumnDefinitions><TextBlock Style="{StaticResource PlayerSettingsFieldLabelStyle}" Text="{DynamicResource Player.Video.Gamma}"/><Slider Grid.Column="1" Style="{StaticResource PlayerStudioSliderStyle}" Minimum="-100" Maximum="100" TickFrequency="5" Value="{Binding VideoGamma, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/><TextBlock Grid.Column="2" Text="{Binding VideoGamma, StringFormat={}{0:0}}" TextAlignment="Right" VerticalAlignment="Center"/></Grid>
                       <Button HorizontalAlignment="Right" Content="{DynamicResource Player.Video.Reset}" Command="{Binding ResetVideoEqualizerCommand}"/>
                       <Separator Margin="0,9"/>
                       <Grid Margin="0,0,0,7"><Grid.ColumnDefinitions><ColumnDefinition Width="105"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Style="{StaticResource PlayerSettingsFieldLabelStyle}" Text="{DynamicResource Player.Hdr.Output}"/><ComboBox Grid.Column="1" ItemsSource="{Binding HdrOutputOptions}" SelectedItem="{Binding SelectedHdrOutputMode, Mode=TwoWay}" DisplayMemberPath="DisplayName"/></Grid>
@@ -1770,9 +2452,10 @@
                     </StackPanel>
                   </Expander>
 
-                  <Border Style="{StaticResource PlayerSettingsCardStyle}">
+                  <Expander Style="{StaticResource PlayerSettingsExpanderStyle}"
+                            Header="{DynamicResource Player.Controls.Navigation}"
+                            IsExpanded="False">
                     <StackPanel>
-                      <TextBlock Style="{StaticResource PlayerSettingsSectionTitleStyle}" Text="{DynamicResource Player.Controls.Navigation}"/>
                       <TextBlock Margin="0,0,0,7" Text="{DynamicResource Player.PlaybackPower.Title}" Foreground="{StaticResource MutedTextBrush}" FontSize="10.5"/>
                       <Grid Margin="0,0,0,8">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="118"/><ColumnDefinition Width="74"/><ColumnDefinition Width="74"/><ColumnDefinition Width="74"/></Grid.ColumnDefinitions>
@@ -1797,7 +2480,44 @@
                       </Grid>
                       <CheckBox Content="{DynamicResource Player.Playlist.AutoFolder}" IsChecked="{Binding AutoAddFolderVideos, Mode=TwoWay}"/>
                     </StackPanel>
-                  </Border>
+                  </Expander>
+
+                  <!-- P4.16.6: explicit embedded-track export. The source is
+                       never auto-downloaded and remote OAuth headers are never
+                       passed to a subprocess. -->
+                  <Expander Style="{StaticResource PlayerSettingsExpanderStyle}"
+                            Header="{DynamicResource Player.TrackExport.Title}">
+                    <StackPanel>
+                      <TextBlock Text="{DynamicResource Player.TrackExport.Help}"
+                                 TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}"
+                                 FontSize="11" Margin="0,0,0,12"/>
+                      <TextBlock Text="{DynamicResource Player.TrackExport.Audio}" Margin="0,0,0,4"/>
+                      <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <ComboBox Grid.Column="0" ItemsSource="{Binding AudioTracks}"
+                                  SelectedItem="{Binding SelectedAudioTrack, Mode=TwoWay}"
+                                  DisplayMemberPath="DisplayName"/>
+                        <Button Grid.Column="1" Margin="8,0,0,0"
+                                Content="{DynamicResource Player.TrackExport.ExportAudio}"
+                                Click="ExportEmbeddedAudio_Click"
+                                IsEnabled="{Binding HasMedia}"/>
+                      </Grid>
+                      <TextBlock Text="{DynamicResource Player.TrackExport.Subtitle}" Margin="0,0,0,4"/>
+                      <Grid Margin="0,0,0,5">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <ComboBox Grid.Column="0" ItemsSource="{Binding SubtitleTracks}"
+                                  SelectedItem="{Binding SelectedSubtitleTrack, Mode=TwoWay}"
+                                  DisplayMemberPath="DisplayName"/>
+                        <Button Grid.Column="1" Margin="8,0,0,0"
+                                Content="{DynamicResource Player.TrackExport.ExportSubtitle}"
+                                Click="ExportEmbeddedSubtitle_Click"
+                                IsEnabled="{Binding HasMedia}"/>
+                      </Grid>
+                      <TextBlock Text="{DynamicResource Player.TrackExport.Note}"
+                                 TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}"
+                                 FontSize="10.5" Margin="0,7,0,0"/>
+                    </StackPanel>
+                  </Expander>
 
                   <Expander Style="{StaticResource PlayerSettingsExpanderStyle}" Header="{DynamicResource Player.ContactSheet.Title}">
                     <StackPanel>
@@ -1809,15 +2529,88 @@
                   <Expander Style="{StaticResource PlayerSettingsExpanderStyle}" Header="{DynamicResource Player.Shortcuts.Title}">
                     <StackPanel>
                       <TextBlock Margin="0,0,0,7" Text="{DynamicResource Player.Shortcuts.Help}" Foreground="{StaticResource MutedTextBrush}" FontSize="10.5" TextWrapping="Wrap"/>
+
                       <Grid Margin="0,2"><Grid.ColumnDefinitions><ColumnDefinition Width="190"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="{DynamicResource Player.Shortcuts.PlayPause}"/><TextBox Grid.Column="1" Text="{Binding ShortcutPlayPause, UpdateSourceTrigger=LostFocus}"/></Grid>
-                      <Grid Margin="0,2"><Grid.ColumnDefinitions><ColumnDefinition Width="190"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="{DynamicResource Player.Shortcuts.Seek}"/><StackPanel Grid.Column="1" Orientation="Horizontal"><TextBox Width="90" Text="{Binding ShortcutSeekBackward, UpdateSourceTrigger=LostFocus}"/><TextBox Width="90" Text="{Binding ShortcutSeekForward, UpdateSourceTrigger=LostFocus}"/></StackPanel></Grid>
-                      <Grid Margin="0,2"><Grid.ColumnDefinitions><ColumnDefinition Width="190"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="{DynamicResource Player.Shortcuts.SeekMedium}"/><StackPanel Grid.Column="1" Orientation="Horizontal"><TextBox Width="90" Text="{Binding ShortcutSeekBackwardMedium, UpdateSourceTrigger=LostFocus}"/><TextBox Width="90" Text="{Binding ShortcutSeekForwardMedium, UpdateSourceTrigger=LostFocus}"/></StackPanel></Grid>
-                      <Grid Margin="0,2"><Grid.ColumnDefinitions><ColumnDefinition Width="190"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="{DynamicResource Player.Shortcuts.SeekLong}"/><StackPanel Grid.Column="1" Orientation="Horizontal"><TextBox Width="90" Text="{Binding ShortcutSeekBackwardLong, UpdateSourceTrigger=LostFocus}"/><TextBox Width="90" Text="{Binding ShortcutSeekForwardLong, UpdateSourceTrigger=LostFocus}"/></StackPanel></Grid>
-                      <Grid Margin="0,2"><Grid.ColumnDefinitions><ColumnDefinition Width="190"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="{DynamicResource Player.Shortcuts.Frame}"/><StackPanel Grid.Column="1" Orientation="Horizontal"><TextBox Width="90" Text="{Binding ShortcutFrameBackward, UpdateSourceTrigger=LostFocus}"/><TextBox Width="90" Text="{Binding ShortcutFrameForward, UpdateSourceTrigger=LostFocus}"/></StackPanel></Grid>
+                      <Grid Margin="0,2"><Grid.ColumnDefinitions><ColumnDefinition Width="190"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="{DynamicResource Player.Shortcuts.Seek}"/><StackPanel Grid.Column="1" Orientation="Horizontal"><TextBox Width="110" Text="{Binding ShortcutSeekBackward, UpdateSourceTrigger=LostFocus}"/><TextBox Width="110" Text="{Binding ShortcutSeekForward, UpdateSourceTrigger=LostFocus}"/></StackPanel></Grid>
+                      <Grid Margin="0,2"><Grid.ColumnDefinitions><ColumnDefinition Width="190"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="{DynamicResource Player.Shortcuts.SeekMedium}"/><StackPanel Grid.Column="1" Orientation="Horizontal"><TextBox Width="110" Text="{Binding ShortcutSeekBackwardMedium, UpdateSourceTrigger=LostFocus}"/><TextBox Width="110" Text="{Binding ShortcutSeekForwardMedium, UpdateSourceTrigger=LostFocus}"/></StackPanel></Grid>
+                      <Grid Margin="0,2"><Grid.ColumnDefinitions><ColumnDefinition Width="190"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="{DynamicResource Player.Shortcuts.SeekLong}"/><StackPanel Grid.Column="1" Orientation="Horizontal"><TextBox Width="110" Text="{Binding ShortcutSeekBackwardLong, UpdateSourceTrigger=LostFocus}"/><TextBox Width="110" Text="{Binding ShortcutSeekForwardLong, UpdateSourceTrigger=LostFocus}"/></StackPanel></Grid>
+                      <Grid Margin="0,2"><Grid.ColumnDefinitions><ColumnDefinition Width="190"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="{DynamicResource Player.Shortcuts.Frame}"/><StackPanel Grid.Column="1" Orientation="Horizontal"><TextBox Width="110" Text="{Binding ShortcutFrameBackward, UpdateSourceTrigger=LostFocus}"/><TextBox Width="110" Text="{Binding ShortcutFrameForward, UpdateSourceTrigger=LostFocus}"/></StackPanel></Grid>
                       <Grid Margin="0,2"><Grid.ColumnDefinitions><ColumnDefinition Width="190"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="{DynamicResource Player.Shortcuts.Screenshot}"/><TextBox Grid.Column="1" Text="{Binding ShortcutScreenshot, UpdateSourceTrigger=LostFocus}"/></Grid>
                       <Grid Margin="0,2"><Grid.ColumnDefinitions><ColumnDefinition Width="190"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="{DynamicResource Player.Shortcuts.Fullscreen}"/><TextBox Grid.Column="1" Text="{Binding ShortcutFullscreen, UpdateSourceTrigger=LostFocus}"/></Grid>
                       <Grid Margin="0,2"><Grid.ColumnDefinitions><ColumnDefinition Width="190"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="{DynamicResource Player.Shortcuts.Mini}"/><TextBox Grid.Column="1" Text="{Binding ShortcutMiniPlayer, UpdateSourceTrigger=LostFocus}"/></Grid>
                       <Grid Margin="0,2"><Grid.ColumnDefinitions><ColumnDefinition Width="190"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="{DynamicResource Player.Shortcuts.Playlist}"/><TextBox Grid.Column="1" Text="{Binding ShortcutPlaylist, UpdateSourceTrigger=LostFocus}"/></Grid>
+                      <Grid Margin="0,2"><Grid.ColumnDefinitions><ColumnDefinition Width="190"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="{DynamicResource Player.Shortcuts.SubtitleDelay}"/><StackPanel Grid.Column="1" Orientation="Horizontal"><TextBox Width="110" Text="{Binding ShortcutSubtitleDelayDecrease, UpdateSourceTrigger=LostFocus}"/><TextBox Width="110" Text="{Binding ShortcutSubtitleDelayIncrease, UpdateSourceTrigger=LostFocus}"/></StackPanel></Grid>
+                      <Grid Margin="0,2"><Grid.ColumnDefinitions><ColumnDefinition Width="190"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="{DynamicResource Player.Shortcuts.AudioDelay}"/><StackPanel Grid.Column="1" Orientation="Horizontal"><TextBox Width="110" Text="{Binding ShortcutAudioDelayDecrease, UpdateSourceTrigger=LostFocus}"/><TextBox Width="110" Text="{Binding ShortcutAudioDelayIncrease, UpdateSourceTrigger=LostFocus}"/></StackPanel></Grid>
+                      <TextBlock Margin="13,13,0,7"
+                                 Text="{DynamicResource Player.Shortcuts.ExtraTitle}"
+                                 FontWeight="SemiBold" FontSize="13"
+                                 Foreground="{StaticResource PlayerGlassTextBrush}"/>
+                      <TextBlock Margin="0,0,0,6"
+                                 Text="{DynamicResource Player.Shortcuts.ExtraHelp}"
+                                 Foreground="{StaticResource MutedTextBrush}"
+                                 TextWrapping="Wrap" FontSize="10.5"/>
+                      <Grid Margin="0,2">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="190"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <TextBlock Text="{DynamicResource Player.Shortcuts.Speed}" VerticalAlignment="Center"/>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                          <TextBox Width="110" Text="{Binding ShortcutSpeedDecrease, UpdateSourceTrigger=LostFocus}"/>
+                          <TextBox Width="110" Text="{Binding ShortcutSpeedIncrease, UpdateSourceTrigger=LostFocus}"/>
+                        </StackPanel>
+                      </Grid>
+                      <Grid Margin="0,2">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="190"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <TextBlock Text="{DynamicResource Player.Shortcuts.SpeedReset}" VerticalAlignment="Center"/>
+                        <TextBox Grid.Column="1" Text="{Binding ShortcutSpeedReset, UpdateSourceTrigger=LostFocus}"/>
+                      </Grid>
+                      <Grid Margin="0,2">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="190"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <TextBlock Text="{DynamicResource Player.Shortcuts.NextMedia}" VerticalAlignment="Center"/>
+                        <TextBox Grid.Column="1" Text="{Binding ShortcutNextMedia, UpdateSourceTrigger=LostFocus}"/>
+                      </Grid>
+                      <Grid Margin="0,2">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="190"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <TextBlock Text="{DynamicResource Player.Shortcuts.AudioTrack}" VerticalAlignment="Center"/>
+                        <TextBox Grid.Column="1" Text="{Binding ShortcutCycleAudioTrack, UpdateSourceTrigger=LostFocus}"/>
+                      </Grid>
+                      <Grid Margin="0,2">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="190"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <TextBlock Text="{DynamicResource Player.Shortcuts.SubtitleTrack}" VerticalAlignment="Center"/>
+                        <TextBox Grid.Column="1" Text="{Binding ShortcutCycleSubtitleTrack, UpdateSourceTrigger=LostFocus}"/>
+                      </Grid>
+                      <Grid Margin="0,2">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="190"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <TextBlock Text="{DynamicResource Player.Shortcuts.Mute}" VerticalAlignment="Center"/>
+                        <TextBox Grid.Column="1" Text="{Binding ShortcutMute, UpdateSourceTrigger=LostFocus}"/>
+                      </Grid>
+                      <Grid Margin="0,2">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="190"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <TextBlock Text="{DynamicResource Player.Shortcuts.Volume}" VerticalAlignment="Center"/>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                          <TextBox Width="110" Text="{Binding ShortcutVolumeDecrease, UpdateSourceTrigger=LostFocus}"/>
+                          <TextBox Width="110" Text="{Binding ShortcutVolumeIncrease, UpdateSourceTrigger=LostFocus}"/>
+                        </StackPanel>
+                      </Grid>
+                      <Grid Margin="0,2">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="190"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <TextBlock Text="{DynamicResource Player.Shortcuts.ScreenshotAlternate}" VerticalAlignment="Center"/>
+                        <TextBox Grid.Column="1" Text="{Binding ShortcutScreenshotAlternate, UpdateSourceTrigger=LostFocus}"/>
+                      </Grid>
+                      <Grid Margin="0,2">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="190"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <TextBlock Text="{DynamicResource Player.Shortcuts.SubtitleDelayAlternate}" VerticalAlignment="Center"/>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                          <TextBox Width="110" Text="{Binding ShortcutSubtitleDelayDecreaseAlternate, UpdateSourceTrigger=LostFocus}"/>
+                          <TextBox Width="110" Text="{Binding ShortcutSubtitleDelayIncreaseAlternate, UpdateSourceTrigger=LostFocus}"/>
+                        </StackPanel>
+                      </Grid>
+                      <Grid Margin="0,2">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="190"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <TextBlock Text="{DynamicResource Player.Shortcuts.AudioDelayAlternate}" VerticalAlignment="Center"/>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                          <TextBox Width="110" Text="{Binding ShortcutAudioDelayDecreaseAlternate, UpdateSourceTrigger=LostFocus}"/>
+                          <TextBox Width="110" Text="{Binding ShortcutAudioDelayIncreaseAlternate, UpdateSourceTrigger=LostFocus}"/>
+                        </StackPanel>
+                      </Grid>
                       <Button Margin="0,8,0,0" HorizontalAlignment="Right" Content="{DynamicResource Player.Shortcuts.Reset}" Command="{Binding ResetShortcutsCommand}"/>
                     </StackPanel>
                   </Expander>
@@ -1868,7 +2661,5 @@
             </Grid>
           </Border>
         </Popup>
-      </Grid>
-    </Border>
   </Grid>
 </Window>

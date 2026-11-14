@@ -1,4 +1,5 @@
 ﻿using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.IO;
 using System.Windows.Input;
 using AltyaziDB.Player.App.Commands;
@@ -44,6 +45,12 @@ public sealed class SourcePanelViewModel : ObservableObject, IAsyncDisposable
     private RcloneCloudProviderOption? _selectedCloudProvider;
     private SavedCloudAccount? _selectedCloudAccount;
     private string _cloudAccountName = "Google Drive";
+    private string _cloudConnectErrorText = string.Empty;
+    private bool _hasCloudConnectError;
+    private CancellationTokenSource? _activeOAuthCancellation;
+    private Uri? _pendingOAuthAuthorizationUri;
+    private bool _canOpenOAuthBrowser;
+    private string _oauthBrowserStatusText = string.Empty;
     private string _rcloneStatusText = "rclone denetleniyor…";
     private bool _rcloneAvailable;
     private string _statusText = "Bağlantı yapıştırın veya bir WebDAV profili oluşturun.";
@@ -149,6 +156,10 @@ public sealed class SourcePanelViewModel : ObservableObject, IAsyncDisposable
     }
     public SavedCloudAccount? SelectedCloudAccount { get => _selectedCloudAccount; set => SetProperty(ref _selectedCloudAccount, value); }
     public string CloudAccountName { get => _cloudAccountName; set => SetProperty(ref _cloudAccountName, value); }
+    public string CloudConnectErrorText { get => _cloudConnectErrorText; private set => SetProperty(ref _cloudConnectErrorText, value); }
+    public bool HasCloudConnectError { get => _hasCloudConnectError; private set => SetProperty(ref _hasCloudConnectError, value); }
+    public bool CanOpenOAuthBrowser { get => _canOpenOAuthBrowser; private set => SetProperty(ref _canOpenOAuthBrowser, value); }
+    public string OAuthBrowserStatusText { get => _oauthBrowserStatusText; private set => SetProperty(ref _oauthBrowserStatusText, value); }
     public string RcloneStatusText { get => _rcloneStatusText; private set => SetProperty(ref _rcloneStatusText, value); }
     public bool RcloneAvailable { get => _rcloneAvailable; private set { if (SetProperty(ref _rcloneAvailable, value)) OnPropertyChanged(nameof(CloudAvailabilityText)); } }
     public string CloudAvailabilityText => LocalizationManager.Get(RcloneAvailable ? "Panel.CloudReady" : "Panel.CloudUnavailable");
@@ -332,7 +343,7 @@ public sealed class SourcePanelViewModel : ObservableObject, IAsyncDisposable
     private async Task<SavedPublicLink> UpsertPublicLinkAsync(string url, string? displayName, RemoteBrowseResult? result)
     {
         var resolvedProvider = result?.DirectOpen?.Provider ?? result?.Provider.ToString() ?? string.Empty;
-        var resolvedName = result is not null && IsResolvedWebProvider(result.Provider)
+        var resolvedName = result is not null && HasResolvedMediaName(result)
             ? result.DisplayName
             : string.Empty;
         var name = string.IsNullOrWhiteSpace(displayName)
@@ -374,15 +385,22 @@ public sealed class SourcePanelViewModel : ObservableObject, IAsyncDisposable
         if (result is not null)
         {
             link.Provider = result.DirectOpen?.Provider ?? result.Provider.ToString();
-            if (IsResolvedWebProvider(result.Provider))
+            if (HasResolvedMediaName(result))
             {
                 if (string.IsNullOrWhiteSpace(link.Name) || link.Name.Equals(HostLabel(link.Url), StringComparison.OrdinalIgnoreCase))
                     link.Name = result.DisplayName;
-                link.Detail = "WebLink.StreamReady";
+                if (IsResolvedWebProvider(result.Provider))
+                    link.Detail = "WebLink.StreamReady";
             }
             await PersistSavedLinksAsync().ConfigureAwait(true);
         }
     }
+
+    private static bool HasResolvedMediaName(RemoteBrowseResult result) =>
+        IsResolvedWebProvider(result.Provider) ||
+        (result.Provider == RemoteSourceProvider.GoogleDrive &&
+         !string.IsNullOrWhiteSpace(result.DisplayName) &&
+         !result.DisplayName.Equals("Google Drive dosyası", StringComparison.OrdinalIgnoreCase));
 
     private static bool IsResolvedWebProvider(RemoteSourceProvider provider) => provider is
         RemoteSourceProvider.GdFlix or
@@ -424,6 +442,288 @@ public sealed class SourcePanelViewModel : ObservableObject, IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Show only whether this provider has user-owned credentials. Never copy
+    /// Client Secret into the source sheet or display it in diagnostics.
+    /// </summary>
+    public async Task<bool> HasSavedCloudCredentialsAsync(RcloneCloudProvider provider)
+    {
+        var prefix = CloudCredentialPrefix(provider);
+        if (prefix.Length == 0) return false;
+        try
+        {
+            var id = await _secretStore.GetAsync($"cloud:{prefix}-client-id").ConfigureAwait(true);
+            var secret = await _secretStore.GetAsync($"cloud:{prefix}-client-secret").ConfigureAwait(true);
+            return !string.IsNullOrWhiteSpace(id) && !string.IsNullOrWhiteSpace(secret);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static string CloudCredentialPrefix(RcloneCloudProvider provider) => provider switch
+    {
+        RcloneCloudProvider.GoogleDrive => "google",
+        RcloneCloudProvider.Dropbox => "dropbox",
+        RcloneCloudProvider.OneDrive => "onedrive",
+        RcloneCloudProvider.PCloud or RcloneCloudProvider.PCloudEurope => "pcloud",
+        _ => string.Empty
+    };
+
+    /// <summary>Own OAuth apps take precedence; Google BYOC is mandatory for new accounts.</summary>
+    public async Task<bool> ConnectCloudProviderAsync(RcloneCloudProvider provider, string? displayName = null,
+        string? customClientId = null, string? customClientSecret = null)
+    {
+        if (IsBusy) return false;
+        HasCloudConnectError = false;
+        CloudConnectErrorText = string.Empty;
+
+        var selected = CloudProviders.FirstOrDefault(item => item.Provider == provider);
+        if (selected is null) return false;
+
+        var id = customClientId?.Trim() ?? string.Empty;
+        var secret = customClientSecret?.Trim() ?? string.Empty;
+        if ((id.Length > 0) != (secret.Length > 0))
+        {
+            CloudConnectErrorText = LocalizationManager.Get("R5164.BYOC.PairRequired");
+            HasCloudConnectError = true;
+            return false;
+        }
+        if (id.Length > 256 || secret.Length > 1024
+            || id.Contains('\n') || id.Contains('\r') || secret.Contains('\n') || secret.Contains('\r'))
+        {
+            CloudConnectErrorText = LocalizationManager.Get("R5164.BYOC.Invalid");
+            HasCloudConnectError = true;
+            return false;
+        }
+
+        var prefix = CloudCredentialPrefix(provider);
+        if (prefix.Length == 0) return false;
+        var clientIdKey = $"cloud:{prefix}-client-id";
+        var clientSecretKey = $"cloud:{prefix}-client-secret";
+        string? previousClientId = null;
+        string? previousClientSecret = null;
+        var staged = false;
+        string selectedId;
+        string selectedSecret;
+
+        async Task RestoreCredentialsAsync()
+        {
+            if (!staged) return;
+            if (string.IsNullOrEmpty(previousClientId))
+                await _secretStore.RemoveAsync(clientIdKey).ConfigureAwait(true);
+            else
+                await _secretStore.SetAsync(clientIdKey, previousClientId).ConfigureAwait(true);
+
+            if (string.IsNullOrEmpty(previousClientSecret))
+                await _secretStore.RemoveAsync(clientSecretKey).ConfigureAwait(true);
+            else
+                await _secretStore.SetAsync(clientSecretKey, previousClientSecret).ConfigureAwait(true);
+        }
+
+        try
+        {
+            previousClientId = await _secretStore.GetAsync(clientIdKey).ConfigureAwait(true);
+            previousClientSecret = await _secretStore.GetAsync(clientSecretKey).ConfigureAwait(true);
+            // Inline values take precedence; otherwise reuse Settings > Cloud BYOC.
+            selectedId = id.Length > 0 ? id : previousClientId?.Trim() ?? string.Empty;
+            selectedSecret = id.Length > 0 ? secret : previousClientSecret?.Trim() ?? string.Empty;
+            // Do not silently accept a half-configured application. Google
+            // Drive's retired shared client cannot be used for new remotes.
+            // Other providers retain their rclone default when no BYOC
+            // credentials are supplied; the sheet explains this fallback.
+            if ((selectedId.Length > 0) != (selectedSecret.Length > 0))
+            {
+                CloudConnectErrorText = LocalizationManager.Get("R5164.BYOC.PairRequired");
+                HasCloudConnectError = true;
+                return false;
+            }
+            if (provider == RcloneCloudProvider.GoogleDrive && selectedId.Length == 0)
+            {
+                CloudConnectErrorText = LocalizationManager.Get("R5164.BYOC.Required");
+                HasCloudConnectError = true;
+                return false;
+            }
+            if (id.Length > 0)
+            {
+                // Temporarily stage this provider's credentials for rclone config.
+                // Always restore the previous defaults after a successful/failed
+                // connection so older saved accounts keep their OAuth identity.
+                staged = true;
+                await _secretStore.SetAsync(clientIdKey, selectedId).ConfigureAwait(true);
+                await _secretStore.SetAsync(clientSecretKey, selectedSecret).ConfigureAwait(true);
+            }
+        }
+        catch
+        {
+            try { await RestoreCredentialsAsync().ConfigureAwait(true); } catch { /* protected store unavailable */ }
+            CloudConnectErrorText = LocalizationManager.Get("R5164.BYOC.StorageError");
+            HasCloudConnectError = true;
+            return false;
+        }
+
+        SelectedCloudProvider = selected;
+        CloudAccountName = string.IsNullOrWhiteSpace(displayName)
+            ? selected.Label
+            : displayName.Trim();
+        var previous = CloudAccounts.Select(item => item.Id)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            await ConnectCloudAsync().ConfigureAwait(true);
+            var newAccount = CloudAccounts.FirstOrDefault(item => !previous.Contains(item.Id));
+            if (newAccount is null) return false;
+
+            // Pin BOTH inline and settings-derived BYOC credentials to each
+            // remote. A later Settings edit must not silently change an older
+            // Google Drive, Dropbox, OneDrive or pCloud account's OAuth app.
+            if (selectedId.Length > 0)
+            {
+                await _secretStore.SetAsync(
+                    $"cloud:remote:{newAccount.RemoteName}:client-id", selectedId).ConfigureAwait(true);
+                await _secretStore.SetAsync(
+                    $"cloud:remote:{newAccount.RemoteName}:client-secret", selectedSecret).ConfigureAwait(true);
+            }
+            else
+            {
+                // Remember explicit provider-default connections. A later
+                // Settings BYOC edit must not change this remote's OAuth app.
+                await _secretStore.SetAsync(
+                    $"cloud:remote:{newAccount.RemoteName}:shared-client", "true").ConfigureAwait(true);
+            }
+            return true;
+        }
+        catch
+        {
+            CloudConnectErrorText = LocalizationManager.Get("R5164.BYOC.SnapshotError");
+            HasCloudConnectError = true;
+            return false;
+        }
+        finally
+        {
+            if (staged)
+            {
+                try { await RestoreCredentialsAsync().ConfigureAwait(true); }
+                catch
+                {
+                    _logger.Warning("Bulut BYOC sağlayıcı ayarları geri yüklenemedi: secure_store_failure");
+                    CloudConnectErrorText = LocalizationManager.Get("R5164.BYOC.StorageError");
+                    HasCloudConnectError = true;
+                }
+            }
+        }
+    }
+
+    /// <summary>WebDAV card enters credentials in Windows, using the existing secret store.</summary>
+    public async Task<bool> ConnectNewWebDavFromCardAsync()
+    {
+        if (IsBusy) return false;
+        SelectedProfile = null;
+        var previous = WebDavProfiles.Select(item => item.Id)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        await ConnectWebDavAsync().ConfigureAwait(true);
+        return WebDavProfiles.Any(item => !previous.Contains(item.Id));
+    }
+
+    public void CancelCloudAuthorization()
+    {
+        if (_activeOAuthCancellation is { IsCancellationRequested: false } active)
+        {
+            active.Cancel();
+            OAuthBrowserStatusText = "OAuth yetkilendirmesi iptal ediliyor…";
+        }
+    }
+
+    public void ClearOAuthAuthorizationLink()
+    {
+        _pendingOAuthAuthorizationUri = null;
+        CanOpenOAuthBrowser = false;
+        OAuthBrowserStatusText = string.Empty;
+    }
+
+    public void OpenOAuthAuthorizationBrowser()
+    {
+        var uri = _pendingOAuthAuthorizationUri;
+        if (uri is null || !CanOpenOAuthBrowser)
+            return;
+
+        // Only the loopback authorization address emitted by the active rclone
+        // process is opened. Never log/copy a provider token into diagnostics.
+        if (uri.Scheme != Uri.UriSchemeHttp || !uri.IsLoopback
+            || uri.AbsolutePath != "/auth" || !uri.Query.StartsWith("?state=", StringComparison.Ordinal))
+            return;
+
+        try
+        {
+            // Windows can reuse an existing browser and return no new Process
+            // object. A successful shell dispatch does not prove consent yet.
+            Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
+            OAuthBrowserStatusText =
+                "Tarayıcı açma isteği gönderildi. Sağlayıcı izin ekranını tamamlayın; açılmadıysa bağlantıyı kopyalayın.";
+        }
+        catch
+        {
+            OAuthBrowserStatusText =
+                "Tarayıcı otomatik açılamadı. Yetkilendirme bağlantısını kopyalayıp tarayıcınızda açın.";
+            _logger.Warning("OAuth yerel tarayıcı başlatma başarısız: shell_open_failed");
+        }
+    }
+
+    public void CopyOAuthAuthorizationLink()
+    {
+        var uri = _pendingOAuthAuthorizationUri;
+        if (!CanOpenOAuthBrowser || uri is null)
+            return;
+
+        try
+        {
+            // The ephemeral OAuth state stays local to the clipboard and is
+            // available only after an explicit button click.
+            System.Windows.Clipboard.SetText(uri.AbsoluteUri);
+            OAuthBrowserStatusText =
+                "Tek kullanımlık yetkilendirme adresi kopyalandı. Tarayıcınızda açın; kimseyle paylaşmayın.";
+        }
+        catch
+        {
+            OAuthBrowserStatusText =
+                "Yetkilendirme adresi kopyalanamadı. Tarayıcıda aç düğmesini tekrar deneyin.";
+        }
+    }
+
+    private static (string Code, string Help) DiagnoseOAuthFailure(Exception exception)
+    {
+        var message = exception.Message.ToLowerInvariant();
+        if (exception is TimeoutException || message.Contains("timed out") || message.Contains("timeout"))
+            return ("oauth_timeout", "Yetkilendirme süresi doldu. Tarayıcı izinlerini kontrol edip yeniden deneyin.");
+        if (message.Contains("access_denied") || message.Contains("authorization declined")
+            || message.Contains("authorization denied") || message.Contains("cancelled"))
+            return ("oauth_denied", "Hesap yetkilendirmesi reddedildi veya iptal edildi. Sağlayıcı girişini yeniden başlatın.");
+        if (message.Contains("invalid_client") || message.Contains("unauthorized_client")
+            || message.Contains("invalid client") || message.Contains("redirect_uri_mismatch"))
+            return ("oauth_client", "OAuth uygulama kimlik bilgileri veya yönlendirme ayarı geçersiz. Özel Client ID/Secret bilgilerinizi denetleyin.");
+        if (message.Contains("oauth_local_port_reserved")
+            || (message.Contains(":53682") && (message.Contains("forbidden")
+                || message.Contains("access permissions") || message.Contains("access is denied"))))
+            return ("oauth_port_reserved", "Windows 53682 OAuth portuna erişimi engelliyor. Hyper-V veya sanallaştırma sistemi bu portu ayırmış olabilir. Salt-okunur port tanılama betiğini çalıştırın.");
+        if (message.Contains("oauth_local_port_occupied")
+            || message.Contains("bind: address already in use")
+            || message.Contains("address already in use")
+            || message.Contains("only one usage of each socket"))
+            return ("oauth_port_busy", "127.0.0.1:53682 OAuth portu başka bir işlem tarafından kullanılıyor. Mevcut hesapları silmeyin; portu kullanan uygulamayı kontrol edin.");
+        if (message.Contains("failed to start auth webserver"))
+            return ("oauth_port_server", "rclone yerel OAuth sunucusunu başlatamadı. Windows 53682 portunun durumunu tanılayın; tarayıcı ayarlarını değiştirmek tek başına çözmez.");
+        if (message.Contains("failed to open browser")
+            || message.Contains("unable to open browser")
+            || message.Contains("browser launch failed"))
+            return ("oauth_browser", "Varsayılan tarayıcı başlatılamadı. Tarayıcıda aç veya Bağlantıyı kopyala seçeneklerini deneyin.");
+        if (exception is FileNotFoundException || message.Contains("rclone.exe"))
+            return ("rclone_missing", "Bulut bağlantı motoru bulunamadı. ADB Player'ın eksiksiz test paketini kullanın.");
+        if (message.Contains("connection") || message.Contains("network") || message.Contains("dns"))
+            return ("oauth_network", "Bağlantı veya DNS sorunu oluştu. İnternet bağlantısını kontrol edin.");
+        return ("oauth_unexpected", "Yetkilendirme tamamlanamadı. Sağlayıcı ve OAuth ayarlarını kontrol edin; yeniden deneyin.");
+    }
+
     private async Task ConnectCloudAsync()
     {
         if (SelectedCloudProvider is null)
@@ -436,8 +736,10 @@ public sealed class SourcePanelViewModel : ObservableObject, IAsyncDisposable
             await RefreshRcloneStatusAsync().ConfigureAwait(true);
             if (!RcloneAvailable)
             {
-                _logger.Warning($"Bulut motoru kullanılamıyor: {RcloneStatusText}");
-                _dialogs.ShowError("Bulut hesapları şu anda kullanılamıyor. Uygulamayı güncelleyip yeniden deneyin.");
+                _logger.Warning("Bulut motoru kullanılamıyor: rclone_unavailable");
+                CloudConnectErrorText = "rclone bağlantı motoru başlatılamadı. Eksiksiz ADB Player paketini kontrol edin.";
+                HasCloudConnectError = true;
+                StatusText = CloudConnectErrorText;
                 return;
             }
         }
@@ -445,9 +747,28 @@ public sealed class SourcePanelViewModel : ObservableObject, IAsyncDisposable
         try
         {
             IsBusy = true;
-            StatusText = $"{SelectedCloudProvider.Label} yetkilendirmesi için tarayıcı açılıyor…";
+            ClearOAuthAuthorizationLink();
+            CloudConnectErrorText = string.Empty;
+            HasCloudConnectError = false;
+            StatusText = $"{SelectedCloudProvider.Label} için OAuth yetkilendirmesi başlatılıyor…";
             var displayName = string.IsNullOrWhiteSpace(CloudAccountName) ? SelectedCloudProvider.Label : CloudAccountName.Trim();
-            var remoteName = await _cloudService.ConnectAsync(SelectedCloudProvider.Provider, displayName).ConfigureAwait(true);
+            var uiContext = SynchronizationContext.Current;
+            _activeOAuthCancellation = new CancellationTokenSource();
+            var remoteName = await _cloudService.ConnectAsync(
+                SelectedCloudProvider.Provider, displayName,
+                cancellationToken: _activeOAuthCancellation.Token,
+                onAuthorizationLink: uri =>
+                {
+                    // rclone stderr is read in a worker task. Marshal every
+                    // UI update and browser open to the WPF UI context.
+                    uiContext?.Post(_ =>
+                    {
+                        if (!IsBusy) return;
+                        _pendingOAuthAuthorizationUri = uri;
+                        CanOpenOAuthBrowser = true;
+                        OpenOAuthAuthorizationBrowser();
+                    }, null);
+                }).ConfigureAwait(true);
             var account = new SavedCloudAccount
             {
                 DisplayName = displayName,
@@ -462,13 +783,87 @@ public sealed class SourcePanelViewModel : ObservableObject, IAsyncDisposable
             StatusText = $"{account.ProviderLabel} hesabı bağlandı.";
             await OpenCloudAsync().ConfigureAwait(true);
         }
+        catch (OperationCanceledException)
+        {
+            CloudConnectErrorText = "OAuth yetkilendirmesi iptal edildi.";
+            HasCloudConnectError = true;
+            StatusText = CloudConnectErrorText;
+        }
         catch (Exception exception)
         {
-            _logger.Error("rclone bulut hesabı bağlanamadı.", exception);
-            StatusText = "Bulut hesabı bağlanamadı.";
-            _dialogs.ShowError($"Bulut hesabı bağlanamadı.\n\n{exception.Message}");
+            // rclone stderr may contain OAuth codes, tokens or callback URLs.
+            // Do not log or display the raw exception. Avoid a second modal
+            // while the source-specific connect sheet is already open.
+            var diagnosis = DiagnoseOAuthFailure(exception);
+            _logger.Warning($"rclone bulut bağlantısı tamamlanamadı: {diagnosis.Code}");
+            CloudConnectErrorText = diagnosis.Help;
+            HasCloudConnectError = true;
+            StatusText = diagnosis.Help;
         }
-        finally { IsBusy = false; }
+        finally
+        {
+            ClearOAuthAuthorizationLink();
+            _activeOAuthCancellation?.Dispose();
+            _activeOAuthCancellation = null;
+            IsBusy = false;
+        }
+    }
+
+    // A persisted cloud resume ID is NOT the temporary rclone HTTP proxy URL.
+    // Re-resolve it through the same authenticated cloud account on every play.
+    public bool IsConnectedCloudSource(string source)
+    {
+        if (!Uri.TryCreate(source, UriKind.Absolute, out var uri) ||
+            !uri.Scheme.Equals("rclone", StringComparison.OrdinalIgnoreCase) ||
+            string.IsNullOrWhiteSpace(uri.Host) || uri.AbsolutePath == "/")
+            return false;
+
+        var remoteName = Uri.UnescapeDataString(uri.Host);
+        return CloudAccounts.Any(account =>
+            account.RemoteName.Equals(remoteName, StringComparison.OrdinalIgnoreCase));
+    }
+
+    public async Task OpenPersistentCloudMediaAsync(string source)
+    {
+        if (!IsConnectedCloudSource(source))
+        {
+            StatusText = "Bulut medya kaynağına ait hesap artık bağlı değil.";
+            _dialogs.ShowError(StatusText);
+            return;
+        }
+
+        var uri = new Uri(source, UriKind.Absolute);
+        var remoteName = Uri.UnescapeDataString(uri.Host);
+        var account = CloudAccounts.First(item =>
+            item.RemoteName.Equals(remoteName, StringComparison.OrdinalIgnoreCase));
+        var filename = Uri.UnescapeDataString(uri.AbsolutePath.Split('/').LastOrDefault() ?? string.Empty);
+        if (string.IsNullOrWhiteSpace(filename))
+        {
+            StatusText = "Bulut dosyasının adı bulunamadı.";
+            return;
+        }
+
+        try
+        {
+            IsBusy = true;
+            var item = new RemoteSourceItem(
+                source, filename, RemoteSourceItemKind.Video,
+                source, null, null, null,
+                Provider: $"rclone:{account.RemoteName}");
+            var request = await _cloudService.CreateOpenRequestAsync(account, item).ConfigureAwait(true);
+            await _openRemote(request).ConfigureAwait(true);
+            StatusText = $"Açılıyor: {filename}";
+        }
+        catch (Exception exception)
+        {
+            _logger.Error("Bulut geçmişi yeniden açılamadı.", exception);
+            StatusText = DescribeRemotePlaybackFailure(exception);
+            _dialogs.ShowError(StatusText);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     private async Task OpenCloudAsync()
@@ -534,6 +929,17 @@ public sealed class SourcePanelViewModel : ObservableObject, IAsyncDisposable
         {
             IsBusy = true;
             await _cloudService.DisconnectAsync(account.RemoteName).ConfigureAwait(true);
+            // Never retain custom client credentials for a disconnected remote.
+            try
+            {
+                await _secretStore.RemoveAsync($"cloud:remote:{account.RemoteName}:client-id").ConfigureAwait(true);
+                await _secretStore.RemoveAsync($"cloud:remote:{account.RemoteName}:client-secret").ConfigureAwait(true);
+                await _secretStore.RemoveAsync($"cloud:remote:{account.RemoteName}:shared-client").ConfigureAwait(true);
+            }
+            catch
+            {
+                _logger.Warning("Bağlantı kaldırıldı; eski özel OAuth kimliği temizlenemedi.");
+            }
             CloudAccounts.Remove(account);
             if (ReferenceEquals(_currentCloudAccount, account)) _currentCloudAccount = null;
             SelectedCloudAccount = CloudAccounts.FirstOrDefault();
@@ -688,13 +1094,42 @@ public sealed class SourcePanelViewModel : ObservableObject, IAsyncDisposable
         catch (Exception exception)
         {
             _logger.Error("Uzak video açılamadı.", exception);
-            StatusText = "Video açılamadı.";
-            _dialogs.ShowError($"Video açılamadı.\n\n{exception.Message}");
+            // User-facing dialogs intentionally hide all paragraphs after a
+            // blank line. Show a SAFE classified error in the first paragraph
+            // while preserving the original exception privately in app logs.
+            StatusText = DescribeRemotePlaybackFailure(exception);
+            _dialogs.ShowError(StatusText);
         }
         finally
         {
             IsBusy = false;
         }
+    }
+
+    private static string DescribeRemotePlaybackFailure(Exception exception)
+    {
+        // Do not display arbitrary exception text: cloud URLs, OAuth tokens,
+        // server auth credentials and local paths may appear in raw errors.
+        var message = exception.Message ?? string.Empty;
+        var http = System.Text.RegularExpressions.Regex.Match(
+            message, @"\bHTTP\s+(401|403|404|416|429|500|502|503|504)\b",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase |
+            System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+        if (http.Success)
+            return $"Video açılamadı: bulut akışı HTTP {http.Groups[1].Value} döndürdü. Drive erişimini ve rclone günlüğünü kontrol edin.";
+        if (exception is TimeoutException ||
+            message.Contains("zaman aşım", StringComparison.OrdinalIgnoreCase))
+            return "Video açılamadı: bulut akışının ilk Range isteği zaman aşımına uğradı. rclone günlüğünü kontrol edin.";
+        if (message.Contains("Range", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("kısmi içerik", StringComparison.OrdinalIgnoreCase))
+            return "Video açılamadı: uzak kaynak HTTP Range isteğini karşılamadı.";
+        if (message.Contains("sunucusu erken kapandı", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("sunucusu zamanında hazır", StringComparison.OrdinalIgnoreCase))
+            return "Video açılamadı: yerel rclone medya sunucusu başlatılamadı. rclone günlüğünü kontrol edin.";
+        if (message.Contains("mpv", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("Oynatıcı", StringComparison.OrdinalIgnoreCase))
+            return "Video açılamadı: libmpv oynatıcı komutu başarısız. Player günlüğünü kontrol edin.";
+        return $"Video açılamadı ({exception.GetType().Name}). Nedeni belirlemek için Player ve rclone günlüklerini kontrol edin.";
     }
 
     private async Task BrowseFolderAsync(string? path)
@@ -914,6 +1349,7 @@ public sealed class SourcePanelViewModel : ObservableObject, IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        CancelCloudAuthorization();
         _service.Dispose();
         await _cloudService.DisposeAsync().ConfigureAwait(false);
     }

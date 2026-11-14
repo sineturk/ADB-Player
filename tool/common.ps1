@@ -87,8 +87,28 @@ function Copy-LibMpvNativeRuntime {
         $files = @(Get-ChildItem -LiteralPath $packageRoot -File -Recurse -ErrorAction SilentlyContinue |
             Where-Object { $_.Extension -ieq ".dll" })
     }
-    if ($files.Count -eq 0) {
-        if ($Required) { throw "libmpv native dosyaları NuGet önbelleğinde bulunamadı: $packageRoot" }
+    # Private RC build may use a separately verified native libmpv runtime
+    # supplied by the tester. Never scan arbitrary PATH directories for DLLs.
+    # Prefer pinned NuGet runtime, and accept only the 3 known mpv DLL names
+    # from an explicit local directory if that package has no playable DLL.
+    $mpvNames = @("libmpv-2.dll", "mpv-2.dll", "libmpv.dll")
+    $hasMpv = @($files | Where-Object { $mpvNames -contains $_.Name }).Count -gt 0
+    if (-not $hasMpv -and -not [string]::IsNullOrWhiteSpace($env:ADB_LIBMPV_NATIVE_DIRECTORY)) {
+        $explicit = $env:ADB_LIBMPV_NATIVE_DIRECTORY
+        if (-not (Test-Path -LiteralPath $explicit -PathType Container)) {
+            throw "Explicit libmpv directory missing: $explicit"
+        }
+        $files = @($mpvNames | ForEach-Object {
+            $candidate = Join-Path $explicit $_
+            if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+                Get-Item -LiteralPath $candidate
+            }
+        })
+        $hasMpv = $files.Count -gt 0
+        if ($hasMpv) { Write-Host "libmpv RC local fallback: $explicit" -ForegroundColor Yellow }
+    }
+    if (-not $hasMpv) {
+        if ($Required) { throw "libmpv native missing from NuGet and explicitly trusted directory." }
         return @()
     }
 

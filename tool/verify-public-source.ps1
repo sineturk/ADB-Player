@@ -15,16 +15,16 @@ function Need([string]$Relative, [string]$Needle = "") {
     }
 }
 
-if ($version -ne "1.0.1.0") { throw "Expected public source version 1.0.1.0; got $version" }
+if ($version -ne "1.0.2.0") { throw "Expected public source version 1.0.2.0; got $version" }
 
 Need "README.md" "# ADB Player"
 Need "README_TR.md" "# ADB Player"
-Need "CHANGELOG.md" "## 1.0.1"
+Need "CHANGELOG.md" "## 1.0.2"
 Need "PRIVACY.md"
 Need "SECURITY.md"
 Need "LICENSE"
 Need "THIRD_PARTY_NOTICES.md"
-Need "RELEASE_NOTES_v1.0.1.md"
+Need "RELEASE_NOTES_v1.0.2.md"
 Need "Directory.Build.props" "<Product>ADB Player</Product>"
 
 foreach ($forbidden in @(
@@ -63,23 +63,25 @@ if ((Test-Path -LiteralPath $docsPath) -and
     throw "Legacy docs/REV*.md files must not exist in public source."
 }
 
+# RC4_PUBLIC_V102_VERIFIER_SET
+# The previous v1.0.1 release checks hardcode Version=1.0.1.0.
+# Verify the CURRENT public v1.0.2 source instead. Do not skip missing checks.
 foreach ($verifier in @(
-    "verify-v1.0.1-hotfix.ps1",
-    "verify-v1.0.1-updater-ready.ps1",
+    "verify-r5-p4113-discover-auto-seed.ps1",
+    "verify-r5-p4152-p5-telegram-hub.ps1",
+    "verify-r5-p4154-unified-continue-watching.ps1",
+    "verify-r5-p4155a-audio-only-visual.ps1",
+    "verify-r5-p4177-telegram-final-ux.ps1",
+    "verify-r5-p4178-telegram-favorites-hub.ps1",
     "verify-v1.0.1-telegram-audio.ps1",
-    "verify-v1.0.1-google-drive.ps1",
-    "verify-v1.0.1-gofile.ps1",
-    "verify-v1.0.1-akirabox.ps1",
-    "verify-v1.0.1-settings-freeze.ps1",
-    "verify-player-ux-final-polish.ps1",
     "verify-subtitle-sync-safe-apply.ps1",
     "verify-subtitle-sync-v2.ps1"
 )) {
     $path = Join-Path $PSScriptRoot $verifier
-    if (Test-Path -LiteralPath $path) {
-        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $path
-        if ($LASTEXITCODE -ne 0) { throw "Public source verifier failed: $verifier" }
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+        throw "Required v1.0.2 public source check is missing: $verifier"
     }
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $path
+    if ($LASTEXITCODE -ne 0) { throw "Public source verifier failed: $verifier" }
 }
-
 Write-Host "ADB Player V1.0 public source verification passed." -ForegroundColor Green

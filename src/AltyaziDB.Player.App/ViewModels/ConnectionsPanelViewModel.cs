@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
+using System.Net;
 using System.Windows.Input;
 using AltyaziDB.Player.App.Commands;
 using AltyaziDB.Player.App.Localization;
@@ -135,6 +136,7 @@ public sealed class ConnectionsPanelViewModel : ObservableObject, IDisposable
         get => _selectedConnectionType;
         set
         {
+            var previousType = _selectedConnectionType?.Type;
             if (!SetProperty(ref _selectedConnectionType, value))
             {
                 return;
@@ -149,6 +151,10 @@ public sealed class ConnectionsPanelViewModel : ObservableObject, IDisposable
             OnPropertyChanged(nameof(BaseUrlHintText));
             if (_editingId is null)
             {
+                if (string.IsNullOrWhiteSpace(ConnectionName) ||
+                    previousType is { } oldType &&
+                    ConnectionName.Equals(oldType.ToString(), StringComparison.OrdinalIgnoreCase))
+                    ConnectionName = (value?.Type ?? ExternalConnectionType.Prowlarr).ToString();
                 ApplyTypeDefaults(value?.Type ?? ExternalConnectionType.Prowlarr);
             }
         }
@@ -169,7 +175,56 @@ public sealed class ConnectionsPanelViewModel : ObservableObject, IDisposable
     public string BaseUrl
     {
         get => _baseUrl;
-        set => SetProperty(ref _baseUrl, value);
+        set
+        {
+            if (!SetProperty(ref _baseUrl, value))
+                return;
+            // Local-only HTTP and public HTTP have different security requirements.
+            // Recompute this warning before Test/Save rather than failing silently.
+            OnPropertyChanged(nameof(IsLocalHttpAddress));
+            OnPropertyChanged(nameof(IsRemoteHttpAddress));
+        }
+    }
+
+    public bool IsLocalHttpAddress => TryGetHttpAddress(out var uri) && IsLocalNetworkHost(uri);
+
+    public bool IsRemoteHttpAddress => TryGetHttpAddress(out var uri) && !IsLocalNetworkHost(uri);
+
+    private bool TryGetHttpAddress(out Uri uri)
+    {
+        if (Uri.TryCreate(BaseUrl?.Trim(), UriKind.Absolute, out var candidate) &&
+            candidate.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase))
+        {
+            uri = candidate;
+            return true;
+        }
+        uri = null!;
+        return false;
+    }
+
+    // Mirrors the service's local-network rule for immediate, non-secret UI feedback.
+    // The actual HTTP policy is enforced by ExternalConnectionService.ValidateRemoteUri.
+    private static bool IsLocalNetworkHost(Uri uri)
+    {
+        if (uri.IsLoopback || uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
+            uri.Host.EndsWith(".local", StringComparison.OrdinalIgnoreCase) ||
+            !uri.Host.Contains('.'))
+            return true;
+
+        if (!IPAddress.TryParse(uri.Host, out var address))
+            return false;
+        if (IPAddress.IsLoopback(address))
+            return true;
+        if (address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+        {
+            var bytes = address.GetAddressBytes();
+            return bytes[0] == 10 ||
+                   bytes[0] == 127 ||
+                   bytes[0] == 192 && bytes[1] == 168 ||
+                   bytes[0] == 172 && bytes[1] is >= 16 and <= 31 ||
+                   bytes[0] == 169 && bytes[1] == 254;
+        }
+        return address.IsIPv6LinkLocal || address.IsIPv6SiteLocal;
     }
 
     public string ApiKey
@@ -440,16 +495,18 @@ public sealed class ConnectionsPanelViewModel : ObservableObject, IDisposable
             _isLoadingSelection = false;
         }
 
-        ConnectionName = string.Empty;
+        ConnectionName = "Prowlarr";
         SelectedConnectionType = ConnectionTypes.FirstOrDefault(item => item.Type == ExternalConnectionType.Prowlarr);
-        BaseUrl = "http://localhost:9696";
+        // The local URL must be an explicit choice, never a silent fallback
+        // when the user is attempting to connect to a separate server.
+        BaseUrl = string.Empty;
         ApiKey = string.Empty;
         MovieCategories = "2000";
         SeriesCategories = "5000";
         AnimeCategories = "5070";
         OtherCategories = string.Empty;
         ResultLimit = 100;
-        AllowLocalHttp = true;
+        AllowLocalHttp = false;
         LegalNoticeAccepted = false;
         UserOwnsServiceConfirmed = false;
         OnPropertyChanged(nameof(IsEditing));
@@ -470,12 +527,8 @@ public sealed class ConnectionsPanelViewModel : ObservableObject, IDisposable
             ConnectionName = type.ToString();
         }
 
-        if (type == ExternalConnectionType.Prowlarr && string.IsNullOrWhiteSpace(BaseUrl))
-        {
-            UseLocalProwlarr();
-        }
-        else if (type != ExternalConnectionType.Prowlarr &&
-                 BaseUrl.Equals("http://localhost:9696", StringComparison.OrdinalIgnoreCase))
+        if (type != ExternalConnectionType.Prowlarr &&
+            BaseUrl.Equals("http://localhost:9696", StringComparison.OrdinalIgnoreCase))
         {
             BaseUrl = string.Empty;
             AllowLocalHttp = false;
@@ -497,13 +550,8 @@ public sealed class ConnectionsPanelViewModel : ObservableObject, IDisposable
         var type = SelectedConnectionType?.Type ?? ExternalConnectionType.Prowlarr;
         var baseUrl = BaseUrl;
         var allowLocalHttp = AllowLocalHttp;
-        if (type == ExternalConnectionType.Prowlarr && string.IsNullOrWhiteSpace(baseUrl))
-        {
-            baseUrl = "http://localhost:9696";
-            allowLocalHttp = true;
-            BaseUrl = baseUrl;
-            AllowLocalHttp = true;
-        }
+        // An empty address now displays validation error instead of redirecting
+        // users to their own Windows PC's localhost instance.
 
         return new SaveConnectionRequest(
             _editingId,

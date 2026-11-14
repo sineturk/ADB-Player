@@ -98,8 +98,20 @@
                        MinHeight="42" Margin="0,4,0,0"/>
             </StackPanel>
 
-            <TextBlock Text="{DynamicResource Account.Field.Email}" Style="{StaticResource R23SecondaryText}"/>
+            <TextBlock>
+              <TextBlock.Style>
+                <Style TargetType="TextBlock" BasedOn="{StaticResource R23SecondaryText}">
+                  <Setter Property="Text" Value="{DynamicResource R5.Auth.Identifier}"/>
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsRegisterMode}" Value="True">
+                      <Setter Property="Text" Value="{DynamicResource Account.Field.Email}"/>
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </TextBlock.Style>
+            </TextBlock>
             <TextBox Text="{Binding Email, UpdateSourceTrigger=PropertyChanged}"
+                     AutomationProperties.Name="{DynamicResource R5.Auth.Identifier}"
                      MinHeight="42" Margin="0,4,0,10"/>
 
             <TextBlock Text="{DynamicResource Account.Field.Password}" Style="{StaticResource R23SecondaryText}"/>

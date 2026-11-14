@@ -6,7 +6,8 @@ V1.0; yerel oynatma, kullanıcının kendi bağladığı kaynaklar, altyazılar,
 
 ## Öne çıkanlar
 
-- libmpv tabanlı yerel video oynatma.
+- libmpv tabanlı yerel video ve bağımsız MP3, FLAC, WAV gibi ses dosyası oynatma.
+- Cinematic Media Hub, Telegram medya gezinimi, ses kapak görselleri ve cihaz içi ortak izleme geçmişi.
 - Doğrudan URL, WebDAV/NAS ve desteklenen bulut kaynağı akışları.
 - İsteğe bağlı Telegram entegrasyonu.
 - Kullanıcının eklediği Stremio uyumlu eklentiler ve harici indexer/kaynak bağlantıları.
@@ -31,8 +32,8 @@ ADB Player; hazır medya kataloğu, torrent indexer'ı, telifli medya, üçünc�
 
 Public sürümde şu çıktılar yayınlanır:
 
-- `ADB-Player-Setup-v1.0.1.0-x64.exe`
-- `ADB-Player-Portable-v1.0.1.0-x64.zip`
+- `ADB-Player-Setup-v1.0.2.0-x64.exe`
+- `ADB-Player-Portable-v1.0.2.0-x64.zip`
 - `SHA256SUMS.txt`
 
 Kurulumdan önce SHA-256 değerlerini doğrulayın. Kod imzalı bir paket yayınlandıysa Windows imzasının da geçerli olması gerekir.
@@ -97,4 +98,4 @@ V1.0 public kaynak snapshot'ı ürün kaynak kodunu ve ADB Player'ı incelemek/d
 
 ## Sürüm
 
-[ADB Player V1.0.1 sürüm notları](RELEASE_NOTES_v1.0.1.md).
+[ADB Player v1.0.2 sürüm notları](RELEASE_NOTES_v1.0.2.md).

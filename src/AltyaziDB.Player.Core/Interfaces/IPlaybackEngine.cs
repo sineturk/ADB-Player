@@ -45,6 +45,8 @@ public interface IPlaybackEngine : IAsyncDisposable
     void SetShaderChain(IReadOnlyList<string> shaderPaths);
     void ApplyVideoProcessingSettings(VideoProcessingSettings settings);
     void SetVideoEqualizer(double brightness, double contrast, double saturation, double gamma);
+    // 0 = fit inside frame (no crop), 1 = fill frame (crop letterboxing).
+    void SetVideoFill(bool fill);
     IReadOnlyList<AudioDeviceInfo> GetAudioDevices();
     void SetAudioDevice(string deviceName);
     void TakeScreenshot(string path);

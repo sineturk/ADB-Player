@@ -10,7 +10,8 @@ public sealed record SharedMediaArtworkEntry(
     string? Title,
     string? PosterUrl,
     string? BackdropUrl,
-    DateTimeOffset ExpiresAtUtc);
+    DateTimeOffset ExpiresAtUtc,
+    bool VerifiedForHome = false);
 
 /// <summary>
 /// Shared artwork/cache coordinator used by Home, History and Library.

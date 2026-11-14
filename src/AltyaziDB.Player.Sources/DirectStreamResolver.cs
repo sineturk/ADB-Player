@@ -57,7 +57,9 @@ internal sealed class DirectStreamResolver
                 throw new InvalidOperationException("Bağlantı geçerli bir HLS veya DASH manifesti döndürmedi.");
             }
 
-            var name = FileName(finalUri, kind == ManifestKind.Hls ? "HLS yayını" : "DASH yayını");
+            var name = RemoteMediaFileName.FromContentDisposition(response.Content.Headers.ContentDisposition)
+                       ?? RemoteMediaFileName.FromUrlPath(finalUri)
+                       ?? FileName(finalUri, kind == ManifestKind.Hls ? "HLS yayını" : "DASH yayını");
             return DirectResult(
                 finalUri,
                 name,
@@ -85,7 +87,11 @@ internal sealed class DirectStreamResolver
             throw new InvalidOperationException(
                 "Bağlantı gerçek medya baytları yerine bir web/onay sayfası döndürdü.");
 
-        return DirectResult(finalUri, FileName(finalUri, "İnternet videosu"), "İleri sarılabilir medya akışı doğrulandı.");
+        var discoveredName = RemoteMediaFileName.FromContentDisposition(response.Content.Headers.ContentDisposition)
+                             ?? RemoteMediaFileName.FromUrlPath(finalUri)
+                             ?? RemoteMediaFileName.FromUrlPath(uri)
+                             ?? FileName(finalUri, "İnternet videosu");
+        return DirectResult(finalUri, discoveredName, "İleri sarılabilir medya akışı doğrulandı.");
     }
 
     private static RemoteBrowseResult DirectResult(Uri uri, string name, string status)

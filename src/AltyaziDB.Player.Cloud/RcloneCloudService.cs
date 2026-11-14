@@ -3,9 +3,12 @@ using System.Globalization;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
+using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using AltyaziDB.Player.Cloud.Generated;
 using AltyaziDB.Player.Core.Interfaces;
 using AltyaziDB.Player.Core.Models;
@@ -16,8 +19,18 @@ namespace AltyaziDB.Player.Cloud;
 public sealed class RcloneCloudService : IRcloneCloudService
 {
     private const string ConfigSecretKey = "rclone:config";
+    // Virtual browsing namespace: never forwarded as an actual Drive folder.
+    private const string SharedDrivesVirtualRoot = "__adb_shared_drives_v1__";
+    // The provider OAuth redirect URL is registered against rclone's fixed port.
+    private const int LocalOAuthPort = 53682;
     private static readonly TimeSpan StandardTimeout = TimeSpan.FromMinutes(2);
     private static readonly TimeSpan AuthorizationTimeout = TimeSpan.FromMinutes(10);
+    // rclone emits this private, short-lived loopback URL while it is running.
+    // Never display it as plain text or log it (the state query is a secret).
+    private static readonly Regex LocalOAuthUrlPattern = new(
+        @"http://(?:127\.0\.0\.1|localhost):[0-9]{2,5}/auth\?state=[^\s""'<>]+",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
 
     private readonly IAppLogger _logger;
     private readonly ISecretStore _secrets;
@@ -68,18 +81,32 @@ public sealed class RcloneCloudService : IRcloneCloudService
     public async Task<string> ConnectAsync(
         RcloneCloudProvider provider,
         string displayName,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Action<Uri>? onAuthorizationLink = null)
     {
         ThrowIfUnavailable();
         await _configGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             await EnsureRuntimeConfigAsync(cancellationToken).ConfigureAwait(false);
+            // Google's shared Drive client is retired in 2026: require BYOC.
+            // Dropbox, OneDrive and pCloud prefer user-owned apps, but may use
+            // provider defaults if the user leaves both fields blank.
+            // Existing saved remotes keep their previously authorized tokens.
+            if (provider == RcloneCloudProvider.GoogleDrive)
+                await RequireUserOwnedClientAsync(provider, cancellationToken).ConfigureAwait(false);
+            // Read-only bind probe: Windows/Hyper-V/WSL can reserve 53682 even
+            // when no process appears in netstat. Do not alter OS port ranges
+            // or terminate any other process. Close the listener immediately.
+            VerifyLocalOAuthPortAvailable();
             var remoteName = CreateRemoteName(provider);
             var arguments = new List<string>
             {
                 "config", "create", remoteName, BackendName(provider),
                 "config_is_local", "true",
+                // App owns browser launch; rclone writes its local /auth?state
+                // link to stderr and waits for provider confirmation.
+                "config_auth_no_browser", "true",
                 "--auto-confirm",
                 "--config", _runtimeConfigFile
             };
@@ -98,11 +125,42 @@ public sealed class RcloneCloudService : IRcloneCloudService
             }
 
             var environment = await BuildProviderEnvironmentAsync(provider, cancellationToken).ConfigureAwait(false);
+            // An optional provider-default connection must really use rclone's
+            // defaults, never a publisher's packaged fallback OAuth credentials.
+            if (provider != RcloneCloudProvider.GoogleDrive &&
+                !await HasUserOwnedClientAsync(provider, cancellationToken).ConfigureAwait(false))
+                environment = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             _logger.Info($"rclone bulut hesabı yetkilendirmesi başlatılıyor: {ProviderLabel(provider)} / {displayName}");
-            var result = await ExecuteTextAsync(arguments, AuthorizationTimeout, cancellationToken, environment).ConfigureAwait(false);
+            var result = await ExecuteTextAsync(
+                    arguments, AuthorizationTimeout, cancellationToken, environment,
+                    onAuthorizationLink).ConfigureAwait(false);
             if (result.ExitCode != 0)
-            {
                 throw new InvalidOperationException(SafeProcessError(result, "Bulut hesabı bağlanamadı."));
+
+            // rclone config create can succeed even if a provider has not
+            // issued a usable token. Verify the remote before reporting success
+            // or adding it to the user's saved accounts. No existing remote is
+            // touched by this validation.
+            var verify = await ExecuteTextAsync(
+                ["lsjson", $"{remoteName}:", "--max-depth", "1",
+                 "--config", _runtimeConfigFile, "--no-mimetype"],
+                StandardTimeout,
+                cancellationToken,
+                environment).ConfigureAwait(false);
+            if (verify.ExitCode != 0)
+            {
+                try
+                {
+                    await ExecuteTextAsync(
+                        ["config", "delete", remoteName, "--config", _runtimeConfigFile],
+                        StandardTimeout, cancellationToken).ConfigureAwait(false);
+                }
+                catch
+                {
+                    // Runtime config is not persisted on failed connect.
+                }
+                throw new InvalidOperationException(SafeProcessError(verify,
+                    "OAuth tamamlanmadı veya bulut erişimi doğrulanamadı."));
             }
 
             await PersistRuntimeConfigAsync(cancellationToken).ConfigureAwait(false);
@@ -169,11 +227,57 @@ public sealed class RcloneCloudService : IRcloneCloudService
         {
             await EnsureRuntimeConfigAsync(cancellationToken).ConfigureAwait(false);
             var normalizedPath = NormalizeRemotePath(path);
-            var remoteSpec = BuildRemoteSpec(account.RemoteName, normalizedPath);
+            var environment = await BuildProviderEnvironmentAsync(account.Provider, cancellationToken, account.RemoteName)
+                .ConfigureAwait(false);
+            if (account.Provider == RcloneCloudProvider.GoogleDrive &&
+                string.Equals(normalizedPath, SharedDrivesVirtualRoot, StringComparison.Ordinal))
+            {
+                var drivesResult = await ExecuteTextAsync(
+                    ["backend", "drives", $"{account.RemoteName}:", "--config", _runtimeConfigFile],
+                    StandardTimeout, cancellationToken, environment).ConfigureAwait(false);
+                if (drivesResult.ExitCode != 0)
+                    throw new InvalidOperationException(SafeProcessError(drivesResult,
+                        "Paylaşılan Google Drive listesi alınamadı. Hesap erişimini kontrol edin."));
+                var sharedDrives = JsonSerializer.Deserialize<List<RcloneSharedDriveEntry>>(
+                    drivesResult.StandardOutput,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? [];
+                var sharedItems = sharedDrives
+                    .Where(drive => IsSafeSharedDriveId(drive.Id))
+                    .OrderBy(drive => drive.Name, StringComparer.CurrentCultureIgnoreCase)
+                    .Select(drive =>
+                    {
+                        var virtualPath = $"{SharedDrivesVirtualRoot}/{drive.Id}";
+                        var virtualUri = BuildRcloneUri(account.RemoteName, virtualPath);
+                        return new RemoteSourceItem(
+                            virtualUri,
+                            string.IsNullOrWhiteSpace(drive.Name) ? drive.Id : drive.Name,
+                            RemoteSourceItemKind.Folder,
+                            null,
+                            virtualUri,
+                            null,
+                            null,
+                            Provider: $"rclone:{account.RemoteName}");
+                    })
+                    .ToList();
+                await PersistRuntimeConfigAsync(cancellationToken).ConfigureAwait(false);
+                return new RemoteBrowseResult(
+                    RemoteSourceProvider.Rclone,
+                    "Paylaşılan Drive'lar",
+                    BuildRcloneUri(account.RemoteName, normalizedPath),
+                    sharedItems,
+                    ParentPath: BuildRcloneUri(account.RemoteName, string.Empty),
+                    StatusMessage: $"{sharedItems.Count} paylaşılan Drive bulundu.");
+            }
+
+            var isSharedDrive = TryParseSharedDrivePath(normalizedPath, out var sharedDriveId, out var sharedPath);
+            if (isSharedDrive && account.Provider != RcloneCloudProvider.GoogleDrive)
+                throw new InvalidOperationException("Bu hesap Google Shared Drives erişimini desteklemiyor.");
+            var remoteSpec = isSharedDrive
+                ? BuildSharedDriveRemoteSpec(account.RemoteName, sharedDriveId, sharedPath)
+                : BuildRemoteSpec(account.RemoteName, normalizedPath);
             var result = await ExecuteTextAsync(
                 ["lsjson", remoteSpec, "--config", _runtimeConfigFile, "--no-mimetype"],
-                StandardTimeout,
-                cancellationToken).ConfigureAwait(false);
+                StandardTimeout, cancellationToken, environment).ConfigureAwait(false);
             if (result.ExitCode != 0)
             {
                 throw new InvalidOperationException(SafeProcessError(result, "Bulut klasörü listelenemedi."));
@@ -189,6 +293,21 @@ public sealed class RcloneCloudService : IRcloneCloudService
                 .OrderByDescending(item => item.IsFolder)
                 .ThenBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
                 .ToList();
+
+            if (account.Provider == RcloneCloudProvider.GoogleDrive &&
+                string.IsNullOrEmpty(normalizedPath))
+            {
+                var sharedUri = BuildRcloneUri(account.RemoteName, SharedDrivesVirtualRoot);
+                items.Insert(0, new RemoteSourceItem(
+                    sharedUri,
+                    "Paylaşılan Drive'lar (Shared Drives)",
+                    RemoteSourceItemKind.Folder,
+                    null,
+                    sharedUri,
+                    null,
+                    null,
+                    Provider: $"rclone:{account.RemoteName}"));
+            }
 
             await PersistRuntimeConfigAsync(cancellationToken).ConfigureAwait(false);
             account.LastUsedUtc = DateTimeOffset.UtcNow;
@@ -221,8 +340,15 @@ public sealed class RcloneCloudService : IRcloneCloudService
         await _configGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            var (_, path) = ParseRcloneUri(item.OpenUrl ?? item.Id);
-            var session = await GetOrStartServerAsync(account.RemoteName, cancellationToken).ConfigureAwait(false);
+            var (requestedRemote, virtualPath) = ParseRcloneUri(item.OpenUrl ?? item.Id);
+            if (!requestedRemote.Equals(account.RemoteName, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Seçilen dosya bu bulut hesabına ait değil.");
+            var isSharedDrive = TryParseSharedDrivePath(virtualPath, out var sharedDriveId, out var mediaPath);
+            if (isSharedDrive && account.Provider != RcloneCloudProvider.GoogleDrive)
+                throw new InvalidOperationException("Google Shared Drive yalnız Google hesabıyla açılabilir.");
+            var path = isSharedDrive ? mediaPath : virtualPath;
+            var session = await GetOrStartServerAsync(account, isSharedDrive ? sharedDriveId : null, cancellationToken)
+                .ConfigureAwait(false);
             var escapedPath = EscapeHttpPath(path);
             var source = $"http://127.0.0.1:{session.Port}/{escapedPath}";
             var basic = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{session.UserName}:{session.Password}"));
@@ -230,6 +356,12 @@ public sealed class RcloneCloudService : IRcloneCloudService
             {
                 ["Authorization"] = $"Basic {basic}"
             };
+
+            // Fail early with a sanitized HTTP status instead of the generic
+            // "Video açılamadı" when the Rclone/Drive Range bridge fails.
+            // Stream headers only; never download an entire multi-GB video here.
+            await ProbeLocalMediaAsync(source, headers["Authorization"], cancellationToken)
+                .ConfigureAwait(false);
 
             // Harici ses libmpv'ye ikinci bir kaynak olarak eklenir. Yetkiyi bu
             // localhost URL'sine gommek, ana videonun HTTP basliklarini degistirmeden
@@ -265,17 +397,27 @@ public sealed class RcloneCloudService : IRcloneCloudService
         try
         {
             await EnsureRuntimeConfigAsync(cancellationToken).ConfigureAwait(false);
-            var (_, path) = ParseRcloneUri(item.OpenUrl ?? item.Id);
+            var (requestedRemote, virtualPath) = ParseRcloneUri(item.OpenUrl ?? item.Id);
+            if (!requestedRemote.Equals(account.RemoteName, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("İndirilecek dosya bu bulut hesabına ait değil.");
+            var isSharedDrive = TryParseSharedDrivePath(virtualPath, out var sharedDriveId, out var sharedPath);
+            if (isSharedDrive && account.Provider != RcloneCloudProvider.GoogleDrive)
+                throw new InvalidOperationException("Google Shared Drive yalnız Google hesabıyla açılabilir.");
+            var remoteSpec = isSharedDrive
+                ? BuildSharedDriveRemoteSpec(account.RemoteName, sharedDriveId, sharedPath)
+                : BuildRemoteSpec(account.RemoteName, virtualPath);
             Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
             var result = await ExecuteTextAsync(
                 [
-                    "copyto", BuildRemoteSpec(account.RemoteName, path), destinationPath,
+                    "copyto", remoteSpec, destinationPath,
                     "--config", _runtimeConfigFile,
                     "--cache-dir", _paths.RcloneCacheDirectory,
                     "--no-traverse"
                 ],
                 TimeSpan.FromMinutes(30),
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken,
+                await BuildProviderEnvironmentAsync(account.Provider, cancellationToken, account.RemoteName).ConfigureAwait(false))
+                .ConfigureAwait(false);
             if (result.ExitCode != 0)
             {
                 throw new InvalidOperationException(SafeProcessError(result, "Bulut dosyası indirilemedi."));
@@ -289,11 +431,14 @@ public sealed class RcloneCloudService : IRcloneCloudService
         }
     }
 
-    private async Task<ServeSession> GetOrStartServerAsync(string remoteName, CancellationToken cancellationToken)
+    private async Task<ServeSession> GetOrStartServerAsync(
+        SavedCloudAccount account, string? sharedDriveId, CancellationToken cancellationToken)
     {
+        var remoteName = account.RemoteName;
+        var serverKey = sharedDriveId is null ? remoteName : $"{remoteName}|team={sharedDriveId}";
         lock (_servers)
         {
-            if (_servers.TryGetValue(remoteName, out var current) && !current.Process.HasExited)
+            if (_servers.TryGetValue(serverKey, out var current) && !current.Process.HasExited)
                 return current;
         }
 
@@ -309,7 +454,9 @@ public sealed class RcloneCloudService : IRcloneCloudService
 
         var startInfo = CreateStartInfo(
             [
-                "serve", "http", $"{remoteName}:",
+                "serve", "http", sharedDriveId is null
+                    ? $"{remoteName}:"
+                    : BuildSharedDriveRemoteSpec(remoteName, sharedDriveId, string.Empty),
                 "--config", _runtimeConfigFile,
                 "--addr", $"127.0.0.1:{port}",
                 "--user", user,
@@ -324,9 +471,11 @@ public sealed class RcloneCloudService : IRcloneCloudService
                 "--log-file", logFile,
                 "--log-level", "INFO"
             ],
-            redirectOutput: false);
+            redirectOutput: false,
+            environment: await BuildProviderEnvironmentAsync(account.Provider, cancellationToken, account.RemoteName)
+                .ConfigureAwait(false));
         var process = Process.Start(startInfo) ?? throw new InvalidOperationException("rclone HTTP sunucusu başlatılamadı.");
-        var session = new ServeSession(remoteName, port, user, password, process);
+        var session = new ServeSession(serverKey, port, user, password, process);
 
         try
         {
@@ -341,12 +490,12 @@ public sealed class RcloneCloudService : IRcloneCloudService
 
         lock (_servers)
         {
-            if (_servers.TryGetValue(remoteName, out var old))
+            if (_servers.TryGetValue(serverKey, out var old))
             {
                 TryTerminate(old.Process);
                 old.Process.Dispose();
             }
-            _servers[remoteName] = session;
+            _servers[serverKey] = session;
         }
 
         _logger.Info($"rclone yerel medya sunucusu başlatıldı: {remoteName} / 127.0.0.1:{port}");
@@ -355,16 +504,24 @@ public sealed class RcloneCloudService : IRcloneCloudService
 
     private async Task StopServerAsync(string remoteName)
     {
-        ServeSession? session;
+        List<ServeSession> sessions;
         lock (_servers)
         {
-            if (!_servers.Remove(remoteName, out session)) return;
+            var keys = _servers.Keys
+                .Where(key => key.Equals(remoteName, StringComparison.OrdinalIgnoreCase) ||
+                    key.StartsWith(remoteName + "|team=", StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+            sessions = keys.Select(key => _servers[key]).ToList();
+            foreach (var key in keys) _servers.Remove(key);
         }
 
-        TryTerminate(session.Process);
-        try { await session.Process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(3)).ConfigureAwait(false); }
-        catch { /* Süre sonunda işlem zaten zorla kapatılır. */ }
-        session.Process.Dispose();
+        foreach (var session in sessions)
+        {
+            TryTerminate(session.Process);
+            try { await session.Process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(3)).ConfigureAwait(false); }
+            catch { /* Best-effort shutdown. */ }
+            session.Process.Dispose();
+        }
     }
 
     private async Task EnsureRuntimeConfigAsync(CancellationToken cancellationToken)
@@ -386,18 +543,42 @@ public sealed class RcloneCloudService : IRcloneCloudService
         await _secrets.SetAsync(ConfigSecretKey, config, cancellationToken).ConfigureAwait(false);
     }
 
+    private static void VerifyLocalOAuthPortAvailable()
+    {
+        var listener = new TcpListener(IPAddress.Loopback, LocalOAuthPort);
+        try
+        {
+            listener.Start();
+        }
+        catch (SocketException exception) when (exception.SocketErrorCode == SocketError.AddressAlreadyInUse)
+        {
+            throw new InvalidOperationException("oauth_local_port_occupied", exception);
+        }
+        catch (SocketException exception) when (exception.SocketErrorCode == SocketError.AccessDenied)
+        {
+            throw new InvalidOperationException("oauth_local_port_reserved", exception);
+        }
+        finally
+        {
+            listener.Stop();
+        }
+    }
+
     private async Task<ProcessResult> ExecuteTextAsync(
         IReadOnlyList<string> arguments,
         TimeSpan timeout,
         CancellationToken cancellationToken,
-        IReadOnlyDictionary<string, string>? environment = null)
+        IReadOnlyDictionary<string, string>? environment = null,
+        Action<Uri>? onAuthorizationLink = null)
     {
         ThrowIfUnavailable();
         using var process = new Process { StartInfo = CreateStartInfo(arguments, redirectOutput: true, environment) };
         if (!process.Start()) throw new InvalidOperationException("rclone işlemi başlatılamadı.");
 
         var outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-        var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
+        var errorTask = onAuthorizationLink is null
+            ? process.StandardError.ReadToEndAsync(cancellationToken)
+            : ReadOAuthStderrAsync(process.StandardError, onAuthorizationLink, cancellationToken);
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeoutCts.CancelAfter(timeout);
         try
@@ -420,6 +601,55 @@ public sealed class RcloneCloudService : IRcloneCloudService
         return new ProcessResult(process.ExitCode, output, error);
     }
 
+    /// <summary>
+    /// Inspect rclone stderr *while* config create is waiting for OAuth.
+    /// Reading only after WaitForExit would make the manual-browser fallback
+    /// unusable. Do not write the authorization state to logs or settings.
+    /// </summary>
+    private static async Task<string> ReadOAuthStderrAsync(
+        StreamReader stderr,
+        Action<Uri> onAuthorizationLink,
+        CancellationToken cancellationToken)
+    {
+        const int maxChars = 32_768;
+        var diagnostic = new StringBuilder();
+        var notified = false;
+        while (await stderr.ReadLineAsync(cancellationToken).ConfigureAwait(false) is { } line)
+        {
+            if (!notified)
+            {
+                var url = TryExtractLocalAuthorizationUri(line);
+                if (url is not null)
+                {
+                    notified = true;
+                    try { onAuthorizationLink(url); }
+                    catch { /* Browser launch/UI callback failure must not abort rclone */ }
+                }
+            }
+
+            // Bound the collected stderr. It is used only by SafeProcessError
+            // on unsuccessful operations, not surfaced as raw user diagnostics.
+            if (diagnostic.Length < maxChars)
+                diagnostic.AppendLine(line[..Math.Min(line.Length, maxChars - diagnostic.Length)]);
+        }
+        return diagnostic.ToString();
+    }
+
+    private static Uri? TryExtractLocalAuthorizationUri(string line)
+    {
+        var match = LocalOAuthUrlPattern.Match(line);
+        if (!match.Success
+            || !Uri.TryCreate(match.Value, UriKind.Absolute, out var candidate)
+            || candidate.Scheme != Uri.UriSchemeHttp
+            || !candidate.IsLoopback
+            || candidate.Port is <= 0 or > 65535
+            || !string.Equals(candidate.AbsolutePath, "/auth", StringComparison.Ordinal)
+            || !candidate.Query.StartsWith("?state=", StringComparison.Ordinal))
+            return null;
+
+        return candidate;
+    }
+
     private ProcessStartInfo CreateStartInfo(
         IReadOnlyList<string> arguments,
         bool redirectOutput,
@@ -432,10 +662,16 @@ public sealed class RcloneCloudService : IRcloneCloudService
             CreateNoWindow = true,
             RedirectStandardOutput = redirectOutput,
             RedirectStandardError = redirectOutput,
-            StandardOutputEncoding = Encoding.UTF8,
-            StandardErrorEncoding = Encoding.UTF8,
             WorkingDirectory = _paths.RcloneDirectory
         };
+        // .NET Process.Start rejects StandardOutputEncoding/StandardErrorEncoding
+        // when the corresponding stream is not redirected. "rclone serve http"
+        // must leave both streams attached, while CLI lsjson/oauth uses capture.
+        if (redirectOutput)
+        {
+            startInfo.StandardOutputEncoding = Encoding.UTF8;
+            startInfo.StandardErrorEncoding = Encoding.UTF8;
+        }
         foreach (var argument in arguments) startInfo.ArgumentList.Add(argument);
         if (environment is not null)
         {
@@ -447,11 +683,46 @@ public sealed class RcloneCloudService : IRcloneCloudService
         return startInfo;
     }
 
+    private async Task<bool> HasUserOwnedClientAsync(
+        RcloneCloudProvider provider, CancellationToken cancellationToken)
+    {
+        var prefix = provider switch
+        {
+            RcloneCloudProvider.GoogleDrive => "google",
+            RcloneCloudProvider.Dropbox => "dropbox",
+            RcloneCloudProvider.OneDrive => "onedrive",
+            RcloneCloudProvider.PCloud or RcloneCloudProvider.PCloudEurope => "pcloud",
+            _ => throw new ArgumentOutOfRangeException(nameof(provider), provider, null)
+        };
+        var id = await _secrets.GetAsync($"cloud:{prefix}-client-id", cancellationToken).ConfigureAwait(false);
+        var secret = await _secrets.GetAsync($"cloud:{prefix}-client-secret", cancellationToken).ConfigureAwait(false);
+        return !string.IsNullOrWhiteSpace(id) && !string.IsNullOrWhiteSpace(secret);
+    }
+
+    private async Task RequireUserOwnedClientAsync(
+        RcloneCloudProvider provider, CancellationToken cancellationToken)
+    {
+        if (!await HasUserOwnedClientAsync(provider, cancellationToken).ConfigureAwait(false))
+            throw new InvalidOperationException(
+                "Yeni Google Drive bağlantısı için kendi OAuth Client ID ve Client Secret bilgileriniz gereklidir. " +
+                "Ayarlar > Bulut bağlantı bilgileri bölümüne girin veya bağlantı penceresinde doldurun.");
+    }
+
     private async Task<IReadOnlyDictionary<string, string>> BuildProviderEnvironmentAsync(
         RcloneCloudProvider provider,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? remoteName = null)
     {
         var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (!string.IsNullOrWhiteSpace(remoteName))
+        {
+            // A provider-default account is pinned to its original shared OAuth
+            // client. Do not silently replace its identity if Settings changes.
+            var shared = await _secrets.GetAsync(
+                $"cloud:remote:{remoteName}:shared-client", cancellationToken).ConfigureAwait(false);
+            if (string.Equals(shared, "true", StringComparison.OrdinalIgnoreCase))
+                return values;
+        }
         switch (provider)
         {
             case RcloneCloudProvider.GoogleDrive:
@@ -499,6 +770,33 @@ public sealed class RcloneCloudService : IRcloneCloudService
                     GeneratedAppCredentials.PCloudClientSecret,
                     cancellationToken).ConfigureAwait(false);
                 break;
+        }
+
+        // Per-remote OAuth client credentials supersede provider-wide defaults.
+        // This avoids replacing the OAuth identity for an already-linked pCloud
+        // or Dropbox account when a new one uses a different custom app.
+        if (!string.IsNullOrWhiteSpace(remoteName))
+        {
+            var remoteId = await _secrets.GetAsync(
+                $"cloud:remote:{remoteName}:client-id", cancellationToken).ConfigureAwait(false);
+            var remoteSecret = await _secrets.GetAsync(
+                $"cloud:remote:{remoteName}:client-secret", cancellationToken).ConfigureAwait(false);
+            if (!string.IsNullOrWhiteSpace(remoteId) && !string.IsNullOrWhiteSpace(remoteSecret))
+            {
+                var prefix = provider switch
+                {
+                    RcloneCloudProvider.GoogleDrive => "RCLONE_DRIVE",
+                    RcloneCloudProvider.Dropbox => "RCLONE_DROPBOX",
+                    RcloneCloudProvider.OneDrive => "RCLONE_ONEDRIVE",
+                    RcloneCloudProvider.PCloud or RcloneCloudProvider.PCloudEurope => "RCLONE_PCLOUD",
+                    _ => string.Empty
+                };
+                if (prefix.Length > 0)
+                {
+                    values[$"{prefix}_CLIENT_ID"] = remoteId;
+                    values[$"{prefix}_CLIENT_SECRET"] = remoteSecret;
+                }
+            }
         }
 
         return values;
@@ -632,6 +930,70 @@ public sealed class RcloneCloudService : IRcloneCloudService
     private static string BuildRemoteSpec(string remoteName, string path) =>
         string.IsNullOrWhiteSpace(path) ? $"{remoteName}:" : $"{remoteName}:{path}";
 
+    private static bool IsSafeSharedDriveId(string? id) =>
+        !string.IsNullOrWhiteSpace(id) &&
+        Regex.IsMatch(id, @"^[a-zA-Z0-9_-]{5,128}$", RegexOptions.CultureInvariant);
+
+    private static bool TryParseSharedDrivePath(string path, out string sharedDriveId, out string relativePath)
+    {
+        sharedDriveId = string.Empty;
+        relativePath = string.Empty;
+        var prefix = SharedDrivesVirtualRoot + "/";
+        if (!path.StartsWith(prefix, StringComparison.Ordinal)) return false;
+        var suffix = path[prefix.Length..];
+        var slash = suffix.IndexOf('/');
+        sharedDriveId = slash < 0 ? suffix : suffix[..slash];
+        if (!IsSafeSharedDriveId(sharedDriveId))
+            throw new InvalidOperationException("Geçersiz Google Shared Drive kimliği.");
+        relativePath = slash < 0 ? string.Empty : suffix[(slash + 1)..];
+        return true;
+    }
+
+    private static string BuildSharedDriveRemoteSpec(string remoteName, string sharedDriveId, string path)
+    {
+        if (!IsSafeSharedDriveId(sharedDriveId))
+            throw new InvalidOperationException("Geçersiz Google Shared Drive kimliği.");
+        // rclone backend config override: use the same user's OAuth token,
+        // choose the Shared Drive root without persisting another remote.
+        var prefix = $"{remoteName},team_drive={sharedDriveId},root_folder_id=:";
+        return string.IsNullOrWhiteSpace(path) ? prefix : prefix + path;
+    }
+
+    private async Task ProbeLocalMediaAsync(
+        string source, string basicAuthorization, CancellationToken cancellationToken)
+    {
+        // A cold Drive read may require upstream metadata and initial range fetches.
+        // This is a bounded, one-byte probe, not a multi-GB pre-download.
+        var probeTimer = Stopwatch.StartNew();
+        using var handler = new HttpClientHandler { UseProxy = false, AllowAutoRedirect = false };
+        using var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(45) };
+        using var request = new HttpRequestMessage(HttpMethod.Get, source);
+        request.Headers.Range = new RangeHeaderValue(0, 0);
+        request.Headers.TryAddWithoutValidation("Authorization", basicAuthorization);
+        try
+        {
+            using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+                .ConfigureAwait(false);
+            _logger.Info($"Bulut ilk Range yanıtı: HTTP {(int)response.StatusCode}; süre {probeTimer.ElapsedMilliseconds} ms.");
+            if (!response.IsSuccessStatusCode)
+                throw new InvalidOperationException(
+                    $"Google Drive/rclone akışı HTTP {(int)response.StatusCode} döndürdü. " +
+                    "Dosya yetkisini ve rclone günlüklerini kontrol edin.");
+            if (response.StatusCode == HttpStatusCode.OK &&
+                response.Content.Headers.ContentLength is > 1024 * 1024)
+                throw new InvalidOperationException(
+                    "Bulut sunucusu Range isteğine 206 yerine büyük bir 200 yanıtı verdi. " +
+                    "Büyük dosyalar için kısmi içerik desteği gerekli.");
+        }
+        catch (TaskCanceledException exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            _logger.Warning($"Bulut ilk Range isteği yanıt vermedi: süre {probeTimer.ElapsedMilliseconds} ms (45s sınır).");
+            throw new TimeoutException(
+                "Bulut akışı ilk Range isteğinde zaman aşımına uğradı (45 saniye). " +
+                "Google Drive OAuth istemcisini, ağ erişimini ve rclone günlüklerini kontrol edin.", exception);
+        }
+    }
+
     private static string NormalizeRemotePath(string? value)
     {
         if (string.IsNullOrWhiteSpace(value)) return string.Empty;
@@ -705,7 +1067,11 @@ public sealed class RcloneCloudService : IRcloneCloudService
             try
             {
                 using var client = new TcpClient();
-                await client.ConnectAsync(IPAddress.Loopback, port, cancellationToken).AsTask().WaitAsync(TimeSpan.FromMilliseconds(500), cancellationToken).ConfigureAwait(false);
+                using var attemptCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                attemptCts.CancelAfter(TimeSpan.FromMilliseconds(500));
+                // Await the real connect operation, not a WaitAsync wrapper which
+                // abandons the socket task and raises unobserved SocketException 995.
+                await client.ConnectAsync(IPAddress.Loopback, port, attemptCts.Token).ConfigureAwait(false);
                 return;
             }
             catch (Exception exception) when (!cancellationToken.IsCancellationRequested && (exception is SocketException or TimeoutException or OperationCanceledException))
@@ -765,6 +1131,12 @@ public sealed class RcloneCloudService : IRcloneCloudService
 
     private sealed record ProcessResult(int ExitCode, string StandardOutput, string StandardError);
     private sealed record ServeSession(string RemoteName, int Port, string UserName, string Password, Process Process);
+
+    private sealed class RcloneSharedDriveEntry
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+    }
 
     private sealed class RcloneListItem
     {

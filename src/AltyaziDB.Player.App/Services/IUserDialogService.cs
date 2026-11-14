@@ -13,6 +13,6 @@ public interface IUserDialogService
         IReadOnlyList<string> items,
         IReadOnlyList<int>? initiallySelected = null,
         bool allowMultiple = false);
-    void ShowError(string message, string title = "AltyazıDB Player");
-    bool Confirm(string message, string title = "AltyazıDB Player");
+    void ShowError(string message, string title = "ADB Player");
+    bool Confirm(string message, string title = "ADB Player");
 }

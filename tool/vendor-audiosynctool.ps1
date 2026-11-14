@@ -28,9 +28,12 @@ $numpySha256 = "C1F9540BE57940698ED329904DB803CF7A402F3FC200BFE599334C9BD84A40B2
 $scipyVersion = "1.15.3"
 $scipyFile = "scipy-1.15.3-cp312-cp312-win_amd64.whl"
 $scipySha256 = "52092BC0472CFD17DF49FF17E70624345EFECE4E1A12B23783A1AC59A1B728ED"
-$audioSyncCommit = "b90fba80b182dae14fc72d5af02d7504794a515c"
+$audioSyncCommit = "819a629790e850db35186f0263d589a336b99f3f"
 $workerVersion = "3.2.0"
-$audioSyncSourceUrl = "https://github.com/blast1see/AudioSyncTool/archive/$audioSyncCommit.zip"
+# The historical pinned SHA was rebased/removed upstream; pin a reachable
+# upstream v2.5.0 commit. The complete source is extracted and checked before
+# replacing a cached runtime. No silent fallback to an unpinned branch.
+$audioSyncSourceUrl = "https://codeload.github.com/blast1see/AudioSyncTool/zip/$audioSyncCommit"
 
 function Invoke-DownloadFile {
     param(
@@ -215,6 +218,38 @@ $tempRoot = Join-Path $env:TEMP ("AltyaziDB-AudioSyncTool-" + [Guid]::NewGuid().
 New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
 
 try {
+    # Resolve/verify upstream source BEFORE deleting old native runtime or
+    # downloading embedded Python and NumPy/SciPy (large dependencies).
+    Write-Host "AudioSyncTool v2.5.0 kaynak arşivi doğrulanıyor..." -ForegroundColor Cyan
+    $sourceZip = Join-Path $tempRoot "audiosynctool-source.zip"
+    Invoke-DownloadFile -Uri $audioSyncSourceUrl -OutFile $sourceZip
+    $sourceExtract = Join-Path $tempRoot "audiosynctool-source"
+    Expand-Archive -LiteralPath $sourceZip -DestinationPath $sourceExtract -Force
+    $repoRoot = Get-ChildItem -LiteralPath $sourceExtract -Directory |
+        Where-Object { $_.Name -eq "AudioSyncTool-$audioSyncCommit" } | Select-Object -First 1
+    if (-not $repoRoot) { throw "AudioSyncTool pinned commit kaynak arşivi beklenen yapıda değil." }
+    $audioSyncPackage = Join-Path $repoRoot.FullName "audio_sync"
+    if (-not (Test-Path -LiteralPath (Join-Path $audioSyncPackage "core\\analyzer.py") -PathType Leaf)) {
+        throw "AudioSyncTool analiz çekirdeği kaynak arşivinde bulunamadı."
+    }
+    # Validate critical upstream Git blob IDs against reviewed v2.5.0 code.
+    $expectedSourceBlobs = [ordered]@{
+        "audio_sync/core/analyzer.py" = "281edd2a75198b19e13320fbfd52bfe9a46a1e7a"
+        "audio_sync/core/pipeline.py" = "d4f0aeac422775d6efce1b6a67d4d810bbfb35b3"
+        "audio_sync/__init__.py" = "c3862ce4c90dcdcf0dfe20d123bd33b775b7cf8b"
+        "LICENSE" = "eb5e3fec927626624bd1ee05b9f46c1fb4a0db39"
+    }
+    $gitCommand = Get-Command git -ErrorAction Stop
+    foreach ($entry in $expectedSourceBlobs.GetEnumerator()) {
+        $sourceFile = Join-Path $repoRoot.FullName $entry.Key
+        if (-not (Test-Path -LiteralPath $sourceFile -PathType Leaf)) { throw "AudioSyncTool eksik kaynak: $($entry.Key)" }
+        $actualBlob = (& $gitCommand.Source hash-object -- $sourceFile).Trim()
+        if ($LASTEXITCODE -ne 0 -or $actualBlob -ne $entry.Value) {
+            throw "AudioSyncTool kaynak kimliği uyuşmuyor: $($entry.Key)"
+        }
+    }
+    Write-Host "AudioSyncTool pinned v2.5.0 core files verified." -ForegroundColor Green
+
     Remove-Item -LiteralPath $nativeRoot -Recurse -Force -ErrorAction SilentlyContinue
     New-Item -ItemType Directory -Path $nativeRoot, $pythonDir, $sourceDir -Force | Out-Null
 
@@ -241,19 +276,7 @@ try {
     Install-Wheel -Package "numpy" -Version $numpyVersion -FileName $numpyFile -ExpectedSha256 $numpySha256 -TempRoot $tempRoot -SitePackages $sitePackages
     Install-Wheel -Package "scipy" -Version $scipyVersion -FileName $scipyFile -ExpectedSha256 $scipySha256 -TempRoot $tempRoot -SitePackages $sitePackages
 
-    Write-Host "AudioSyncTool v2.5.0 analiz kaynağı indiriliyor..." -ForegroundColor Cyan
-    $sourceZip = Join-Path $tempRoot "audiosynctool-source.zip"
-    Invoke-DownloadFile -Uri $audioSyncSourceUrl -OutFile $sourceZip
-    $sourceExtract = Join-Path $tempRoot "audiosynctool-source"
-    Expand-Archive -LiteralPath $sourceZip -DestinationPath $sourceExtract -Force
-    $repoRoot = Get-ChildItem -LiteralPath $sourceExtract -Directory | Where-Object { $_.Name -like "AudioSyncTool-*" } | Select-Object -First 1
-    if (-not $repoRoot) {
-        throw "AudioSyncTool kaynak arşivi beklenen yapıda değil."
-    }
-    $audioSyncPackage = Join-Path $repoRoot.FullName "audio_sync"
-    if (-not (Test-Path -LiteralPath (Join-Path $audioSyncPackage "core\analyzer.py") -PathType Leaf)) {
-        throw "AudioSyncTool analiz çekirdeği kaynak arşivinde bulunamadı."
-    }
+    # Source download and identity checks completed before runtime preparation.
     Copy-Item -LiteralPath $audioSyncPackage -Destination $sourceDir -Recurse -Force
     $license = Join-Path $repoRoot.FullName "LICENSE"
     if (Test-Path -LiteralPath $license -PathType Leaf) {

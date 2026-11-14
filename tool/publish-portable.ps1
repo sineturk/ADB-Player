@@ -45,7 +45,8 @@ if (-not $subtitleSyncExe) {
     throw "V1.0 release icin ffsubsync runtime hazirlanamadi."
 }
 
-& "$PSScriptRoot\generate-app-credentials.ps1"
+# Distribution must never compile maintainer Telegram credentials, even when the env file contains them.
+& "$PSScriptRoot\generate-app-credentials.ps1" -OmitTelegramCredentials
 
 if (Test-Path -LiteralPath $output) { Remove-Item -LiteralPath $output -Recurse -Force }
 New-Item -ItemType Directory -Path $output -Force | Out-Null
@@ -94,8 +95,9 @@ Copy-Item "$root\README_PUBLIC.md" "$output\README.md" -Force
 Copy-Item "$root\README_PUBLIC_TR.md" "$output\README_TR.md" -Force
 Copy-Item "$root\PRIVACY.md" "$output\PRIVACY.md" -Force
 Copy-Item "$root\SECURITY.md" "$output\SECURITY.md" -Force
-Copy-Item "$root\RELEASE_NOTES_v1.0.1.md" "$output\RELEASE_NOTES_v1.0.1.md" -Force
+Copy-Item "$root\RELEASE_NOTES_v1.0.2.md" "$output\RELEASE_NOTES_v1.0.2.md" -Force
 Copy-Item "$root\THIRD_PARTY_NOTICES.md" "$output\THIRD_PARTY_NOTICES.md" -Force
+Copy-Item "$root\docs\licenses\TagLibSharp2-LICENSE.txt" "$output\TagLibSharp2-LICENSE.txt" -Force
 Copy-Item "$root\LICENSE" "$output\LICENSE" -Force
 Copy-Item "$root\LICENSE_GPL-3.0.txt" "$output\LICENSE_GPL-3.0.txt" -Force
 

@@ -2,7 +2,7 @@
     [Parameter(Mandatory=$true)][string]$InstallerBaseUrl,
     [Parameter(Mandatory=$true)][string]$PortableBaseUrl,
     [ValidateSet("stable", "preview")][string]$Channel = "stable",
-    [string]$ReleaseNotes = "ADB Player V1.0.1 fullscreen, kontrol paneli, HDR ve güvenli güncelleme hotfix.",
+    [string]$ReleaseNotes = "ADB Player v1.0.2: Cinematic Media Hub, Telegram UX, Unified Continue Watching and standalone audio playback.",
     [switch]$Mandatory
 )
 

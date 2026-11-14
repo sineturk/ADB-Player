@@ -1,6 +1,11 @@
-﻿using System.Globalization;
+﻿using System.Collections;
+using System.Globalization;
 using System.Text.RegularExpressions;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Data;
+using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace AltyaziDB.Player.App.Localization;
 
@@ -205,6 +210,114 @@ public static class LocalizationManager
             ["Video ile harici ses aynı içerik olarak doğrulanamadı."] = "The video and external audio could not be verified as the same content.",
             ["Ses gecikmesi ve zaman kayması otomatik düzeltiliyor."] = "Audio delay and progressive drift are being corrected automatically.",
             ["pCloud Avrupa"] = "pCloud Europe",
+            // R5/P4.10: user-facing status and error messages uncovered by audit.
+            ["Bir kaynak seçin."] = "Select a source.",
+            ["Görüntü profili hazır."] = "Video profile ready.",
+            ["Harici ses eklendiğinde yalnızca istenirse senkronlanır."] = "External audio sync starts only when requested.",
+            ["Altyazı eklendiğinde yalnızca istenirse senkronlanır."] = "Subtitle sync starts only when requested.",
+            ["Tanılama klasörü açılamadı."] = "Diagnostics folder could not be opened.",
+            ["Ekran görüntüsü klasörü açılamadı."] = "Screenshot folder could not be opened.",
+            ["Bir bulut hesabı, paylaşım bağlantısı, klasör veya torrent seçin."] = "Choose a cloud account, shared link, folder, or torrent.",
+            ["Kaynak merkezi hazır · Video kütüphanesi kullanılamıyor."] = "Sources are ready; the video library is unavailable.",
+            ["Kaynak merkezi hazırlanamadı."] = "Media sources could not be prepared.",
+            ["Oynatıcı penceresi henüz hazır değil."] = "The player window is not ready yet.",
+            ["Oynatıcı hazırlanıyor…"] = "Preparing the player…",
+            ["Video oynatıcı başlatılamadı."] = "Video player could not start.",
+            ["Video oynatıcı başlatılamadı. Uygulamayı güncelleyip yeniden deneyin."] = "Video player could not start. Update the app and retry.",
+            ["Web bağlantısını Medya Merkezi alanına yapıştırın."] = "Paste the web link into Media Center.",
+            ["Harici ses eklemek için önce bir video açın."] = "Open a video before adding external audio.",
+            ["Ses arşivi inceleniyor…"] = "Checking audio archive…",
+            ["Harici ses eklenemedi."] = "External audio could not be added.",
+            ["Bulut, paylaşım bağlantısı veya WebDAV üzerinden harici ses seçin."] = "Choose external audio from cloud, a shared link, or WebDAV.",
+            ["Telegram üzerinden bir ses dosyası veya ses arşivi seçin."] = "Choose audio or an audio archive from Telegram.",
+            ["Medya merkezi hazır · Hesaplarınızı yönetin veya bir kaynak seçin."] = "Media Center is ready. Manage accounts or choose a source.",
+            ["Görüntü renk ayarları sıfırlandı."] = "Video color settings reset.",
+            ["Kare özeti oluşturmak için önce bir video açın."] = "Open a video before creating a contact sheet.",
+            ["Kare özeti oluşturulamadı: FFmpeg bulunamadı."] = "Contact sheet could not be created: FFmpeg is missing.",
+            ["Kare özeti oluşturulamadı."] = "Contact sheet could not be created.",
+            ["Klavye kısayolları varsayılanlara döndürüldü."] = "Keyboard shortcuts restored to defaults.",
+            ["Görüntü iyileştirme dosyaları hazır değil veya ekran kartı bu modu çalıştıramadı."] = "Video enhancement is unavailable on this device.",
+            ["Uzak bağlantı açılamadı."] = "Remote link could not be opened.",
+            ["Ses arşivi indiriliyor…"] = "Downloading audio archive…",
+            ["Arşivden ses seçimi iptal edildi."] = "Audio archive selection cancelled.",
+            ["Bağlantı desteklenen bir ses dosyasını göstermiyor."] = "This link does not point to supported audio.",
+            ["Özel OAuth kullanıyorsanız Client ID ve Client Secret birlikte girilmeli."] = "Enter both Client ID and Client Secret for custom sign-in.",
+            ["OAuth kimlik bilgileri geçersiz veya çok uzun."] = "Invalid OAuth credentials.",
+            ["OAuth bilgileri güvenli depoya kaydedilemedi."] = "OAuth details could not be saved securely.",
+            ["Hesap bağlandı ancak özel OAuth bilgileri güvenli depoda saklanamadı."] = "Account connected, but custom OAuth details were not saved.",
+            ["Bağlantı doğrulanamadı. Önceki OAuth yapılandırması korundu."] = "Connection could not be verified. Previous settings were kept.",
+            ["OAuth yetkilendirmesi iptal ediliyor…"] = "Cancelling sign-in…",
+            ["Tarayıcı açma isteği gönderildi. Sağlayıcı izin ekranını tamamlayın; açılmadıysa bağlantıyı kopyalayın."] = "Complete sign-in in your browser. If it did not open, copy the link.",
+            ["Tarayıcı otomatik açılamadı. Yetkilendirme bağlantısını kopyalayıp tarayıcınızda açın."] = "Could not open the browser. Copy and open the sign-in link.",
+            ["Tek kullanımlık yetkilendirme adresi kopyalandı. Tarayıcınızda açın; kimseyle paylaşmayın."] = "Sign-in link copied. Open it in your browser. Do not share it.",
+            ["Yetkilendirme adresi kopyalanamadı. Tarayıcıda aç düğmesini tekrar deneyin."] = "Could not copy the sign-in link. Try opening it in the browser.",
+            ["Yetkilendirme süresi doldu. Tarayıcı izinlerini kontrol edip yeniden deneyin."] = "Sign-in expired. Check your browser and try again.",
+            ["Hesap yetkilendirmesi reddedildi veya iptal edildi. Sağlayıcı girişini yeniden başlatın."] = "Sign-in was denied or cancelled. Try again.",
+            ["OAuth uygulama kimlik bilgileri veya yönlendirme ayarı geçersiz. Özel Client ID/Secret bilgilerinizi denetleyin."] = "Invalid OAuth app settings. Check Client ID and Secret.",
+            ["Windows 53682 OAuth portuna erişimi engelliyor. Hyper-V veya sanallaştırma sistemi bu portu ayırmış olabilir. Salt-okunur port tanılama betiğini çalıştırın."] = "Windows is blocking the sign-in port. Check port 53682.",
+            ["127.0.0.1:53682 OAuth portu başka bir işlem tarafından kullanılıyor. Mevcut hesapları silmeyin; portu kullanan uygulamayı kontrol edin."] = "Port 53682 is in use. Check the other app using it.",
+            ["rclone yerel OAuth sunucusunu başlatamadı. Windows 53682 portunun durumunu tanılayın; tarayıcı ayarlarını değiştirmek tek başına çözmez."] = "Cloud sign-in could not start. Check port 53682.",
+            ["Varsayılan tarayıcı başlatılamadı. Tarayıcıda aç veya Bağlantıyı kopyala seçeneklerini deneyin."] = "Could not open the default browser. Try Open or Copy link.",
+            ["Bulut bağlantı motoru bulunamadı. ADB Player'ın eksiksiz test paketini kullanın."] = "Cloud connector is missing. Use the complete ADB Player package.",
+            ["Bağlantı veya DNS sorunu oluştu. İnternet bağlantısını kontrol edin."] = "Network or DNS error. Check your connection.",
+            ["Yetkilendirme tamamlanamadı. Sağlayıcı ve OAuth ayarlarını kontrol edin; yeniden deneyin."] = "Sign-in could not finish. Check your provider settings.",
+            ["rclone bağlantı motoru başlatılamadı. Eksiksiz ADB Player paketini kontrol edin."] = "Cloud connector could not start. Check the installation.",
+            ["Bağlantı kaldırıldı; eski özel OAuth kimliği temizlenemedi."] = "Account disconnected, but previous OAuth details could not be cleared.",
+            ["WebDAV bağlantısı kurulamadı."] = "WebDAV connection could not be established.",
+            ["Bir ses dosyası veya ZIP, RAR ya da 7-Zip arşivi seçin."] = "Choose an audio file or ZIP, RAR, or 7z archive.",
+            ["Arşivdeki ses dosyaları inceleniyor…"] = "Checking audio files in archive…",
+            ["Uzak ses akışı açılıyor…"] = "Opening remote audio…",
+            ["Uzak ses akışı açılamadı."] = "Remote audio could not be opened.",
+            ["Ses akışı açılamadı."] = "Audio stream could not be opened.",
+            ["Ses bağlantısı bulunamadı."] = "Audio link not found.",
+            ["PixelDrain video akışı doğrulanamadı."] = "PixelDrain video stream could not be verified.",
+            ["PixelDrain ses akışı doğrulanamadı."] = "PixelDrain audio stream could not be verified.",
+            ["Bulut hesabı, paylaşım bağlantısı veya WebDAV konumu açın; ardından ses dosyasını ya da ses arşivini seçin."] = "Open a cloud, shared link, or WebDAV source, then choose audio.",
+            ["Bağlantılarınız hazır."] = "Your connections are ready.",
+            ["Telegram güvenli ayarları yüklenemedi."] = "Telegram settings could not be loaded.",
+            ["Telegram oturumu açılıyor…"] = "Connecting to Telegram…",
+            ["Telefon numaranızı ülke koduyla girin."] = "Enter your phone number with country code.",
+            ["Telegram uygulama kimliği eksik."] = "Telegram app credentials are missing.",
+            ["Telegram doğrulama bilgisi gönderilemedi."] = "Telegram verification could not be submitted.",
+            ["Telegram doğrulaması başarısız."] = "Telegram verification failed.",
+            ["Telegram sohbetleri alınamadı."] = "Could not load Telegram chats.",
+            ["Telegram sohbet içeriği alınamadı."] = "Could not load chat messages.",
+            ["Telegram medyası alınamadı."] = "Could not load Telegram media.",
+            ["Telegram sohbet araması başarısız."] = "Chat search failed.",
+            ["Telegram genel araması başarısız."] = "Telegram search failed.",
+            ["Telegram akışı açılamadı."] = "Could not open the Telegram stream.",
+            ["Telegram akışı açılamadı"] = "Could not open the Telegram stream",
+            ["Bu dosya bir arşiv parçası. Aynı sete ait tüm parçaları yükleyip yenileyin."] = "This is an archive part. Add all parts and refresh.",
+            ["Harici ses için bir ses dosyası veya ses içeren arşiv seçin."] = "Choose an audio file or archive.",
+            ["Telegram'dan bir ses dosyası veya ses içeren arşiv seçin."] = "Choose audio or an archive from Telegram.",
+            ["Telegram oturumunuz açıldığında ses dosyalarınızı seçebilirsiniz."] = "Connect to Telegram to select audio files.",
+            ["Arşiv parçaları eksik veya belirsiz. Önce Parçaları düzenle seçeneğini kullanın."] = "Archive parts are missing. Use Arrange parts first.",
+            ["Arşivde desteklenen bir ses dosyası bulunamadı."] = "No supported audio file was found in the archive.",
+            ["Arşivden ses dosyası seçin"] = "Select audio from archive",
+            ["Arşiv medya seçimi iptal edildi."] = "Archive selection cancelled.",
+            ["Arşivdeki medya şifreli. Şifreli arşiv akışı henüz desteklenmiyor."] = "Encrypted archive playback is not supported.",
+            ["Önce çok parçalı bir arşiv seçin."] = "Select a multipart archive first.",
+            ["Arşiv parçaları düzenlenemedi."] = "Archive parts could not be arranged.",
+            ["Telefon numarası Telegram'a gönderiliyor…"] = "Sending phone number to Telegram…",
+            ["Torrent hazırlama iptal edildi."] = "Torrent preparation cancelled.",
+            ["Oynatma için ilk parçalar hazırlanıyor…"] = "Preparing playback segments…",
+            ["Eklentiler yüklenemedi."] = "Add-ons could not be loaded.",
+            ["Eklenti katalogları yüklenemedi."] = "Add-on catalogs could not be loaded.",
+            ["Eklenti kurulamadı."] = "Add-on could not be installed.",
+            ["Eklenti kaldırılamadı."] = "Add-on could not be removed.",
+            ["Eklenti durumu değiştirilemedi."] = "Add-on status could not be changed.",
+            ["İçerik bölüm bilgileri yüklenemedi."] = "Episode details could not be loaded.",
+            ["İçerik akış seçenekleri yüklenemedi."] = "Playback options could not be loaded.",
+            ["Torrent seçimi iptal edildi."] = "Torrent selection cancelled.",
+            ["Eklenti akışı açılamadı."] = "Add-on stream could not be opened.",
+            ["Eklenti önbellek klasörü açılamadı."] = "Add-on cache folder could not be opened.",
+            ["API ayarları yüklenemedi."] = "API settings could not be loaded.",
+            ["API ayarları kaydedilemedi."] = "API settings could not be saved.",
+            ["Zorlu kurgu bölgesel senkron haritası geri yüklendi."] = "Regional sync map restored.",
+            ["Bu bölüm için güvenilir Türkçe senkron bölgesi bulunamadı; orijinal ses kullanılıyor."] = "No reliable dubbed-audio sync for this segment; using original audio.",
+            ["Türkçe harici ses bölgesi hazırlanıyor…"] = "Preparing the external audio segment…",
+            ["Bu bölüm için canlı senkron henüz hazırlanamadı; orijinal sesle devam ediliyor."] = "Sync is not ready for this segment; continuing with original audio.",
+            ["Harici ses eklendi."] = "External audio added.",
         };
 
     private static readonly (string Turkish, string English)[] EnglishPrefixes =
@@ -228,7 +341,23 @@ public static class LocalizationManager
         ("Uzak altyazı indirilemedi: ", "Remote subtitle download failed: "),
         ("Uzak ses indirilemedi: ", "Remote audio download failed: "),
         ("Ses otomatik senkronize edildi (", "Audio automatically synchronized ("),
-        ("Ses gecikmesi elle ayarlandı: ", "Audio delay adjusted manually: ")
+        ("Ses gecikmesi elle ayarlandı: ", "Audio delay adjusted manually: "),
+        ("Arşivden harici ses eklendi: ", "External audio added from archive: "),
+        ("Harici ses akışı eklendi: ", "External audio stream added: "),
+        ("Telegram akışı açılıyor: ", "Opening Telegram stream: "),
+        ("Telegram akışı oynatılıyor: ", "Playing Telegram stream: "),
+        ("Telegram harici sesi eklendi: ", "Telegram audio added: "),
+        ("Arşiv yapısı denetleniyor: ", "Checking archive: "),
+        ("Arşiv akışı açılıyor: ", "Opening archive stream: "),
+        ("Arşiv çözülüyor ve oynatma hazırlanıyor: ", "Extracting archive for playback: "),
+        ("Arşivden oynatılıyor: ", "Playing from archive: "),
+        ("Harici ses eklendi: ", "External audio added: "),
+        ("Harici ses akışı açıldı; veri arka planda önbelleğe alınıyor: ", "External audio opened, buffering: "),
+        ("Altyazı eklendi: ", "Subtitle added: "),
+        ("Kare özeti kaydedildi: ", "Contact sheet saved: "),
+        ("Geçersiz kısayol: ", "Invalid shortcut: "),
+        ("AudioSyncTool tam senkron dosyası hazırlanıyor · ", "Preparing full audio sync · "),
+        ("Güvenlik: ", "Safety: ")
     ];
 
     private static readonly IReadOnlyDictionary<string, string> TurkishExact =
@@ -238,6 +367,39 @@ public static class LocalizationManager
 
     private static readonly (string English, string Turkish)[] TurkishPrefixes =
         EnglishPrefixes.Select(pair => (pair.English, pair.Turkish)).ToArray();
+
+    // Translate cached UI status values by matching the 1:1 language resources.
+    // This also handles text assigned before the user changed the language.
+    private static readonly Lazy<(IReadOnlyDictionary<string, string> En, IReadOnlyDictionary<string, string> Tr)>
+        ResourceValueTranslations = new(LoadResourceValueTranslations);
+
+    private static (IReadOnlyDictionary<string, string> En, IReadOnlyDictionary<string, string> Tr)
+        LoadResourceValueTranslations()
+    {
+        var english = new Dictionary<string, string>(StringComparer.Ordinal);
+        var turkish = new Dictionary<string, string>(StringComparer.Ordinal);
+        try
+        {
+            var tr = new ResourceDictionary { Source = new Uri("Localization/Strings.tr-TR.xaml", UriKind.Relative) };
+            var en = new ResourceDictionary { Source = new Uri("Localization/Strings.en-US.xaml", UriKind.Relative) };
+            foreach (DictionaryEntry entry in tr)
+            {
+                if (entry.Key is not string key || entry.Value is not string trValue ||
+                    !en.Contains(key) || en[key] is not string enValue ||
+                    string.Equals(trValue, enValue, StringComparison.Ordinal))
+                    continue;
+
+                english.TryAdd(trValue, enValue);
+                turkish.TryAdd(enValue, trValue);
+            }
+        }
+        catch (Exception)
+        {
+            // Resource fallback is optional. Keep the exact/prefix translations
+            // active even in unit tests or hosts without WPF pack resources.
+        }
+        return (english, turkish);
+    }
 
     public static IReadOnlyList<LanguageOption> SupportedLanguages { get; } =
     [
@@ -284,6 +446,29 @@ public static class LocalizationManager
 
         CurrentLanguageCode = code;
         LanguageChanged?.Invoke(null, EventArgs.Empty);
+        // Resource dictionaries refresh DynamicResource automatically. Status and
+        // error strings produced by view models need their binding converter rerun.
+        if (System.Windows.Application.Current is { } app)
+        {
+            foreach (Window window in app.Windows)
+            {
+                if (!window.IsLoaded) continue;
+                _ = window.Dispatcher.BeginInvoke(
+                    new Action(() => RefreshTextBindings(window)),
+                    DispatcherPriority.ContextIdle);
+            }
+        }
+    }
+
+    private static void RefreshTextBindings(DependencyObject root)
+    {
+        if (root is TextBlock block)
+            BindingOperations.GetBindingExpression(block, TextBlock.TextProperty)?.UpdateTarget();
+        if (root is ContentControl content)
+            BindingOperations.GetBindingExpression(content, ContentControl.ContentProperty)?.UpdateTarget();
+
+        for (var index = 0; index < VisualTreeHelper.GetChildrenCount(root); index++)
+            RefreshTextBindings(VisualTreeHelper.GetChild(root, index));
     }
 
     public static string Get(string key)
@@ -315,6 +500,9 @@ public static class LocalizationManager
         {
             return exact;
         }
+
+        if (ResourceValueTranslations.Value.En.TryGetValue(value, out var resourceEnglish))
+            return resourceEnglish;
 
         foreach (var (turkish, english) in EnglishPrefixes)
         {
@@ -490,6 +678,9 @@ public static class LocalizationManager
             return exact;
         }
 
+        if (ResourceValueTranslations.Value.Tr.TryGetValue(value, out var resourceTurkish))
+            return resourceTurkish;
+
         foreach (var (english, turkish) in TurkishPrefixes)
         {
             if (value.StartsWith(english, StringComparison.Ordinal))
@@ -611,6 +802,16 @@ public static class LocalizationManager
         if (string.IsNullOrWhiteSpace(translated))
         {
             return string.Empty;
+        }
+
+        // Never expose an unmapped Turkish backend failure on the English UI.
+        // Known messages are handled by exact/prefix rules above; unknown error
+        // details are intentionally represented by a short localized fallback.
+        if (IsEnglish && Regex.IsMatch(translated,
+            @"(?:başarısız|başlatılamadı|yüklenemedi|doğrulanamadı|kaydedilemedi|açılamadı|kurulamadı|kaldırılamadı|gönderilemedi|engellendi|geçersiz|reddedildi|hata oluştu|bulunamadı)",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
+        {
+            return Get("Status.UnknownEnglishError");
         }
 
         var firstParagraph = translated

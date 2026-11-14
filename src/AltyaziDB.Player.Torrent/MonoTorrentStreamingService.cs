@@ -23,6 +23,9 @@ public sealed class MonoTorrentStreamingService : ITorrentService
 
     private readonly IAppLogger _logger;
     private readonly ConcurrentDictionary<string, SessionState> _sessions = new(StringComparer.Ordinal);
+    // A TorrentManager may already be registered while metadata is still loading,
+    // or when an earlier cleanup failed. Guard registry ownership across Add/Remove.
+    private readonly SemaphoreSlim _registryGate = new(1, 1);
     private readonly CancellationTokenSource _lifetime = new();
     private ClientEngine? _engine;
     private TorrentEngineConfiguration? _configuration;
@@ -70,7 +73,8 @@ public sealed class MonoTorrentStreamingService : ITorrentService
             // are being prioritised around the current playback position.
             DiskCacheBytes = 16 * 1024 * 1024,
 
-            UsePartialFiles = true,
+            // User-selected shared folders retain original filenames for qBittorrent recheck.
+            UsePartialFiles = configuration.UsePartialFiles,
             AllowLocalPeerDiscovery = true,
             AllowPortForwarding = true,
             AutoSaveLoadDhtCache = true,
@@ -90,19 +94,23 @@ public sealed class MonoTorrentStreamingService : ITorrentService
         if (!Uri.TryCreate(magnetUri.Trim(), UriKind.Absolute, out var uri) || !uri.Scheme.Equals("magnet", StringComparison.OrdinalIgnoreCase))
             throw new FormatException("Geçerli bir magnet bağlantısı girin.");
 
-        var manager = await engine.AddStreamingAsync(
-            MagnetLink.Parse(magnetUri.Trim()),
-            _configuration!.CacheDirectory,
-            CreateStreamingTorrentSettings()).ConfigureAwait(false);
-        var session = new SessionState(Guid.NewGuid().ToString("N"), magnetUri.Trim(), manager);
-        _sessions[session.Id] = session;
-        Raise(CreateSnapshot(session, TorrentSessionState.Metadata));
+        var magnet = MagnetLink.Parse(magnetUri.Trim());
+        var (session, created) = await RegisterStreamingSessionAsync(
+            magnet.InfoHashes, magnetUri.Trim(),
+            () => engine.AddStreamingAsync(
+                magnet, _configuration!.CacheDirectory, CreateStreamingTorrentSettings()),
+            cancellationToken).ConfigureAwait(false);
 
         try
         {
-            await manager.StartAsync().ConfigureAwait(false);
-            await manager.WaitForMetadataAsync(cancellationToken).ConfigureAwait(false);
-            await DisableUnselectedFilesAsync(manager, selected: null).ConfigureAwait(false);
+            if (created)
+                Raise(CreateSnapshot(session, TorrentSessionState.Metadata));
+            // Never stop/restart an already downloading or playing manager.
+            if (session.Manager.State == TorrentState.Stopped)
+                await session.Manager.StartAsync().ConfigureAwait(false);
+            await session.Manager.WaitForMetadataAsync(cancellationToken).ConfigureAwait(false);
+            if (created)
+                await DisableUnselectedFilesAsync(session.Manager, selected: null).ConfigureAwait(false);
             var snapshot = CreateSnapshot(session, TorrentSessionState.Ready);
             TorrentContentSafety.ValidatePlayableVideo(snapshot.Files);
             LogBlockedSidecars(snapshot);
@@ -111,10 +119,11 @@ public sealed class MonoTorrentStreamingService : ITorrentService
         }
         catch (Exception exception)
         {
-            await RemoveFailedSessionAsync(
-                    session,
-                    deleteData: exception is InvalidDataException)
-                .ConfigureAwait(false);
+            // A reused session may still be playing or downloading on another
+            // attempt. Never remove or delete it when this attempt times out.
+            if (created)
+                await RemoveFailedSessionAsync(
+                    session, deleteData: exception is InvalidDataException).ConfigureAwait(false);
             throw;
         }
     }
@@ -125,17 +134,19 @@ public sealed class MonoTorrentStreamingService : ITorrentService
         if (!File.Exists(torrentFilePath)) throw new FileNotFoundException("Torrent dosyası bulunamadı.", torrentFilePath);
         var torrent = await MonoTorrent.Torrent.LoadAsync(torrentFilePath).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
-        var manager = await engine.AddStreamingAsync(
-            torrent,
-            _configuration!.CacheDirectory,
-            CreateStreamingTorrentSettings()).ConfigureAwait(false);
-        var session = new SessionState(Guid.NewGuid().ToString("N"), torrentFilePath, manager);
-        _sessions[session.Id] = session;
+        var (session, created) = await RegisterStreamingSessionAsync(
+            torrent.InfoHashes, torrentFilePath,
+            () => engine.AddStreamingAsync(
+                torrent, _configuration!.CacheDirectory, CreateStreamingTorrentSettings()),
+            cancellationToken).ConfigureAwait(false);
 
         try
         {
-            await DisableUnselectedFilesAsync(manager, selected: null).ConfigureAwait(false);
-            await manager.StartAsync().ConfigureAwait(false);
+            if (created)
+                await DisableUnselectedFilesAsync(session.Manager, selected: null).ConfigureAwait(false);
+            if (session.Manager.State == TorrentState.Stopped)
+                await session.Manager.StartAsync().ConfigureAwait(false);
+            await session.Manager.WaitForMetadataAsync(cancellationToken).ConfigureAwait(false);
             var snapshot = CreateSnapshot(session, TorrentSessionState.Ready);
             TorrentContentSafety.ValidatePlayableVideo(snapshot.Files);
             LogBlockedSidecars(snapshot);
@@ -144,11 +155,54 @@ public sealed class MonoTorrentStreamingService : ITorrentService
         }
         catch (Exception exception)
         {
-            await RemoveFailedSessionAsync(
-                    session,
-                    deleteData: exception is InvalidDataException)
-                .ConfigureAwait(false);
+            if (created)
+                await RemoveFailedSessionAsync(
+                    session, deleteData: exception is InvalidDataException).ConfigureAwait(false);
             throw;
+        }
+    }
+
+    private async Task<(SessionState Session, bool Created)> RegisterStreamingSessionAsync(
+        InfoHashes infoHashes,
+        string source,
+        Func<Task<TorrentManager>> addStreaming,
+        CancellationToken cancellationToken)
+    {
+        await _registryGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var engine = EnsureInitialized();
+            var existing = engine.Torrents.FirstOrDefault(
+                candidate => candidate.InfoHashes.Equals(infoHashes));
+            if (existing is not null)
+            {
+                // Avoid adopting a non-streaming manager; it cannot serve HTTP
+                // Range requests to the media player.
+                if (existing.StreamProvider is null)
+                    throw new InvalidOperationException(
+                        "Bu torrent zaten akış desteklemeyen bir oturumda kayıtlı.");
+
+                var tracked = _sessions.Values.FirstOrDefault(
+                    session => ReferenceEquals(session.Manager, existing));
+                if (tracked is not null)
+                    return (tracked, false);
+
+                // Previous cleanup may have failed after the view model forgot
+                // its session. Recover ownership without touching existing files.
+                var recovered = new SessionState(Guid.NewGuid().ToString("N"), source, existing);
+                _sessions[recovered.Id] = recovered;
+                _logger.Warning("MonoTorrent kaydı var ancak panel oturumu yoktu; mevcut yönetici korundu ve yeniden bağlandı.");
+                return (recovered, false);
+            }
+
+            var manager = await addStreaming().ConfigureAwait(false);
+            var registered = new SessionState(Guid.NewGuid().ToString("N"), source, manager);
+            _sessions[registered.Id] = registered;
+            return (registered, true);
+        }
+        finally
+        {
+            _registryGate.Release();
         }
     }
 
@@ -209,26 +263,40 @@ public sealed class MonoTorrentStreamingService : ITorrentService
 
     public async Task RemoveAsync(string sessionId, bool deleteFiles, CancellationToken cancellationToken = default)
     {
-        if (!_sessions.TryRemove(sessionId, out var session)) return;
-        await session.StreamGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        // Do not discard the session from _sessions until the underlying engine
+        // confirms removal. Otherwise a failed cleanup leaves an orphan manager
+        // and the next AddStreamingAsync fails as "already registered".
+        await _registryGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            // Manager, ClientEngine.RemoveAsync sonrasında dispose edilir. Removed
-            // snapshot'ını önce al ki event aşamasında disposed manager okunmasın.
-            var removedSnapshot = CreateSnapshot(session, TorrentSessionState.Removed);
-            session.HttpStream?.Dispose();
-            session.HttpStream = null;
-            try { await session.Manager.StopAsync().ConfigureAwait(false); } catch { }
-            if (_engine is not null)
-                await _engine.RemoveAsync(
-                    session.Manager,
-                    deleteFiles ? RemoveMode.CacheDataAndDownloadedData : RemoveMode.KeepAllData).ConfigureAwait(false);
-            Raise(removedSnapshot);
+            if (!_sessions.TryGetValue(sessionId, out var session)) return;
+            await session.StreamGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            var removed = false;
+            try
+            {
+                var removedSnapshot = CreateSnapshot(session, TorrentSessionState.Removed);
+                session.HttpStream?.Dispose();
+                session.HttpStream = null;
+                // Do not swallow removal errors and clear the UI as if removal worked.
+                await session.Manager.StopAsync().ConfigureAwait(false);
+                if (_engine is not null)
+                    await _engine.RemoveAsync(
+                        session.Manager,
+                        deleteFiles ? RemoveMode.CacheDataAndDownloadedData : RemoveMode.KeepAllData).ConfigureAwait(false);
+                _sessions.TryRemove(sessionId, out _);
+                removed = true;
+                Raise(removedSnapshot);
+            }
+            finally
+            {
+                session.StreamGate.Release();
+                if (removed)
+                    session.StreamGate.Dispose();
+            }
         }
         finally
         {
-            session.StreamGate.Release();
-            session.StreamGate.Dispose();
+            _registryGate.Release();
         }
     }
 
@@ -324,26 +392,17 @@ public sealed class MonoTorrentStreamingService : ITorrentService
 
     private async Task RemoveFailedSessionAsync(SessionState session, bool deleteData = false)
     {
-        // RemoveAsync ile metadata hazırlama hatası aynı anda çalışabilir. Sadece
-        // sözlükten oturumu gerçekten çıkaran taraf manager/gate temizliğini yapar.
-        if (!_sessions.TryRemove(session.Id, out _))
-        {
-            return;
-        }
-
-        try { await session.Manager.StopAsync().ConfigureAwait(false); } catch { }
+        // Preserve ownership if the engine refuses to unregister the manager;
+        // the next attempt can recover it by its exact info-hash.
         try
         {
-            if (_engine is not null)
-            {
-                await _engine.RemoveAsync(
-                        session.Manager,
-                        deleteData ? RemoveMode.CacheDataAndDownloadedData : RemoveMode.KeepAllData)
-                    .ConfigureAwait(false);
-            }
+            await RemoveAsync(session.Id, deleteFiles: deleteData).ConfigureAwait(false);
         }
-        catch { }
-        session.StreamGate.Dispose();
+        catch (Exception)
+        {
+            // Do not log magnet URLs, tracker tokens or private passkeys.
+            _logger.Warning("Torrent metadata hatasından sonra motor temizliği tamamlanamadı; kayıt ve dosyalar korundu.");
+        }
     }
 
     private void LogBlockedSidecars(TorrentSessionSnapshot snapshot)
@@ -400,6 +459,7 @@ public sealed class MonoTorrentStreamingService : ITorrentService
             try { await _engine.StopAllAsync().ConfigureAwait(false); } catch { }
             _engine.Dispose();
         }
+        _registryGate.Dispose();
         _lifetime.Dispose();
     }
 

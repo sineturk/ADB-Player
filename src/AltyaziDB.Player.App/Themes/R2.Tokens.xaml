@@ -447,4 +447,277 @@
     <Setter Property="IsHitTestVisible" Value="False"/>
   </Style>
 
+
+  <Style x:Key="R5GlassWorkspacePanel" TargetType="Border" BasedOn="{StaticResource R24WorkspacePanel}">
+    <Setter Property="Background" Value="#E30D1826"/>
+    <Setter Property="BorderBrush" Value="#2C475E"/>
+    <Setter Property="SnapsToDevicePixels" Value="True"/>
+  </Style>
+
+  <!-- R5/P3: scoped cinematic glass surfaces; legacy player/HUD styles stay unchanged. -->
+  <Style x:Key="R5GlassHeroPanel" TargetType="Border" BasedOn="{StaticResource R23HeroPanel}">
+    <Setter Property="BorderBrush" Value="#3C52718A"/>
+    <Setter Property="SnapsToDevicePixels" Value="True"/>
+  </Style>
+
+  <Style x:Key="R5GlassHomePanel" TargetType="Border" BasedOn="{StaticResource R24HomeDataPanel}">
+    <Setter Property="Background">
+      <Setter.Value>
+        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+          <GradientStop Color="#EE122134" Offset="0"/>
+          <GradientStop Color="#F60A141F" Offset="1"/>
+        </LinearGradientBrush>
+      </Setter.Value>
+    </Setter>
+    <Setter Property="BorderBrush" Value="#2E4960"/>
+    <Setter Property="SnapsToDevicePixels" Value="True"/>
+  </Style>
+
+  <Style x:Key="R5GlassMediaCardButton" TargetType="Button" BasedOn="{StaticResource R23MediaCardButton}">
+    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+    <Setter Property="SnapsToDevicePixels" Value="True"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Grid>
+            <Border x:Name="GlowFrame" Background="Transparent"
+                    BorderBrush="#325577" BorderThickness="1" CornerRadius="13"/>
+            <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+          </Grid>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="GlowFrame" Property="BorderBrush" Value="#8D37D6FF"/>
+            </Trigger>
+            <Trigger Property="IsKeyboardFocused" Value="True">
+              <Setter TargetName="GlowFrame" Property="BorderBrush" Value="#F1E3FAFF"/>
+              <Setter TargetName="GlowFrame" Property="BorderThickness" Value="2"/>
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter Property="Opacity" Value=".52"/>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- Always stretch the Grid children: the legacy R23Button template centers content. -->
+  <Style x:Key="R5GlassSourceButton" TargetType="Button" BasedOn="{StaticResource R24LinkRowButton}">
+    <Setter Property="MinHeight" Value="53"/>
+    <Setter Property="Padding" Value="11,6"/>
+    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+    <Setter Property="BorderBrush" Value="#344A63"/>
+    <Setter Property="Background" Value="#C10C1A2B"/>
+    <Setter Property="SnapsToDevicePixels" Value="True"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border x:Name="Surface" CornerRadius="10"
+                  Background="{TemplateBinding Background}"
+                  BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}">
+            <ContentPresenter Margin="{TemplateBinding Padding}"
+                              HorizontalAlignment="Stretch" VerticalAlignment="Center"/>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Surface" Property="Background" Value="#1A3043"/>
+              <Setter TargetName="Surface" Property="BorderBrush" Value="#578EB0"/>
+            </Trigger>
+            <Trigger Property="IsKeyboardFocused" Value="True">
+              <Setter TargetName="Surface" Property="BorderBrush" Value="#E3FAFF"/>
+              <Setter TargetName="Surface" Property="BorderThickness" Value="2"/>
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter Property="Opacity" Value=".5"/>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style x:Key="R5GlassQuickButton" TargetType="Button" BasedOn="{StaticResource R5GlassSourceButton}">
+    <Setter Property="MinHeight" Value="49"/>
+    <Setter Property="Height" Value="49"/>
+    <Setter Property="Padding" Value="11,6"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="Background" Value="#B00E1B2B"/>
+    <Setter Property="BorderBrush" Value="#2B455C"/>
+  </Style>
+
+  <!-- R5/P3.2: Android-inspired provider cards, scoped to Sources only. -->
+  <Style x:Key="R5ProviderCard" TargetType="Button" BasedOn="{StaticResource R5GlassSourceButton}">
+    <Setter Property="MinHeight" Value="115"/>
+    <Setter Property="Padding" Value="15,12"/>
+    <Setter Property="Margin" Value="5"/>
+    <Setter Property="VerticalContentAlignment" Value="Center"/>
+    <Setter Property="Background" Value="#142638"/>
+    <Setter Property="BorderBrush" Value="#31536B"/>
+  </Style>
+  <!-- R5/P4.16.7: standalone rounded source segments.
+       Native TabPanel intentionally overlaps the content seam by a few pixels;
+       that clips the bottom strokes even with extra margins. A horizontal
+       items-host StackPanel avoids overlap while preserving TabItem selection. -->
+  <Style x:Key="R5SourcesTabItem" TargetType="TabItem">
+    <Setter Property="Foreground" Value="{StaticResource R23MutedBrush}"/>
+    <Setter Property="Margin" Value="0,0,5,0"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="Padding" Value="16,10"/>
+    <Setter Property="MinHeight" Value="40"/>
+    <Setter Property="SnapsToDevicePixels" Value="True"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="TabItem">
+          <Border x:Name="TabSurface"
+                  Background="#13283E" BorderBrush="#31536B"
+                  BorderThickness="1" CornerRadius="9"
+                  Padding="{TemplateBinding Padding}"
+                  SnapsToDevicePixels="True">
+            <ContentPresenter ContentSource="Header"
+                              HorizontalAlignment="Center"
+                              VerticalAlignment="Center"/>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsSelected" Value="True">
+              <Setter TargetName="TabSurface" Property="Background" Value="#164567"/>
+              <Setter TargetName="TabSurface" Property="BorderBrush" Value="#27C4F3"/>
+              <Setter TargetName="TabSurface" Property="BorderThickness" Value="1.5"/>
+              <Setter Property="Foreground" Value="White"/>
+            </Trigger>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="TabSurface" Property="BorderBrush" Value="#6DB8D3"/>
+            </Trigger>
+            <Trigger Property="IsKeyboardFocused" Value="True">
+              <Setter TargetName="TabSurface" Property="BorderBrush" Value="#E3FAFF"/>
+              <Setter TargetName="TabSurface" Property="BorderThickness" Value="2"/>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style x:Key="R5SourcesTabControl" TargetType="TabControl">
+    <Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="SnapsToDevicePixels" Value="True"/>
+    <Setter Property="ItemContainerStyle" Value="{StaticResource R5SourcesTabItem}"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="TabControl">
+          <Grid SnapsToDevicePixels="True">
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto"/>
+              <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <Border Grid.Row="0" HorizontalAlignment="Left" VerticalAlignment="Top"
+                    Background="#0B1828" BorderBrush="#28465E" BorderThickness="1"
+                    CornerRadius="12" Padding="5" Margin="2,2,0,7"
+                    SnapsToDevicePixels="True">
+              <StackPanel IsItemsHost="True" Orientation="Horizontal"/>
+            </Border>
+            <Border Grid.Row="1" Background="Transparent" Padding="2,7,2,0">
+              <ContentPresenter ContentSource="SelectedContent"/>
+            </Border>
+          </Grid>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- R5/P4.1: cinema-first Explore surfaces. Reused by future P4 pages only
+       through explicit style opt-in; player HWND and existing HUD untouched. -->
+  <Style x:Key="R5DiscoverToolbar" TargetType="Border" BasedOn="{StaticResource R23Toolbar}">
+    <Setter Property="Background" Value="#E40A1623"/>
+    <Setter Property="BorderBrush" Value="#34516C"/>
+    <Setter Property="CornerRadius" Value="12"/>
+    <Setter Property="Padding" Value="8"/>
+  </Style>
+  <Style x:Key="R5DiscoverStatCard" TargetType="Border" BasedOn="{StaticResource R24InsetPanel}">
+    <Setter Property="Background" Value="#B8122638"/>
+    <Setter Property="BorderBrush" Value="#31536C"/>
+    <Setter Property="Padding" Value="13,9"/>
+    <Setter Property="CornerRadius" Value="11"/>
+    <Setter Property="SnapsToDevicePixels" Value="True"/>
+  </Style>
+  <Style x:Key="R5DiscoverCatalogPanel" TargetType="Border" BasedOn="{StaticResource R5GlassHomePanel}">
+    <Setter Property="Padding" Value="16"/>
+    <Setter Property="SnapsToDevicePixels" Value="True"/>
+  </Style>
+  <Style x:Key="R5DiscoverDetailsPanel" TargetType="Border" BasedOn="{StaticResource R5GlassWorkspacePanel}">
+    <Setter Property="Padding" Value="15"/>
+    <Setter Property="BorderBrush" Value="#3C6782"/>
+    <Setter Property="SnapsToDevicePixels" Value="True"/>
+  </Style>
+
+  <!-- R5/P4.2: opt-in cinematic Library surfaces. Shared R5 tokens stay intact. -->
+  <Style x:Key="R5LibraryHeroPanel" TargetType="Border" BasedOn="{StaticResource R5GlassHeroPanel}">
+    <Setter Property="Background">
+      <Setter.Value>
+        <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
+          <GradientStop Color="#F50A1521" Offset="0"/>
+          <GradientStop Color="#E4112539" Offset=".60"/>
+          <GradientStop Color="#E0091A2B" Offset="1"/>
+        </LinearGradientBrush>
+      </Setter.Value>
+    </Setter>
+    <Setter Property="BorderBrush" Value="#3C6683"/>
+  </Style>
+  <Style x:Key="R5LibraryFolderPanel" TargetType="Border" BasedOn="{StaticResource R5GlassWorkspacePanel}">
+    <Setter Property="Padding" Value="14"/>
+    <Setter Property="Background" Value="#E3101E2D"/>
+  </Style>
+  <Style x:Key="R5LibraryToolbar" TargetType="Border" BasedOn="{StaticResource R23Toolbar}">
+    <Setter Property="Background" Value="#E60B1826"/>
+    <Setter Property="BorderBrush" Value="#31516A"/>
+    <Setter Property="Padding" Value="9"/>
+    <Setter Property="CornerRadius" Value="12"/>
+  </Style>
+  <Style x:Key="R5LibraryStage" TargetType="Border" BasedOn="{StaticResource R5GlassHomePanel}">
+    <Setter Property="Background" Value="#EA0B1827"/>
+    <Setter Property="BorderBrush" Value="#355371"/>
+    <Setter Property="Padding" Value="13"/>
+    <Setter Property="SnapsToDevicePixels" Value="True"/>
+  </Style>
+  <Style x:Key="R5LibraryStatus" TargetType="Border" BasedOn="{StaticResource R24InsetPanel}">
+    <Setter Property="Background" Value="#C60B1826"/>
+    <Setter Property="BorderBrush" Value="#2B485F"/>
+    <Setter Property="CornerRadius" Value="11"/>
+    <Setter Property="Padding" Value="10,7"/>
+  </Style>
+
+
+  <!-- R5/P4.3: opt-in Playlist surfaces, consistent with cinematic Home/Explore/Library. -->
+  <Style x:Key="R5PlaylistHero" TargetType="Border" BasedOn="{StaticResource R5GlassHeroPanel}">
+    <Setter Property="Background">
+      <Setter.Value>
+        <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
+          <GradientStop Color="#F407111D" Offset="0"/>
+          <GradientStop Color="#E511263A" Offset=".61"/>
+          <GradientStop Color="#D70B1C2E" Offset="1"/>
+        </LinearGradientBrush>
+      </Setter.Value>
+    </Setter>
+    <Setter Property="BorderBrush" Value="#385E78"/>
+  </Style>
+  <Style x:Key="R5PlaylistWorkspace" TargetType="Border" BasedOn="{StaticResource R5GlassHomePanel}">
+    <Setter Property="Padding" Value="15"/>
+    <Setter Property="Background" Value="#EE0A1725"/>
+    <Setter Property="BorderBrush" Value="#34546C"/>
+    <Setter Property="SnapsToDevicePixels" Value="True"/>
+  </Style>
+  <Style x:Key="R5PlaylistCloud" TargetType="Border" BasedOn="{StaticResource R24InsetPanel}">
+    <Setter Property="Background" Value="#C8112639"/>
+    <Setter Property="BorderBrush" Value="#38607D"/>
+    <Setter Property="CornerRadius" Value="11"/>
+    <Setter Property="Padding" Value="13,11"/>
+  </Style>
+  <Style x:Key="R5PlaylistActions" TargetType="Border" BasedOn="{StaticResource R24InsetPanel}">
+    <Setter Property="Background" Value="#D0101C2B"/>
+    <Setter Property="BorderBrush" Value="#314C64"/>
+    <Setter Property="Padding" Value="11,9"/>
+    <Setter Property="CornerRadius" Value="11"/>
+  </Style>
+
 </ResourceDictionary>

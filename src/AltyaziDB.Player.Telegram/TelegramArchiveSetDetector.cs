@@ -62,6 +62,8 @@ public static partial class TelegramArchiveSetDetector
             TelegramArchiveFormat.SplitZip => parts.Any(item => !item.IsFinal),
             TelegramArchiveFormat.MultipartRar => parts[0].Scheme == "rar-part" || parts.Count > 1,
             TelegramArchiveFormat.Split7Zip => true,
+            TelegramArchiveFormat.RawSplit => parts.Count > 1,
+            TelegramArchiveFormat.GenericSplit => parts.Count > 1,
             _ => false
         };
     }
@@ -81,6 +83,10 @@ public static partial class TelegramArchiveSetDetector
             TelegramArchiveFormat.SplitZip => contiguous && finalCount == 1,
             TelegramArchiveFormat.MultipartRar => contiguous,
             TelegramArchiveFormat.Split7Zip => contiguous,
+            // Raw concatenated video chunks have no mandatory final marker;
+            // only a continuous sequence of 2+ chunks is stream-eligible.
+            TelegramArchiveFormat.RawSplit => contiguous && uniqueSequences.Length >= 2,
+            TelegramArchiveFormat.GenericSplit => contiguous && uniqueSequences.Length >= 2,
             _ => false
         };
         var ambiguous = duplicateSequence || finalCount > 1;
@@ -144,6 +150,14 @@ public static partial class TelegramArchiveSetDetector
         isFinal = false;
         scheme = string.Empty;
         if (string.IsNullOrWhiteSpace(fileName)) return false;
+        // TDLib may expose a filename with Unicode spacing or invisible
+        // formatting characters. Match the canonical filename, not its
+        // caption, while keeping exact base-name matching between volumes.
+        fileName = string.Concat(fileName.Normalize(System.Text.NormalizationForm.FormKC)
+            .Where(ch => ch is not ('\u200B' or '\u200C' or '\u200D' or '\u200E' or '\u200F' or '\u2060' or '\uFEFF')))
+            .Trim().TrimEnd('.');
+        fileName = Path.GetFileName(fileName);
+        if (string.IsNullOrWhiteSpace(fileName)) return false;
 
         var match = SplitZipPartRegex().Match(fileName);
         if (match.Success && TrySequence(match, "number", -1, out sequence))
@@ -202,6 +216,31 @@ public static partial class TelegramArchiveSetDetector
             return true;
         }
 
+        // Telegram uploader raw splitting, e.g. Resident.Evil.mkv.001/.002.
+        // Unlike .7z.001, these are already container media bytes, not an
+        // archive that must be decompressed.
+        match = RawMediaPartRegex().Match(fileName);
+        if (match.Success && TrySequence(match, "number", -1, out sequence))
+        {
+            format = TelegramArchiveFormat.RawSplit;
+            baseName = match.Groups["base"].Value;
+            scheme = "raw-media";
+            return true;
+        }
+
+        // Some Telegram uploaders split a file into NAME.001/NAME.002 without
+        // keeping a .mkv, .zip or .7z extension before the numeric suffix.
+        // Keep the type neutral: sniff the first bytes before deciding whether
+        // the complete set is a raw video or an archive.
+        match = GenericVolumePartRegex().Match(fileName);
+        if (match.Success && TrySequence(match, "number", -1, out sequence))
+        {
+            format = TelegramArchiveFormat.GenericSplit;
+            baseName = match.Groups["base"].Value;
+            scheme = "generic-numeric";
+            return true;
+        }
+
         return false;
     }
 
@@ -229,6 +268,12 @@ public static partial class TelegramArchiveSetDetector
 
     [GeneratedRegex(@"^(?<base>.+\.7z)\.(?<number>\d{3,})$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex Split7ZipRegex();
+
+    [GeneratedRegex(@"^(?<base>.+\.(?:mkv|mp4|m4v|webm|mov|avi|ts|m2ts|mpg|mpeg|mka|mp3|flac|aac|ac3|eac3|dts|opus|ogg|wav))\.(?<number>\d{3,})$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex RawMediaPartRegex();
+
+    [GeneratedRegex(@"^(?<base>.+)\.(?<number>\d{3,})$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex GenericVolumePartRegex();
 
     private sealed record PartDescriptor(
         TelegramMediaItem Item,

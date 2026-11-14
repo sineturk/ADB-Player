@@ -171,41 +171,120 @@ public sealed class NeonCloudAccountService : ICloudAccountService, IPlayerApiAu
         bool rememberMe = true,
         CancellationToken cancellationToken = default)
     {
-        if (_baseUri is null) return CloudAccountResult.Fail("ADB Cloud henüz yapılandırılmadı.");
+        // The production v0.8 auth bridge accepts either a username or an email.
+        // It resolves usernames server-side; the Windows client never queries
+        // public.adb_profiles or Neon Auth user tables.
+        if (_baseUri is null || _apiBaseUri is null)
+            return CloudAccountResult.Fail("ADB Cloud giriş servisi yapılandırılmadı.");
 
-        var validation = ValidateCredentials(email, password);
-        if (validation is not null) return CloudAccountResult.Fail(validation);
+        var identifier = email?.Trim() ?? string.Empty;
+        if (identifier.Length < 2 || identifier.Length > 254
+            || identifier.Contains('\r') || identifier.Contains('\n'))
+            return CloudAccountResult.Fail("Kullanıcı adı veya e-posta girin.");
+        if (string.IsNullOrWhiteSpace(password) || password.Length < 8)
+            return CloudAccountResult.Fail("Parola en az 8 karakter olmalıdır.");
 
         try
         {
+            // Do not mix a previous user's cookie with a new login.
+            await ClearStoredCookiesAsync(cancellationToken).ConfigureAwait(false);
+
             using var response = await _http.PostAsJsonAsync(
-                new Uri(_baseUri, "sign-in/email"),
-                new
-                {
-                    email = email.Trim(),
-                    password,
-                    rememberMe,
-                    callbackURL = _baseUri.AbsoluteUri
-                },
-                cancellationToken).ConfigureAwait(false);
-
+                    new Uri(_apiBaseUri, "v1/auth/sign-in"),
+                    new { identifier, password, rememberMe },
+                    cancellationToken)
+                .ConfigureAwait(false);
             if (!response.IsSuccessStatusCode)
-                return CloudAccountResult.Fail(await ReadErrorAsync(response, cancellationToken).ConfigureAwait(false));
+            {
+                var error = await ReadErrorAsync(response, cancellationToken).ConfigureAwait(false);
+                return CloudAccountResult.Fail(error switch
+                {
+                    "invalid_credentials" => "Kullanıcı adı/e-posta veya parola hatalı.",
+                    "too_many_requests" => "Çok fazla deneme yapıldı. Daha sonra tekrar deneyin.",
+                    "auth_unavailable" => "Kimlik doğrulama servisine ulaşılamıyor.",
+                    "auth_session_missing" => "Oturum başlatılamadı. Tekrar deneyin.",
+                    _ => "Giriş yapılamadı. Bilgilerinizi kontrol edip tekrar deneyin."
+                });
+            }
 
-            var snapshot = await ParseSnapshotAsync(response, cancellationToken).ConfigureAwait(false)
-                           ?? await RestoreSessionAsync(cancellationToken).ConfigureAwait(false);
+            using var document = await JsonDocument.ParseAsync(
+                    await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false),
+                    cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+            var root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object
+                || (root.TryGetProperty("ok", out var ok) && ok.ValueKind == JsonValueKind.False)
+                || !root.TryGetProperty("authCookieHeader", out var header)
+                || header.ValueKind != JsonValueKind.String
+                || !TryApplyAuthCookieHeader(header.GetString()))
+                return CloudAccountResult.Fail("ADB Cloud oturum çerezi doğrulanamadı.");
 
+            // Verify session against Neon Auth itself before treating the login
+            // as successful. Only a validated session will request artwork JWTs.
+            using var sessionResponse = await _http.GetAsync(
+                    new Uri(_baseUri, "get-session"), cancellationToken)
+                .ConfigureAwait(false);
+            if (!sessionResponse.IsSuccessStatusCode)
+            {
+                await ClearStoredCookiesAsync(cancellationToken).ConfigureAwait(false);
+                return CloudAccountResult.Fail("Giriş yapıldı ancak Neon Auth oturumu doğrulanamadı.");
+            }
+
+            var snapshot = await ParseSnapshotAsync(sessionResponse, cancellationToken)
+                .ConfigureAwait(false);
             if (snapshot is null)
-                return CloudAccountResult.Fail("Oturum açıldı ancak kullanıcı bilgisi alınamadı.");
+            {
+                await ClearStoredCookiesAsync(cancellationToken).ConfigureAwait(false);
+                return CloudAccountResult.Fail("Giriş yapıldı ancak kullanıcı bilgileri alınamadı.");
+            }
 
-            await PersistCookiesAsync(cancellationToken).ConfigureAwait(false);
+            if (rememberMe)
+                await PersistCookiesAsync(cancellationToken).ConfigureAwait(false);
+            else
+                await _secrets.RemoveAsync(CookieSecretKey, cancellationToken).ConfigureAwait(false);
+
             return CloudAccountResult.Ok(snapshot);
         }
-        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException or JsonException)
+        catch (Exception exception) when (exception is HttpRequestException
+            or TaskCanceledException or JsonException or CookieException)
         {
-            _logger.Warning($"ADB Cloud giriş isteği başarısız: {exception.Message}");
-            return CloudAccountResult.Fail("ADB Cloud hizmetine ulaşılamadı.");
+            _logger.Warning($"ADB Cloud kullanıcı adı/e-posta girişi başarısız: {exception.GetType().Name}");
+            return CloudAccountResult.Fail("ADB Cloud giriş servisine ulaşılamadı.");
         }
+    }
+
+    // Install only the opaque Better/Neon Auth session cookie supplied by our
+    // HTTPS API bridge. Never accept arbitrary cookie headers or extra domains.
+    private bool TryApplyAuthCookieHeader(string? header)
+    {
+        if (_baseUri is null || string.IsNullOrWhiteSpace(header))
+            return false;
+
+        var count = 0;
+        foreach (var part in header.Split(';', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var entry = part.Trim();
+            var split = entry.IndexOf('=');
+            if (split <= 0 || split >= entry.Length - 1)
+                continue;
+
+            var name = entry[..split].Trim();
+            var value = entry[(split + 1)..].Trim();
+            if (!name.EndsWith(".session_token", StringComparison.OrdinalIgnoreCase)
+                || (!name.Contains("neon-auth", StringComparison.OrdinalIgnoreCase)
+                    && !name.Contains("better-auth", StringComparison.OrdinalIgnoreCase))
+                || value.Length > 8192)
+                continue;
+
+            _cookies.Add(_baseUri, new Cookie(name, value, "/", _baseUri.Host)
+            {
+                HttpOnly = true,
+                Secure = true
+            });
+            count++;
+        }
+
+        return count > 0;
     }
 
     public async Task SignOutAsync(CancellationToken cancellationToken = default)

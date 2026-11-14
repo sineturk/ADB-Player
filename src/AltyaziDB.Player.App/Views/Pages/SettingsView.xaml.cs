@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using UserControl = System.Windows.Controls.UserControl;
 using AltyaziDB.Player.App.ViewModels;
+using WinForms = System.Windows.Forms;
 
 namespace AltyaziDB.Player.App.Views.Pages;
 
@@ -19,6 +20,11 @@ public partial class SettingsView : UserControl
     private void SettingsView_OnLoaded(object sender, RoutedEventArgs e)
     {
         AttachSettings((DataContext as MainViewModel)?.ApiSettings);
+        if (DataContext is MainViewModel viewModel)
+        {
+            _ = viewModel.Telegram.RefreshCacheUsageAsync();
+            _ = viewModel.CloudCache.RefreshUsageAsync();
+        }
     }
 
     private void SettingsView_OnUnloaded(object sender, RoutedEventArgs e)
@@ -94,6 +100,65 @@ public partial class SettingsView : UserControl
         {
             box.Password = value;
         }
+    }
+
+    private void ChooseTorrentDownloadDirectory_Click(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel viewModel) return;
+
+        using var dialog = new WinForms.FolderBrowserDialog
+        {
+            Description = AltyaziDB.Player.App.Localization.LocalizationManager.Get("Settings.TorrentStorage.Choose"),
+            UseDescriptionForTitle = true,
+            ShowNewFolderButton = true,
+            SelectedPath = viewModel.TorrentDownloadDirectory
+        };
+        if (dialog.ShowDialog() == WinForms.DialogResult.OK)
+            viewModel.SetTorrentDownloadDirectory(dialog.SelectedPath);
+    }
+
+    private void ResetTorrentDownloadDirectory_Click(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is MainViewModel viewModel)
+            viewModel.RestoreTorrentDownloadDirectory();
+    }
+
+    private async void ChooseTelegramCacheDirectory_Click(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel viewModel) return;
+        using var dialog = new WinForms.FolderBrowserDialog
+        {
+            Description = AltyaziDB.Player.App.Localization.LocalizationManager.Get("Settings.TelegramCache.Choose"),
+            UseDescriptionForTitle = true,
+            ShowNewFolderButton = true
+        };
+        if (dialog.ShowDialog() == WinForms.DialogResult.OK)
+            await viewModel.Telegram.SetCacheDirectoryAsync(dialog.SelectedPath);
+    }
+
+    private async void ResetTelegramCacheDirectory_Click(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is MainViewModel viewModel)
+            await viewModel.Telegram.RestoreDefaultCacheDirectoryAsync();
+    }
+
+    private async void ChooseCloudCacheDirectory_Click(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel viewModel) return;
+        using var dialog = new WinForms.FolderBrowserDialog
+        {
+            Description = AltyaziDB.Player.App.Localization.LocalizationManager.Get("Settings.CloudCache.Choose"),
+            UseDescriptionForTitle = true,
+            ShowNewFolderButton = true
+        };
+        if (dialog.ShowDialog() == WinForms.DialogResult.OK)
+            await viewModel.CloudCache.SetDirectoryAsync(dialog.SelectedPath);
+    }
+
+    private async void ResetCloudCacheDirectory_Click(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is MainViewModel viewModel)
+            await viewModel.CloudCache.ResetDirectoryAsync();
     }
 
     private void TelegramApiHashBox_OnPasswordChanged(object sender, RoutedEventArgs e)

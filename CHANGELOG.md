@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.0.2
+
+Windows feature update. Candidate binaries are validated separately before public release.
+
+### Added and improved
+
+- Cinematic Media Hub with refreshed Home, Discover, Library, Lists and Sources.
+- Telegram Desktop-style folder, chat and media browsing, plus Telegram Hub for history, favorites and unfinished plays.
+- Telegram ZIP/7z multipart archive handling and direct Range seeks for eligible 7z Store entries.
+- Combined local, HTTP/HTTPS and account-scoped Telegram "Continue Watching" on Home, without requiring ADB Cloud login.
+- Standalone audio file playback (including MP3, FLAC and WAV), album-art/logo fallback and minimal audio-only cinematic surface.
+- Cleaner player controls, translation coverage, connection flows and torrent/qBittorrent handoff presentation.
+
+### Validation
+
+- Native Windows playback, account-switch privacy, large multipart seeks, bundled native dependencies, installer/portable upgrades and public-source gate must be checked on the final candidate before stable publication.
+- See `RELEASE_NOTES_v1.0.2.md` for the complete acceptance requirements.
+
+
 ## 1.0.1
 
 Focused Windows hotfix.

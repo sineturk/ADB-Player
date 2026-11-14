@@ -34,7 +34,7 @@ internal sealed class SplitArchiveVolumeMap
         TelegramArchiveFormat format,
         CancellationToken cancellationToken)
     {
-        if (format == TelegramArchiveFormat.Split7Zip)
+        if (format is TelegramArchiveFormat.Split7Zip or TelegramArchiveFormat.GenericSplit)
         {
             return
             [
@@ -134,10 +134,32 @@ internal static class SplitZipArchiveReader
     private const uint LocalFileHeaderSignature = 0x04034B50;
     private const int MaximumCentralDirectoryBytes = 64 * 1024 * 1024;
 
-    public static async Task<TelegramArchiveInspection> InspectAsync(
+    // Preserve the legacy multipart-ZIP entry point used by WinRAR .z01/.zip.
+    public static Task<TelegramArchiveInspection> InspectAsync(
         SplitArchiveVolumeMap archive,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken) =>
+        InspectCoreAsync(archive, cancellationToken, concatenatedParts: false);
+
+    // A .zip file cut into arbitrary NAME.001/.002 chunks is *not* a
+    // multi-disk ZIP: its central-directory disk offsets remain disk 0.
+    public static Task<TelegramArchiveInspection> InspectConcatenatedAsync(
+        SplitArchiveVolumeMap archive,
+        CancellationToken cancellationToken) =>
+        InspectCoreAsync(archive, cancellationToken, concatenatedParts: true);
+
+    private static async Task<TelegramArchiveInspection> InspectCoreAsync(
+        SplitArchiveVolumeMap archive,
+        CancellationToken cancellationToken,
+        bool concatenatedParts)
     {
+        long ResolveDiskOffset(int disk, long offset)
+        {
+            if (!concatenatedParts) return archive.ToGlobalOffset(disk, offset);
+            if (disk != 0 || offset < 0 || offset > archive.Length)
+                throw new InvalidDataException("Birleştirilmiş ZIP disk/ofset bilgisi geçersiz.");
+            return offset;
+        }
+
         var tailSize = (int)Math.Min(archive.Length, 128 * 1024L);
         var tailOffset = archive.Length - tailSize;
         var tail = await archive.ReadExactAsync(tailOffset, tailSize, cancellationToken).ConfigureAwait(false);
@@ -156,7 +178,7 @@ internal static class SplitZipArchiveReader
         if (diskNumber == ushort.MaxValue || directoryDisk == ushort.MaxValue || entryCount == ushort.MaxValue ||
             directorySize == uint.MaxValue || directoryOffset == uint.MaxValue)
         {
-            var zip64 = await ReadZip64DirectoryInfoAsync(archive, eocdGlobalOffset, tail, eocdIndex, cancellationToken)
+            var zip64 = await ReadZip64DirectoryInfoAsync(archive, eocdGlobalOffset, tail, eocdIndex, cancellationToken, concatenatedParts)
                 .ConfigureAwait(false);
             diskNumber = zip64.DiskNumber;
             directoryDisk = zip64.DirectoryDisk;
@@ -165,18 +187,21 @@ internal static class SplitZipArchiveReader
             directoryOffset = zip64.DirectoryOffset;
         }
 
-        if (diskNumber + 1 != archive.PartCount)
+        if (concatenatedParts ? diskNumber != 0 || directoryDisk != 0 :
+            diskNumber + 1 != archive.PartCount)
             return new TelegramArchiveInspection(
                 TelegramArchiveFormat.SplitZip,
                 [],
                 false,
-                $"Arşiv {diskNumber + 1} parça bekliyor, Telegram'da {archive.PartCount} parça bulundu.");
+                concatenatedParts
+                    ? "Birleştirilmiş ZIP tek diskli değil; gerçek .z01/.zip parçaları gerekebilir."
+                    : $"Arşiv {diskNumber + 1} parça bekliyor, Telegram'da {archive.PartCount} parça bulundu.");
         if (directorySize <= 0 || directorySize > MaximumCentralDirectoryBytes)
             throw new InvalidDataException("ZIP merkezi dizini desteklenen sınırın dışında.");
         if (entryCount < 0 || entryCount > 200_000)
             throw new InvalidDataException("ZIP dosya sayısı desteklenen sınırın dışında.");
 
-        var directoryGlobalOffset = archive.ToGlobalOffset(directoryDisk, directoryOffset);
+        var directoryGlobalOffset = ResolveDiskOffset(directoryDisk, directoryOffset);
         var directory = await archive.ReadExactAsync(directoryGlobalOffset, checked((int)directorySize), cancellationToken)
             .ConfigureAwait(false);
         var entries = new List<TelegramArchiveEntry>();
@@ -203,7 +228,7 @@ internal static class SplitZipArchiveReader
             ReadZip64Extra(extra, ref uncompressedSize, ref compressedSize, ref localOffset, ref startDisk);
             if (startDisk > int.MaxValue) throw new InvalidDataException("ZIP disk numarası desteklenmiyor.");
 
-            var localGlobalOffset = archive.ToGlobalOffset((int)startDisk, localOffset);
+            var localGlobalOffset = ResolveDiskOffset((int)startDisk, localOffset);
             var localHeader = await archive.ReadExactAsync(localGlobalOffset, 30, cancellationToken).ConfigureAwait(false);
             if (ReadUInt32(localHeader, 0) != LocalFileHeaderSignature)
                 throw new InvalidDataException($"ZIP yerel dosya başlığı bulunamadı: {name}");
@@ -240,7 +265,8 @@ internal static class SplitZipArchiveReader
         long eocdGlobalOffset,
         byte[] tail,
         int eocdIndex,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool concatenatedParts)
     {
         var locatorIndex = eocdIndex - 20;
         if (locatorIndex < 0 || ReadUInt32(tail, locatorIndex) != Zip64LocatorSignature)
@@ -251,7 +277,11 @@ internal static class SplitZipArchiveReader
         var locator = tail.AsSpan(locatorIndex, 20);
         var zip64Disk = checked((int)ReadUInt32(locator, 4));
         var zip64Offset = checked((long)ReadUInt64(locator, 8));
-        var zip64GlobalOffset = archive.ToGlobalOffset(zip64Disk, zip64Offset);
+        var zip64GlobalOffset = concatenatedParts
+            ? zip64Disk == 0 && zip64Offset >= 0 && zip64Offset <= archive.Length
+                ? zip64Offset
+                : throw new InvalidDataException("Birleştirilmiş ZIP64 disk/ofset bilgisi geçersiz.")
+            : archive.ToGlobalOffset(zip64Disk, zip64Offset);
         if (zip64GlobalOffset >= eocdGlobalOffset) throw new InvalidDataException("ZIP64 son dizin konumu geçersiz.");
         var header = await archive.ReadExactAsync(zip64GlobalOffset, 56, cancellationToken).ConfigureAwait(false);
         if (ReadUInt32(header, 0) != Zip64EndOfCentralDirectorySignature)
@@ -313,7 +343,8 @@ internal static class SplitZipArchiveReader
         return new[]
         {
             ".mkv", ".mp4", ".m4v", ".webm", ".mov", ".avi", ".ts", ".m2ts", ".mpg", ".mpeg",
-            ".mka", ".mp3", ".flac", ".aac", ".ac3", ".eac3", ".dts", ".opus", ".ogg"
+            ".mka", ".mp3", ".flac", ".aac", ".ac3", ".eac3", ".dts", ".dtshd", ".thd", ".truehd", ".m4a", ".opus", ".ogg", ".wav",
+            ".srt", ".ass", ".ssa", ".vtt", ".sub", ".idx", ".sup"
         }.Contains(extension, StringComparer.OrdinalIgnoreCase);
     }
 

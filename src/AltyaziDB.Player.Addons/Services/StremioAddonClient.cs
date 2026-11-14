@@ -269,6 +269,9 @@ internal sealed partial class StremioAddonClient : IDisposable
             var infoHash = NormalizeInfoHash(GetString(stream, "infoHash"));
             var fileIndex = GetInteger(stream, "fileIdx");
             var fileName = TryGetNestedString(stream, "behaviorHints", "filename");
+            // Stremio stream.sources carries optional tracker hints for infoHash
+            // streams. Without these, a synthesized magnet depends on DHT only.
+            var trackerUrls = ReadTrackerSources(stream, allowLocalHttp);
 
             var kind = DetermineStreamKind(url, infoHash);
             if (kind is null)
@@ -285,7 +288,10 @@ internal sealed partial class StremioAddonClient : IDisposable
             var combined = $"{name} {title} {fileName}";
             var quality = ParseQuality(combined);
             var seeders = ParseSeeders(combined);
-            var size = ParseSize(combined);
+            // Prefer the structured byte count when the add-on supplies it.
+            // Many Stremio streams expose only a human-readable size in title;
+            // retain that safe fallback without fabricating unknown sizes.
+            var size = ReadStreamSizeBytes(stream) ?? ParseSize(combined);
             var key = infoHash is not null
                 ? $"hash:{infoHash.ToLowerInvariant()}:{fileIndex?.ToString(CultureInfo.InvariantCulture) ?? "-"}"
                 : $"url:{url}";
@@ -303,7 +309,8 @@ internal sealed partial class StremioAddonClient : IDisposable
                 fileName,
                 quality,
                 seeders,
-                size));
+                size,
+                trackerUrls));
         }
 
         return results;
@@ -630,6 +637,40 @@ internal sealed partial class StremioAddonClient : IDisposable
     private static bool IsSupportedType(string type) =>
         type is "movie" or "series" or "tv" or "anime";
 
+    private static IReadOnlyList<string> ReadTrackerSources(JsonElement stream, bool allowLocalHttp)
+    {
+        if (!stream.TryGetProperty("sources", out var sources) ||
+            sources.ValueKind != JsonValueKind.Array)
+            return Array.Empty<string>();
+
+        // Do not trust arbitrary addon-provided transport addresses. Exclude
+        // local network targets by default and do not log tracker URLs because
+        // private-tracker passkeys may be embedded in their paths.
+        var output = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var source in sources.EnumerateArray())
+        {
+            if (source.ValueKind != JsonValueKind.String) continue;
+            var entry = source.GetString();
+            if (string.IsNullOrWhiteSpace(entry) ||
+                !entry.StartsWith("tracker:", StringComparison.OrdinalIgnoreCase))
+                continue;
+            var candidate = entry["tracker:".Length..].Trim();
+            if (candidate.Length is < 8 or > 2048 ||
+                !Uri.TryCreate(candidate, UriKind.Absolute, out var tracker) ||
+                (tracker.Scheme != "udp" && tracker.Scheme != "http" &&
+                 tracker.Scheme != "https") ||
+                string.IsNullOrWhiteSpace(tracker.Host) ||
+                !string.IsNullOrWhiteSpace(tracker.UserInfo) ||
+                (!allowLocalHttp && IsLocalNetworkHost(tracker)))
+                continue;
+            if (seen.Add(tracker.AbsoluteUri))
+                output.Add(tracker.AbsoluteUri);
+            if (output.Count >= 24) break;
+        }
+        return output;
+    }
+
     private static CatalogStreamKind? DetermineStreamKind(string? url, string? infoHash)
     {
         if (!string.IsNullOrWhiteSpace(infoHash))
@@ -737,6 +778,39 @@ internal sealed partial class StremioAddonClient : IDisposable
     {
         var match = SeedersRegex().Match(value);
         return match.Success && int.TryParse(match.Groups[1].Value, out var seeders) ? seeders : null;
+    }
+
+    private static long? ReadStreamSizeBytes(JsonElement stream)
+    {
+        if (stream.TryGetProperty("behaviorHints", out var hints) &&
+            hints.ValueKind == JsonValueKind.Object &&
+            hints.TryGetProperty("videoSize", out var videoSize))
+        {
+            var size = ParseSizeValue(videoSize);
+            if (size is > 0) return size;
+        }
+
+        return stream.TryGetProperty("size", out var topLevelSize)
+            ? ParseSizeValue(topLevelSize)
+            : null;
+    }
+
+    private static long? ParseSizeValue(JsonElement value)
+    {
+        if (value.ValueKind == JsonValueKind.Number &&
+            value.TryGetInt64(out var bytes) && bytes > 0)
+            return bytes;
+
+        if (value.ValueKind != JsonValueKind.String)
+            return null;
+
+        var text = value.GetString()?.Trim();
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        if (long.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out bytes) &&
+            bytes > 0)
+            return bytes;
+
+        return ParseSize(text);
     }
 
     private static long? ParseSize(string value)

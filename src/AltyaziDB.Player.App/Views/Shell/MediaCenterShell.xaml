@@ -24,15 +24,23 @@
       <ColumnDefinition x:Name="NavigationColumn" Width="218"/>
       <ColumnDefinition Width="*"/>
     </Grid.ColumnDefinitions>
-    <Border Grid.Column="0" Background="{StaticResource R23SidebarBrush}"
+    <!-- Span both columns so the hover rail can paint beyond the reserved
+         64px compact column without the Grid clipping labels at its edge. -->
+    <Border x:Name="NavigationRail" Grid.Column="0" Grid.ColumnSpan="2" Panel.ZIndex="20"
+            Width="218" HorizontalAlignment="Left"
+            MouseEnter="NavigationRail_OnMouseEnter"
+            MouseLeave="NavigationRail_OnMouseLeave"
+            Background="{StaticResource R23SidebarBrush}"
             BorderBrush="{StaticResource R23StrokeBrush}" BorderThickness="0,0,1,0">
       <DockPanel LastChildFill="True">
-        <StackPanel DockPanel.Dock="Top" Margin="16,14,14,12">
-          <!-- Canonical ADB Player brand asset; tuned for the compact premium shell. -->
-          <Image Source="/ADB.Player;component/Assets/logo.png"
+        <StackPanel x:Name="NavigationBrandPanel" DockPanel.Dock="Top" Margin="16,14,14,12">
+          <Image x:Name="NavigationFullLogo" Source="/ADB.Player;component/Assets/logo.png"
                  Height="62" MaxWidth="180" Stretch="Uniform"
                  HorizontalAlignment="Left"
                  AutomationProperties.Name="ADB Player"/>
+          <Image x:Name="NavigationCompactLogo" Source="/ADB.Player;component/Assets/app_icon.png"
+                 Width="40" Height="40" Stretch="Uniform" Visibility="Collapsed"
+                 HorizontalAlignment="Left" AutomationProperties.Name="ADB Player"/>
         </StackPanel>
         <ScrollViewer VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled"
@@ -56,6 +64,9 @@
             <Border Style="{StaticResource R23Divider}"/>
             <Button x:Name="NavTelegram" Tag="5" Click="Navigate_Click" Style="{StaticResource R23NavButton}" AutomationProperties.Name="Telegram">
               <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE122;" FontFamily="Segoe MDL2 Assets" FontSize="18" Width="33"/><TextBlock Text="{DynamicResource Tab.Telegram}" VerticalAlignment="Center"/></StackPanel>
+            </Button>
+            <Button x:Name="NavTelegramHub" Tag="13" Click="Navigate_Click" Style="{StaticResource R23NavButton}" AutomationProperties.Name="{DynamicResource Telegram.Hub.PageTitle}">
+              <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE80F;" FontFamily="Segoe MDL2 Assets" FontSize="18" Width="33"/><TextBlock Text="{DynamicResource Telegram.Hub.PageTitle}" VerticalAlignment="Center"/></StackPanel>
             </Button>
             <Button x:Name="NavConnections" Tag="6" Click="Navigate_Click" Style="{StaticResource R23NavButton}" AutomationProperties.Name="Connections">
               <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE71B;" FontFamily="Segoe MDL2 Assets" FontSize="18" Width="33"/><TextBlock Text="{DynamicResource Tab.Connections}" VerticalAlignment="Center"/></StackPanel>
@@ -112,6 +123,15 @@
               BorderBrush="{StaticResource R23StrokeBrush}" BorderThickness="0,0,0,1"
               Padding="14,0">
         <DockPanel LastChildFill="False">
+          <Button x:Name="NavigationToggle" DockPanel.Dock="Left"
+                  Width="36" Height="36" Margin="0,0,8,0"
+                  Style="{StaticResource R23ToolbarButton}"
+                  Click="NavigationToggle_Click"
+                  ToolTip="Gezinme menüsünü aç/kapat"
+                  AutomationProperties.Name="Toggle navigation">
+            <TextBlock Text="&#xE700;" FontFamily="Segoe MDL2 Assets"
+                       FontSize="19" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Button>
           <!-- R2.4: attached utility toolbar. Related commands read as one calm surface. -->
           <Border DockPanel.Dock="Right" Style="{StaticResource R23Toolbar}" VerticalAlignment="Center">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
@@ -144,6 +164,7 @@
         <pages:PlaylistView x:Name="PlaylistPage" Visibility="Collapsed"/>
         <pages:HistoryView x:Name="HistoryPage" Visibility="Collapsed"/>
         <pages:TelegramView x:Name="TelegramPage" Visibility="Collapsed"/>
+        <pages:TelegramHubView x:Name="TelegramHubPage" Visibility="Collapsed"/>
         <pages:ConnectionsView x:Name="ConnectionsPage" Visibility="Collapsed"/>
         <pages:AddonsView x:Name="AddonsPage" Visibility="Collapsed"/>
         <pages:TorrentView x:Name="TorrentPage" Visibility="Collapsed"/>

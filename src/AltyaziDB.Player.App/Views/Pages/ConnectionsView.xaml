@@ -126,10 +126,20 @@
         </Grid>
       </Border>
 
-      <!-- Editor: one clean vertical form with section separators instead of nested cards. -->
-      <Border Grid.Column="2" Style="{StaticResource R24WorkspacePanel}" Padding="14">
+      <!-- P4.8: focus the connection form until a saved profile exists. -->
+      <Border Grid.Column="2" Padding="16">
+        <Border.Style>
+          <Style TargetType="Border" BasedOn="{StaticResource R24WorkspacePanel}">
+            <Style.Triggers>
+              <DataTrigger Binding="{Binding HasProfiles}" Value="False">
+                <Setter Property="Grid.ColumnSpan" Value="3"/>
+              </DataTrigger>
+            </Style.Triggers>
+          </Style>
+        </Border.Style>
         <ScrollViewer VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled"
+                      HorizontalAlignment="Stretch" MaxWidth="720"
                       PanningMode="VerticalOnly">
           <StackPanel>
             <Grid Margin="0,0,0,14">
@@ -158,18 +168,29 @@
               </Border>
             </Grid>
 
-            <TextBlock Text="{DynamicResource R24.Connections.Section.Basic}"
-                       FontWeight="SemiBold" Foreground="{StaticResource R23CyanBrush}"
-                       FontSize="12" Margin="0,0,0,9"/>
-
-            <TextBlock Text="{DynamicResource Connections.Field.Name}" Style="{StaticResource R23SecondaryText}"/>
-            <TextBox Text="{Binding ConnectionName, UpdateSourceTrigger=PropertyChanged}"
-                     MinHeight="41" Margin="0,4,0,10"/>
+            <Border Background="#102A3D" BorderBrush="#275671" BorderThickness="1"
+                    CornerRadius="10" Padding="13" Margin="0,0,0,14">
+              <StackPanel>
+                <TextBlock Text="{DynamicResource Connections.Setup.IntroTitle}"
+                           FontWeight="SemiBold" FontSize="15" Foreground="#ECF8FF"/>
+                <TextBlock Text="{DynamicResource Connections.Setup.IntroHelp}"
+                           Margin="0,6,0,0" TextWrapping="Wrap" Foreground="#A8C9DC"/>
+              </StackPanel>
+            </Border>
 
             <TextBlock Text="{DynamicResource Connections.Field.Type}" Style="{StaticResource R23SecondaryText}"/>
             <ComboBox ItemsSource="{Binding ConnectionTypes}"
                       SelectedItem="{Binding SelectedConnectionType, Mode=TwoWay}"
-                      MinHeight="41" Margin="0,4,0,2"/>
+                      MinHeight="42" Margin="0,4,0,12"
+                      AutomationProperties.Name="{DynamicResource Connections.Field.Type}"/>
+
+            <TextBlock Text="{DynamicResource Connections.Field.Name}" Style="{StaticResource R23SecondaryText}"/>
+            <TextBox Text="{Binding ConnectionName, UpdateSourceTrigger=PropertyChanged}"
+                     MinHeight="42" Margin="0,4,0,3"
+                     AutomationProperties.Name="{DynamicResource Connections.Field.Name}"/>
+            <TextBlock Text="{DynamicResource Connections.Setup.NameHint}"
+                       Style="{StaticResource R23SecondaryText}" TextWrapping="Wrap"
+                       Margin="0,0,0,8"/>
 
             <Border Style="{StaticResource R24SectionRule}"/>
 
@@ -177,17 +198,18 @@
                        FontWeight="SemiBold" Foreground="{StaticResource R23CyanBrush}"
                        FontSize="12" Margin="0,0,0,9"/>
 
-            <TextBlock Text="{Binding ConnectionGuideTitle}"
-                       FontWeight="SemiBold" Foreground="{StaticResource R23TextBrush}"/>
-            <TextBlock Text="{Binding ConnectionGuideText}"
-                       Style="{StaticResource R23SecondaryText}" Margin="0,5,0,0"/>
-            <TextBlock Text="{Binding ConnectionCredentialsText}"
-                       Foreground="{StaticResource R23MutedBrush}"
-                       FontSize="12" TextWrapping="Wrap" Margin="0,5,0,0"/>
+            <TextBlock Text="{DynamicResource Connections.Field.Url}" Style="{StaticResource R23SecondaryText}"/>
+            <TextBox x:Name="ConnectionAddressBox"
+                     Text="{Binding BaseUrl, UpdateSourceTrigger=PropertyChanged}"
+                     ToolTip="{Binding BaseUrlHintText}" MinHeight="44" Margin="0,4,0,4"
+                     AutomationProperties.Name="{DynamicResource Connections.Field.Url}"/>
+            <TextBlock Text="{DynamicResource Connections.Setup.UrlExamples}"
+                       Style="{StaticResource R23SecondaryText}"
+                       TextWrapping="Wrap" Margin="0,0,0,9"/>
 
             <Button Content="{DynamicResource Connections.Prowlarr.UseLocal}"
                     Command="{Binding UseLocalProwlarrCommand}"
-                    HorizontalAlignment="Left" Margin="0,9,0,11">
+                    HorizontalAlignment="Left" Margin="0,0,0,11">
               <Button.Style>
                 <Style TargetType="Button" BasedOn="{StaticResource R23ToolbarButton}">
                   <Setter Property="Visibility" Value="Collapsed"/>
@@ -200,21 +222,84 @@
               </Button.Style>
             </Button>
 
-            <TextBlock Text="{DynamicResource Connections.Field.Url}" Style="{StaticResource R23SecondaryText}"/>
-            <TextBox Text="{Binding BaseUrl, UpdateSourceTrigger=PropertyChanged}"
-                     ToolTip="{Binding BaseUrlHintText}" Margin="0,4,0,10"/>
+            <Border x:Name="ConnectionRemoteHttpWarning" Background="#312317"
+                    BorderBrush="#94703E" BorderThickness="1"
+                    CornerRadius="10" Padding="12" Margin="0,0,0,11">
+              <Border.Style>
+                <Style TargetType="Border">
+                  <Setter Property="Visibility" Value="Collapsed"/>
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsRemoteHttpAddress}" Value="True">
+                      <Setter Property="Visibility" Value="Visible"/>
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </Border.Style>
+              <StackPanel>
+                <TextBlock Text="{DynamicResource Connections.Setup.RemoteHttpTitle}"
+                           FontWeight="SemiBold" Foreground="#FFD398"/>
+                <TextBlock Text="{DynamicResource Connections.Setup.RemoteHttpHelp}"
+                           TextWrapping="Wrap" Foreground="#EAD0AA" Margin="0,5,0,0"/>
+                <TextBlock Text="{DynamicResource Connections.Setup.RemoteHttpSolution}"
+                           TextWrapping="Wrap" Foreground="#EAD0AA" Margin="0,4,0,0"/>
+              </StackPanel>
+            </Border>
 
-            <TextBlock Text="{Binding ApiKeyRequirementText}" Style="{StaticResource R23SecondaryText}"/>
-            <PasswordBox PasswordChanged="ApiKey_OnChanged"
-                         MinHeight="42" Margin="0,4,0,9"
-                         AutomationProperties.Name="Service API key"/>
+            <TextBlock Text="{Binding ApiKeyRequirementText}"
+                       Style="{StaticResource R23SecondaryText}"/>
+            <PasswordBox x:Name="ConnectionApiKeyBox"
+                         PasswordChanged="ApiKey_OnChanged"
+                         MinHeight="44" Margin="0,4,0,5"
+                         AutomationProperties.Name="{DynamicResource Connections.Setup.ApiKeyField}"/>
+            <TextBlock Text="{DynamicResource Connections.Setup.ProwlarrApiKeyHelp}"
+                       TextWrapping="Wrap" Margin="0,0,0,10">
+              <TextBlock.Style>
+                <Style TargetType="TextBlock" BasedOn="{StaticResource R23SecondaryText}">
+                  <Setter Property="Visibility" Value="Collapsed"/>
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsProwlarrSelected}" Value="True">
+                      <Setter Property="Visibility" Value="Visible"/>
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </TextBlock.Style>
+            </TextBlock>
 
             <CheckBox Content="{DynamicResource Connections.Field.AllowLocalHttp}"
                       IsChecked="{Binding AllowLocalHttp, Mode=TwoWay}"
-                      Margin="0,2,0,2"/>
+                      Margin="0,0,0,8">
+              <CheckBox.Style>
+                <Style TargetType="CheckBox">
+                  <Setter Property="Visibility" Value="Collapsed"/>
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsLocalHttpAddress}" Value="True">
+                      <Setter Property="Visibility" Value="Visible"/>
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </CheckBox.Style>
+            </CheckBox>
+
+            <Expander Header="{DynamicResource Connections.Setup.HelpMore}"
+                      IsExpanded="False" Margin="0,5,0,8">
+              <StackPanel Margin="5,9,5,6">
+                <TextBlock Text="{Binding ConnectionGuideTitle}" FontWeight="SemiBold"
+                           TextWrapping="Wrap" Foreground="{StaticResource R23TextBrush}"/>
+                <TextBlock Text="{Binding ConnectionGuideText}"
+                           Style="{StaticResource R23SecondaryText}"
+                           TextWrapping="Wrap" Margin="0,6,0,0"/>
+                <TextBlock Text="{Binding ConnectionCredentialsText}"
+                           Foreground="{StaticResource R23MutedBrush}"
+                           FontSize="12" TextWrapping="Wrap" Margin="0,6,0,0"/>
+              </StackPanel>
+            </Expander>
 
             <Border Style="{StaticResource R24SectionRule}"/>
 
+            <Expander x:Name="ConnectionAdvancedSettings"
+                      Header="{DynamicResource Connections.Setup.Advanced}"
+                      IsExpanded="False" Margin="0,8,0,8">
+              <StackPanel Margin="4,10,4,4">
             <TextBlock Text="{DynamicResource R24.Connections.Section.Categories}"
                        FontWeight="SemiBold" Foreground="{StaticResource R23CyanBrush}"
                        FontSize="12" Margin="0,0,0,9"/>
@@ -251,6 +336,10 @@
             <TextBlock Text="{DynamicResource Connections.Field.ResultLimit}" Style="{StaticResource R23SecondaryText}"/>
             <TextBox Text="{Binding ResultLimit, UpdateSourceTrigger=LostFocus}" Margin="0,3,0,2"/>
 
+
+              </StackPanel>
+            </Expander>
+
             <Border Style="{StaticResource R24SectionRule}"/>
 
             <TextBlock Text="{DynamicResource R24.Connections.Section.Validation}"
@@ -262,22 +351,37 @@
             <CheckBox Content="{DynamicResource Connections.Legal.OwnService}"
                       IsChecked="{Binding UserOwnsServiceConfirmed, Mode=TwoWay}" Margin="0,4,0,10"/>
 
+            <TextBlock Text="{DynamicResource Connections.Setup.SaveHelp}"
+                       Foreground="{StaticResource R23MutedBrush}"
+                       TextWrapping="Wrap" Margin="0,0,0,7"/>
             <Border Style="{StaticResource R24CommandDeck}" HorizontalAlignment="Right">
               <StackPanel Orientation="Horizontal">
                 <Button Style="{StaticResource R23ToolbarButton}"
                         Content="{DynamicResource Connections.Action.Test}"
-                        Command="{Binding TestConnectionCommand}" Margin="0,0,4,0"/>
+                        Command="{Binding TestConnectionCommand}" MinHeight="40" Margin="0,0,7,0"/>
                 <Button Style="{StaticResource R23ToolbarPrimaryButton}"
                         Content="{DynamicResource Connections.Action.Save}"
-                        Command="{Binding SaveConnectionCommand}"/>
+                        Command="{Binding SaveConnectionCommand}" MinHeight="40"/>
               </StackPanel>
             </Border>
+            <TextBlock Text="{Binding StatusText, Converter={StaticResource UserFacingTextConverter}}"
+                       Style="{StaticResource R23SecondaryText}"
+                       TextWrapping="Wrap" Margin="0,9,0,0"/>
           </StackPanel>
         </ScrollViewer>
       </Border>
 
-      <!-- Search workspace: visually separate from connection editing. -->
-      <Border Grid.Column="4" Style="{StaticResource R24WorkspacePanel}" Padding="14">
+      <!-- Release search is shown after first successful connection. -->
+      <Border Grid.Column="4" Padding="14">
+        <Border.Style>
+          <Style TargetType="Border" BasedOn="{StaticResource R24WorkspacePanel}">
+            <Style.Triggers>
+              <DataTrigger Binding="{Binding HasProfiles}" Value="False">
+                <Setter Property="Visibility" Value="Collapsed"/>
+              </DataTrigger>
+            </Style.Triggers>
+          </Style>
+        </Border.Style>
         <Grid>
           <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>

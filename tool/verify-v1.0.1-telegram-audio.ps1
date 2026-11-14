@@ -23,7 +23,7 @@ function Require-Text([string]$content, [string]$needle, [string]$label) {
 $service = Read-Text "src\AltyaziDB.Player.Telegram\TdJsonTelegramService.cs"
 $panel = Read-Text "src\AltyaziDB.Player.App\ViewModels\TelegramPanelViewModel.cs"
 
-Require-Text $service 'else if (IsAudioDocument(name, mime))' "Telegram document ses dosyalari Audio olarak siniflandiriliyor"
+Require-Text $service 'IsAudioDocument(name, mime) ? TelegramMediaKind.Audio' "Telegram document ses dosyalari Audio olarak siniflandiriliyor"
 Require-Text $service '".eac3"' "E-AC-3 Telegram document olarak destekleniyor"
 Require-Text $service '".dts"' "DTS Telegram document olarak destekleniyor"
 Require-Text $service '".truehd"' "TrueHD Telegram document olarak destekleniyor"

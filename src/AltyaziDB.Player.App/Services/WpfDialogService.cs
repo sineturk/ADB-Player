@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using Microsoft.Win32;
 using AltyaziDB.Player.App.Localization;
+using AltyaziDB.Player.Core.Models;
 using AltyaziDB.Player.App.Views;
 using Forms = System.Windows.Forms;
 
@@ -15,8 +16,8 @@ public sealed class WpfDialogService : IUserDialogService
     {
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
-            Title = LocalizationManager.Get("Dialog.VideoPickerTitle"),
-            Filter = $"{LocalizationManager.Get("Dialog.VideoFiles")}|*.mkv;*.mp4;*.avi;*.webm;*.mov;*.m4v;*.ts;*.m2ts;*.mts;*.mpeg;*.mpg;*.wmv;*.flv;*.ogv|{LocalizationManager.Get("Dialog.AllFiles")}|*.*",
+            Title = LocalizationManager.Get("Dialog.MediaPickerTitle"),
+            Filter = $"{LocalizationManager.Get("Dialog.MediaFiles")}|*.mkv;*.mp4;*.avi;*.webm;*.mov;*.m4v;*.ts;*.m2ts;*.mts;*.mpeg;*.mpg;*.wmv;*.flv;*.ogv;*.vob;*.3gp;{LocalAudioFilePolicy.FileDialogPattern}|{LocalizationManager.Get("Dialog.AudioFiles")}|{LocalAudioFilePolicy.FileDialogPattern}|{LocalizationManager.Get("Dialog.AllFiles")}|*.*",
             CheckFileExists = true,
             Multiselect = true,
             RestoreDirectory = true
@@ -39,7 +40,7 @@ public sealed class WpfDialogService : IUserDialogService
 
     public string? PickSubtitle(string? initialDirectory = null) => PickFile(
         LocalizationManager.Get("Dialog.SubtitlePicker"),
-        $"{LocalizationManager.Get("Dialog.SubtitleFiles")}|*.srt;*.ass;*.ssa;*.vtt;*.sub;*.idx;*.sup|{LocalizationManager.Get("Dialog.AllFiles")}|*.*",
+        $"{LocalizationManager.Get("Dialog.SubtitleFiles")}|*.srt;*.ass;*.ssa;*.vtt;*.sub;*.idx;*.sup;*.zip|{LocalizationManager.Get("Dialog.AllFiles")}|*.*",
         initialDirectory);
 
     public string? PickAudio(string? initialDirectory = null) => PickFile(
@@ -123,19 +124,17 @@ public sealed class WpfDialogService : IUserDialogService
         return window.ShowDialog() == true ? result : [];
     }
 
-    public void ShowError(string message, string title = "AltyazıDB Player") => System.Windows.MessageBox.Show(
-        System.Windows.Application.Current.MainWindow,
-        LocalizationManager.ToUserFacingText(message),
-        LocalizationManager.TranslateMessage(title),
-        MessageBoxButton.OK,
-        MessageBoxImage.Error);
+    public void ShowError(string message, string title = "ADB Player") =>
+        AppDialog.ShowError(
+            System.Windows.Application.Current.MainWindow,
+            LocalizationManager.ToUserFacingText(message),
+            LocalizationManager.TranslateMessage(title));
 
-    public bool Confirm(string message, string title = "AltyazıDB Player") => System.Windows.MessageBox.Show(
-        System.Windows.Application.Current.MainWindow,
-        LocalizationManager.TranslateMessage(message),
-        LocalizationManager.TranslateMessage(title),
-        MessageBoxButton.YesNo,
-        MessageBoxImage.Question) == MessageBoxResult.Yes;
+    public bool Confirm(string message, string title = "ADB Player") =>
+        AppDialog.Confirm(
+            System.Windows.Application.Current.MainWindow,
+            LocalizationManager.TranslateMessage(message),
+            LocalizationManager.TranslateMessage(title));
 
     private static string? PickFile(string title, string filter, string? initialDirectory)
     {

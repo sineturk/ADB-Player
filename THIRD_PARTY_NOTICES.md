@@ -24,6 +24,13 @@ Telegram özelliği `tdlib.native.win-x64` 1.8.66 NuGet paketindeki TDLib `tdjso
 
 Torrent akışı `MonoTorrent` 3.0.2 NuGet paketini kullanır. Bileşen MIT lisanslıdır. Yerleşik HTTP Range akışı, oynatıcının beklemeden başlamasını ve seek konumundaki torrent parçalarının önceliklendirilmesini sağlar.
 
+## TagLibSharp2
+
+- Package: `TagLibSharp2` 0.6.0 (managed read-only audio tag parser)
+- License: MIT; bundled copy: `TagLibSharp2-LICENSE.txt` (portable/installer) and `docs/licenses/TagLibSharp2-LICENSE.txt` (source).
+- Usage: Reading optional local track titles, artist/album tags and bounded album artwork. Audio playback itself continues to use libmpv.
+- This component does not fetch remote artwork or transcode media.
+
 ## SharpCompress
 
 Sıkıştırılmış ZIP, RAR ve 7-Zip arşivlerindeki medyayı oynatma sırasında çözmek için `SharpCompress` 0.50.1 kullanılır. Bileşen MIT lisanslıdır.

@@ -4,14 +4,150 @@
              Background="{StaticResource R23AppBrush}"
              Foreground="{StaticResource R23TextBrush}"
              FontFamily="Segoe UI Variable Text, Segoe UI"
-             FontSize="14">
-  <Grid Margin="20,18,22,20">
+             FontSize="14"
+             PreviewKeyDown="TelegramView_OnPreviewKeyDown"
+             Loaded="TelegramView_OnLoaded"
+             SizeChanged="TelegramView_OnSizeChanged">
+  <UserControl.Resources>
+    <!-- Telegram Desktop-inspired compact rows, scoped to this page only. -->
+    <Style x:Key="TelegramChatListItemStyle" TargetType="{x:Type ListBoxItem}">
+      <Setter Property="Padding" Value="7,5"/>
+      <Setter Property="Margin" Value="0,1"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="{x:Type ListBoxItem}">
+            <Grid>
+              <Border x:Name="ChatRow" Background="{TemplateBinding Background}"
+                      CornerRadius="9" Padding="{TemplateBinding Padding}"
+                      BorderThickness="1" BorderBrush="Transparent">
+                <ContentPresenter HorizontalAlignment="Stretch"/>
+              </Border>
+              <Border x:Name="SelectedLine" Width="3" Background="{StaticResource R23CyanBrush}"
+                      HorizontalAlignment="Left" CornerRadius="2" Margin="0,10,0,10"
+                      Visibility="Collapsed"/>
+            </Grid>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="ChatRow" Property="Background" Value="#15293A"/>
+              </Trigger>
+              <Trigger Property="IsSelected" Value="True">
+                <Setter TargetName="ChatRow" Property="Background" Value="#173952"/>
+                <Setter TargetName="SelectedLine" Property="Visibility" Value="Visible"/>
+              </Trigger>
+              <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                <Setter TargetName="ChatRow" Property="BorderBrush" Value="#3D7899"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="TelegramChatFilterChipStyle" TargetType="{x:Type RadioButton}">
+      <Setter Property="Foreground" Value="{StaticResource R23MutedBrush}"/>
+      <Setter Property="FontSize" Value="11.5"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="Margin" Value="0,0,4,5"/>
+      <Setter Property="Padding" Value="9,5"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="{x:Type RadioButton}">
+            <Border x:Name="Chip" Background="#102333" BorderBrush="#274155"
+                    BorderThickness="1" CornerRadius="14" Padding="{TemplateBinding Padding}">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Chip" Property="Background" Value="#1A3348"/>
+              </Trigger>
+              <Trigger Property="IsChecked" Value="True">
+                <Setter TargetName="Chip" Property="Background" Value="#17516A"/>
+                <Setter TargetName="Chip" Property="BorderBrush" Value="#2F92B6"/>
+                <Setter Property="Foreground" Value="#E7F7FF"/>
+              </Trigger>
+              <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                <Setter TargetName="Chip" Property="BorderBrush" Value="#80CDEB"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <!-- The media list uses denser, independent selection styling. -->
+    <Style x:Key="TelegramMediaListItemStyle" TargetType="{x:Type ListBoxItem}">
+      <Setter Property="Padding" Value="8,5"/>
+      <Setter Property="Margin" Value="0,1"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="{x:Type ListBoxItem}">
+            <Border x:Name="MediaRow" Background="{TemplateBinding Background}"
+                    BorderThickness="1" BorderBrush="Transparent"
+                    CornerRadius="8" Padding="{TemplateBinding Padding}">
+              <ContentPresenter HorizontalAlignment="Stretch"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="MediaRow" Property="Background" Value="#142B3D"/>
+              </Trigger>
+              <Trigger Property="IsSelected" Value="True">
+                <Setter TargetName="MediaRow" Property="Background" Value="#19405B"/>
+                <Setter TargetName="MediaRow" Property="BorderBrush" Value="#2C647E"/>
+              </Trigger>
+              <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                <Setter TargetName="MediaRow" Property="BorderBrush" Value="#75C8E7"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <!-- P4: flatter Telegram-only surfaces and compact folder navigation. -->
+    <Style x:Key="TelegramFlatSurfaceStyle" TargetType="{x:Type Border}" BasedOn="{StaticResource R24WorkspacePanel}">
+      <Setter Property="Background" Value="#0F202E"/>
+      <Setter Property="BorderBrush" Value="#22374A"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="CornerRadius" Value="10"/>
+    </Style>
+    <Style x:Key="TelegramFolderListItemStyle" TargetType="{x:Type ListBoxItem}">
+      <Setter Property="Padding" Value="6,4"/>
+      <Setter Property="Margin" Value="0,1"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="{x:Type ListBoxItem}">
+            <Border x:Name="FolderRow" Background="{TemplateBinding Background}"
+                    BorderThickness="1" BorderBrush="Transparent" CornerRadius="7"
+                    Padding="{TemplateBinding Padding}">
+              <ContentPresenter HorizontalAlignment="Stretch"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="FolderRow" Property="Background" Value="#1A3041"/>
+              </Trigger>
+              <Trigger Property="IsSelected" Value="True">
+                <Setter TargetName="FolderRow" Property="Background" Value="#1C455D"/>
+              </Trigger>
+              <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                <Setter TargetName="FolderRow" Property="BorderBrush" Value="#78C7E5"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+  </UserControl.Resources>
+  <Grid Margin="14,14,16,14">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto"/>
       <RowDefinition Height="*"/>
     </Grid.RowDefinitions>
 
-    <Grid Margin="0,0,0,15">
+    <Grid Margin="0,0,0,10">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="*"/>
         <ColumnDefinition Width="Auto"/>
@@ -20,10 +156,16 @@
         <TextBlock Text="{DynamicResource Tab.Telegram}" Style="{StaticResource R23PageHeading}"/>
         <TextBlock Text="{DynamicResource R23.Page.Telegram.Help}" Style="{StaticResource R23SecondaryText}" Margin="0,4,0,0"/>
       </StackPanel>
-      <Border Grid.Column="1" Style="{StaticResource R24StatusPill}" VerticalAlignment="Center">
-        <TextBlock Text="{Binding Telegram.AuthorizationLabel, Converter={StaticResource UserFacingTextConverter}}"
-                   FontSize="11.5" Foreground="{StaticResource R23MutedBrush}"/>
-      </Border>
+      <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+        <Button Style="{StaticResource R23ToolbarButton}"
+                Content="{DynamicResource Telegram.Hub.OpenHub}"
+                Command="{Binding ShowTelegramHubCommand}"
+                Margin="0,0,8,0"/>
+        <Border Style="{StaticResource R24StatusPill}" VerticalAlignment="Center">
+          <TextBlock Text="{Binding Telegram.AuthorizationLabel, Converter={StaticResource UserFacingTextConverter}}"
+                     FontSize="11.5" Foreground="{StaticResource R23MutedBrush}"/>
+        </Border>
+      </StackPanel>
     </Grid>
 
     <Grid Grid.Row="1" DataContext="{Binding Telegram}">
@@ -77,10 +219,15 @@
                 </Style>
               </Grid.Style>
               <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-              <TextBox Text="{Binding PhoneNumber, UpdateSourceTrigger=PropertyChanged}" MinHeight="44"
-                       ToolTip="{DynamicResource Tooltip.Phone}"/>
+              <StackPanel Grid.Column="0">
+                <TextBox Text="{Binding PhoneNumber, UpdateSourceTrigger=PropertyChanged}" MinHeight="44"
+                         ToolTip="{DynamicResource Tooltip.Phone}"/>
+                <TextBlock Text="{DynamicResource R5177.Telegram.PhoneHint}"
+                           Style="{StaticResource R23SecondaryText}" Margin="2,5,0,0"
+                           TextWrapping="Wrap"/>
+              </StackPanel>
               <Button Grid.Column="1" Style="{StaticResource R23PrimaryButton}" Content="{DynamicResource Action.Connect}"
-                      Command="{Binding StartCommand}" Margin="8,0,0,0"/>
+                      Command="{Binding StartCommand}" VerticalAlignment="Top" Margin="8,0,0,0"/>
             </Grid>
 
             <Grid Margin="0,5">
@@ -189,53 +336,84 @@
           </ProgressBar.Style>
         </ProgressBar>
 
-        <Grid Grid.Row="1">
+        <!-- P4: stable responsive columns; only the view changes widths/visibility. -->
+        <Grid x:Name="TelegramWorkspaceGrid" Grid.Row="1">
           <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="190"/>
-            <ColumnDefinition Width="12"/>
-            <ColumnDefinition Width="320"/>
-            <ColumnDefinition Width="12"/>
-            <ColumnDefinition Width="*"/>
+            <ColumnDefinition x:Name="TelegramFolderColumn" Width="176"/>
+            <ColumnDefinition x:Name="TelegramFolderGap" Width="8"/>
+            <ColumnDefinition x:Name="TelegramChatColumn" Width="306"/>
+            <ColumnDefinition x:Name="TelegramMediaGap" Width="8"/>
+            <ColumnDefinition x:Name="TelegramMediaColumn" Width="*"/>
           </Grid.ColumnDefinitions>
 
           <!-- Telegram chat folders -->
-          <Border Grid.Column="0" Style="{StaticResource R24WorkspacePanel}" Padding="12">
+          <Border x:Name="TelegramFolderSurface" Grid.Column="0" Style="{StaticResource TelegramFlatSurfaceStyle}" Padding="9">
             <Grid>
               <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
               </Grid.RowDefinitions>
               <TextBlock Text="{DynamicResource R23.Telegram.Folders}" Style="{StaticResource R23SectionHeading}"/>
-              <ListBox Grid.Row="1" Margin="0,10,0,8"
+              <ListBox Grid.Row="1" Margin="0,7,0,6"
+                       ItemContainerStyle="{StaticResource TelegramFolderListItemStyle}"
                        ItemsSource="{Binding ChatFolders}"
                        SelectedItem="{Binding SelectedFolder, Mode=TwoWay}"
                        ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                 <ListBox.ItemTemplate>
                   <DataTemplate>
-                    <Grid Margin="2,5">
+                    <Grid Margin="2,3">
                       <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="28"/>
                         <ColumnDefinition Width="*"/>
                       </Grid.ColumnDefinitions>
-                      <TextBlock Text="&#xE8B7;" FontFamily="Segoe MDL2 Assets" FontSize="14"
-                                 Foreground="{StaticResource R23CyanBrush}" VerticalAlignment="Center"/>
+                      <!-- Geometry avoids missing/partially rendered Segoe MDL2 folder glyphs. -->
+                      <Path Width="19" Height="17" Stretch="Uniform" HorizontalAlignment="Center"
+                            VerticalAlignment="Center" Stroke="{StaticResource R23CyanBrush}"
+                            StrokeThickness="1.65" StrokeLineJoin="Round" Fill="Transparent"
+                            Data="M1,6 L7,6 9,8 19,8 19,18 1,18 Z M1,6 L1,4 8,4 10,6"/>
                       <TextBlock Grid.Column="1" Text="{Binding Name}" FontWeight="SemiBold"
                                  TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
                     </Grid>
                   </DataTemplate>
                 </ListBox.ItemTemplate>
               </ListBox>
-              <Button Grid.Row="2" Style="{StaticResource R23ToolbarButton}"
+              <Expander Grid.Row="2" IsExpanded="False" Margin="0,4,0,7">
+                <Expander.Header>
+                  <TextBlock Text="{DynamicResource Telegram.Hub.Title}" FontWeight="SemiBold"
+                             Foreground="{StaticResource R23CyanBrush}"/>
+                </Expander.Header>
+                <StackPanel Margin="0,8,0,0">
+                  <TextBlock Text="{Binding FavoritesSummary}" FontSize="11"
+                             Foreground="{StaticResource R23MutedBrush}" Margin="0,0,0,6"/>
+                  <ListBox ItemsSource="{Binding FavoriteChats}" MaxHeight="124"
+                           ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListBox.ItemTemplate>
+                      <DataTemplate>
+                        <Button Click="TelegramFavoriteChat_OnClick"
+                                HorizontalContentAlignment="Stretch"
+                                Style="{StaticResource R23ToolbarButton}"
+                                Margin="0,2,0,2" Padding="6,6">
+                          <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis"
+                                     ToolTip="{Binding Title}"/>
+                        </Button>
+                      </DataTemplate>
+                    </ListBox.ItemTemplate>
+                  </ListBox>
+                </StackPanel>
+              </Expander>
+              <Button Grid.Row="3" Style="{StaticResource R23ToolbarButton}"
                       Content="{DynamicResource Action.Logout}" Command="{Binding LogoutCommand}"
                       HorizontalAlignment="Stretch"/>
             </Grid>
           </Border>
 
           <!-- Chats + forum topics -->
-          <Border Grid.Column="2" Style="{StaticResource R24WorkspacePanel}" Padding="12">
+          <Border x:Name="TelegramChatSurface" Grid.Column="2" Style="{StaticResource TelegramFlatSurfaceStyle}" Padding="10">
             <Grid>
               <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
@@ -246,38 +424,161 @@
                 <Grid.ColumnDefinitions>
                   <ColumnDefinition Width="*"/>
                   <ColumnDefinition Width="Auto"/>
+                  <ColumnDefinition Width="Auto"/>
+                  <ColumnDefinition Width="Auto"/>
+                  <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <TextBlock Text="{DynamicResource R23.Telegram.Chats}" Style="{StaticResource R23SectionHeading}"/>
-                <Button Grid.Column="1" Style="{StaticResource R23ToolbarButton}"
+                <StackPanel VerticalAlignment="Center">
+                  <TextBlock Text="{DynamicResource R23.Telegram.Chats}" Style="{StaticResource R23SectionHeading}"/>
+                  <TextBlock Text="{Binding FilteredChatCountText}" Margin="0,3,0,0"
+                             Foreground="{StaticResource R23MutedBrush}" FontSize="10.5"/>
+                </StackPanel>
+                <!-- Narrow mode: the chat list stays accessible even if the media pane is full-width. -->
+                <Button x:Name="TelegramShowMediaButton" Grid.Column="1"
+                        Content="{DynamicResource Telegram.Responsive.ShowMedia}"
+                        Click="TelegramShowMedia_OnClick" Visibility="Collapsed"
+                        Style="{StaticResource R23ToolbarButton}"
+                        VerticalAlignment="Center" Padding="6,4" FontSize="11"
+                        ToolTip="{DynamicResource Telegram.Responsive.ShowMedia}"/>
+                <!-- Folder picker replaces the hidden sidebar; it binds to the exact same VM state. -->
+                <ComboBox x:Name="TelegramFolderPicker" Grid.Column="2"
+                          ItemsSource="{Binding ChatFolders}" SelectedItem="{Binding SelectedFolder, Mode=TwoWay}"
+                          DisplayMemberPath="Name" MinWidth="95" MaxWidth="125" Height="30"
+                          Margin="4,0" Visibility="Collapsed" VerticalAlignment="Center"
+                          ToolTip="{DynamicResource Telegram.Responsive.PickFolder}"
+                          AutomationProperties.Name="{DynamicResource Telegram.Responsive.PickFolder}"/>
+                <Button Grid.Column="3" Style="{StaticResource R23ToolbarButton}"
                         Content="↻" Command="{Binding LoadChatsCommand}"
-                        ToolTip="{DynamicResource Action.Refresh}"/>
+                        ToolTip="{DynamicResource Action.Refresh}" VerticalAlignment="Center"/>
+                <Menu x:Name="TelegramCompactMenu" Grid.Column="4" Visibility="Collapsed"
+                      VerticalAlignment="Center" Padding="0" Margin="2,0,0,0"
+                      Background="Transparent" BorderThickness="0">
+                  <MenuItem Header="⋯" FontSize="16" Padding="6,3"
+                            ToolTip="{DynamicResource Telegram.Responsive.MoreActions}">
+                    <MenuItem Header="{DynamicResource Action.Logout}"
+                              Command="{Binding LogoutCommand}"/>
+                  </MenuItem>
+                </Menu>
               </Grid>
 
-              <Grid Grid.Row="1" Margin="0,9,0,8">
-                <ListBox ItemsSource="{Binding Chats}" SelectedItem="{Binding SelectedChat, Mode=TwoWay}"
+              <!-- Single search and exclusive, keyboard-accessible filter chips.
+                   Chat list filters are local and never query Telegram history. -->
+              <StackPanel Grid.Row="1" Margin="0,11,0,2">
+                <Grid>
+                  <TextBox x:Name="TelegramChatSearch"
+                           Text="{Binding ChatFilterText, UpdateSourceTrigger=PropertyChanged}"
+                           MinHeight="38" Padding="31,7,30,7"
+                           ToolTip="{DynamicResource Telegram.Hub.FilterHelp}"
+                           AutomationProperties.Name="{DynamicResource Telegram.Hub.Filter}"/>
+                  <TextBlock Text="⌕" FontSize="20" Foreground="{StaticResource R23MutedBrush}"
+                             Margin="10,0,0,0" HorizontalAlignment="Left" VerticalAlignment="Center"
+                             IsHitTestVisible="False"/>
+                  <TextBlock Text="{DynamicResource Telegram.ChatList.SearchPlaceholder}"
+                             Margin="34,0,34,0" Foreground="{StaticResource R23MutedBrush}"
+                             VerticalAlignment="Center" FontSize="11.5" IsHitTestVisible="False">
+                    <TextBlock.Style>
+                      <Style TargetType="TextBlock">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                          <DataTrigger Binding="{Binding ChatFilterText}" Value="">
+                            <Setter Property="Visibility" Value="Visible"/>
+                          </DataTrigger>
+                          <DataTrigger Binding="{Binding IsKeyboardFocusWithin, ElementName=TelegramChatSearch}"
+                                       Value="True">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                          </DataTrigger>
+                        </Style.Triggers>
+                      </Style>
+                    </TextBlock.Style>
+                  </TextBlock>
+                  <Button HorizontalAlignment="Right" VerticalAlignment="Center" Width="26" Height="27"
+                          Margin="0,0,4,0" Content="×" FontSize="16"
+                          Command="{Binding ClearChatFilterCommand}"
+                          ToolTip="{DynamicResource Telegram.ChatList.ClearSearch}"
+                          >
+                    <Button.Style>
+                      <Style TargetType="Button" BasedOn="{StaticResource R23ToolbarButton}">
+                        <Setter Property="Visibility" Value="Visible"/>
+                        <Style.Triggers>
+                          <DataTrigger Binding="{Binding ChatFilterText}" Value="">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                          </DataTrigger>
+                        </Style.Triggers>
+                      </Style>
+                    </Button.Style>
+                  </Button>
+                </Grid>
+                <WrapPanel Margin="0,10,0,0">
+                  <RadioButton Content="{DynamicResource Telegram.ChatList.All}"
+                               GroupName="TelegramChatScope" Style="{StaticResource TelegramChatFilterChipStyle}"
+                               IsChecked="{Binding IsAllFilter, Mode=TwoWay}"/>
+                  <RadioButton Content="{DynamicResource Telegram.ChatList.Starred}"
+                               GroupName="TelegramChatScope" Style="{StaticResource TelegramChatFilterChipStyle}"
+                               IsChecked="{Binding IsStarredFilter, Mode=TwoWay}"/>
+                  <RadioButton Content="{DynamicResource Telegram.ChatList.Channels}"
+                               GroupName="TelegramChatScope" Style="{StaticResource TelegramChatFilterChipStyle}"
+                               IsChecked="{Binding IsChannelsFilter, Mode=TwoWay}"/>
+                  <RadioButton Content="{DynamicResource Telegram.ChatList.Groups}"
+                               GroupName="TelegramChatScope" Style="{StaticResource TelegramChatFilterChipStyle}"
+                               IsChecked="{Binding IsGroupsFilter, Mode=TwoWay}"/>
+                  <RadioButton Content="{DynamicResource Telegram.ChatList.Private}"
+                               GroupName="TelegramChatScope" Style="{StaticResource TelegramChatFilterChipStyle}"
+                               IsChecked="{Binding IsPrivateFilter, Mode=TwoWay}"/>
+                </WrapPanel>
+              </StackPanel>
+
+              <Grid Grid.Row="2" Margin="0,7,0,8">
+                <!-- Selection is OneWay: a chat filtered out of the list must
+                     NOT clear SelectedChat or interrupt the right-hand media pane. -->
+                <ListBox x:Name="TelegramChatList"
+                         ItemsSource="{Binding FilteredChats}"
+                         SelectedItem="{Binding SelectedChat, Mode=OneWay}"
+                         SelectionChanged="TelegramChatList_OnSelectionChanged"
+                         ItemContainerStyle="{StaticResource TelegramChatListItemStyle}"
+                         VirtualizingStackPanel.IsVirtualizing="True"
+                         VirtualizingStackPanel.VirtualizationMode="Recycling"
+                         ScrollViewer.CanContentScroll="True"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                   <ListBox.ItemTemplate>
                     <DataTemplate>
-                      <Grid Margin="2,5">
+                      <Grid Height="46" Margin="0,1">
                         <Grid.ColumnDefinitions>
-                          <ColumnDefinition Width="42"/>
+                          <ColumnDefinition Width="40"/>
                           <ColumnDefinition Width="*"/>
+                          <ColumnDefinition Width="Auto"/>
                           <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <Border Width="34" Height="34" CornerRadius="17"
-                                Background="#13283A" BorderBrush="#28506A" BorderThickness="1"
+                                Background="#163249" BorderBrush="#2B536A" BorderThickness="1"
                                 VerticalAlignment="Center">
-                          <TextBlock Text="{Binding AvatarText}" FontSize="11" FontWeight="SemiBold"
+                          <TextBlock Text="{Binding AvatarText}" FontSize="11.5" FontWeight="SemiBold"
                                      Foreground="{StaticResource R23CyanBrush}"
                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                          <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-                          <TextBlock Text="{DynamicResource Telegram.Chat.Subtitle}" FontSize="10.5"
-                                     Foreground="{StaticResource R23MutedBrush}" TextTrimming="CharacterEllipsis"/>
+                          <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="12.5"
+                                     Foreground="{StaticResource R23TextBrush}"
+                                     TextTrimming="CharacterEllipsis" ToolTip="{Binding Title}"/>
+                          <TextBlock FontSize="10.5" Margin="0,3,0,0"
+                                     Foreground="{StaticResource R23MutedBrush}"
+                                     TextTrimming="CharacterEllipsis">
+                            <TextBlock.Style>
+                              <Style TargetType="TextBlock">
+                                <Setter Property="Text" Value="{DynamicResource Telegram.ChatList.PrivateLabel}"/>
+                                <Style.Triggers>
+                                  <DataTrigger Binding="{Binding IsChannel}" Value="True">
+                                    <Setter Property="Text" Value="{DynamicResource Telegram.ChatList.ChannelLabel}"/>
+                                  </DataTrigger>
+                                  <DataTrigger Binding="{Binding IsGroup}" Value="True">
+                                    <Setter Property="Text" Value="{DynamicResource Telegram.ChatList.GroupLabel}"/>
+                                  </DataTrigger>
+                                </Style.Triggers>
+                              </Style>
+                            </TextBlock.Style>
+                          </TextBlock>
                         </StackPanel>
-                        <Border Grid.Column="2" MinWidth="24" Height="22" CornerRadius="11"
-                                Background="#123247" Margin="6,0,0,0" VerticalAlignment="Center">
+                        <Border Grid.Column="2" MinWidth="22" Height="20" CornerRadius="10"
+                                Background="#18516E" Margin="4,0,0,0" VerticalAlignment="Center">
                           <Border.Style>
                             <Style TargetType="Border">
                               <Setter Property="Visibility" Value="Visible"/>
@@ -288,10 +589,53 @@
                               </Style.Triggers>
                             </Style>
                           </Border.Style>
-                          <TextBlock Text="{Binding UnreadCount}" FontSize="10.5"
-                                     Foreground="{StaticResource R23CyanBrush}"
-                                     HorizontalAlignment="Center" VerticalAlignment="Center" Margin="6,0"/>
+                          <TextBlock Text="{Binding UnreadBadgeText}" FontSize="10" FontWeight="SemiBold"
+                                     Foreground="#E5F8FF"
+                                     HorizontalAlignment="Center" VerticalAlignment="Center" Margin="5,0"/>
                         </Border>
+                        <!-- Dedicated and always-visible favorite action; independent of chat row selection. -->
+                        <Button Grid.Column="3" Width="32" Height="32"
+                                Click="TelegramFavoriteToggle_OnClick"
+                                ToolTipService.InitialShowDelay="500"
+                                Margin="7,0,0,0" VerticalAlignment="Center">
+                          <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource R23ToolbarButton}">
+                              <!-- R23Button's inherited 11,6 padding clips a 20x20 Path inside 34x34.
+                                   A zero inset leaves the vector star fully visible at every DPI. -->
+                              <Setter Property="Padding" Value="0"/>
+                              <Setter Property="Background" Value="#173144"/>
+                              <Setter Property="BorderBrush" Value="#36586E"/>
+                              <Setter Property="BorderThickness" Value="1"/>
+                              <Setter Property="ToolTip" Value="{DynamicResource Telegram.ChatList.FavoriteAdd}"/>
+                              <Setter Property="AutomationProperties.Name" Value="{DynamicResource Telegram.ChatList.FavoriteAdd}"/>
+                              <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsFavorite}" Value="True">
+                                  <Setter Property="Background" Value="#334027"/>
+                                  <Setter Property="BorderBrush" Value="#9E893F"/>
+                                  <Setter Property="ToolTip" Value="{DynamicResource Telegram.ChatList.FavoriteRemove}"/>
+                                  <Setter Property="AutomationProperties.Name" Value="{DynamicResource Telegram.ChatList.FavoriteRemove}"/>
+                                </DataTrigger>
+                              </Style.Triggers>
+                            </Style>
+                          </Button.Style>
+                          <!-- Scalable star path: independent of font glyph fallback or baseline. -->
+                          <Path Width="16" Height="16" Stretch="Uniform" StrokeThickness="1.5"
+                                StrokeLineJoin="Round"
+                                Data="M10,1.4 L12.8,6.8 18.9,7.7 14.5,12 15.5,18.2 10,15.3 4.5,18.2 5.5,12 1.1,7.7 7.2,6.8 Z">
+                            <Path.Style>
+                              <Style TargetType="Path">
+                                <Setter Property="Stroke" Value="#BBD4E3"/>
+                                <Setter Property="Fill" Value="Transparent"/>
+                                <Style.Triggers>
+                                  <DataTrigger Binding="{Binding IsFavorite}" Value="True">
+                                    <Setter Property="Stroke" Value="#F6D878"/>
+                                    <Setter Property="Fill" Value="#F6D878"/>
+                                  </DataTrigger>
+                                </Style.Triggers>
+                              </Style>
+                            </Path.Style>
+                          </Path>
+                        </Button>
                       </Grid>
                     </DataTemplate>
                   </ListBox.ItemTemplate>
@@ -302,7 +646,7 @@
                     <Style TargetType="StackPanel">
                       <Setter Property="Visibility" Value="Collapsed"/>
                       <Style.Triggers>
-                        <DataTrigger Binding="{Binding Chats.Count}" Value="0">
+                        <DataTrigger Binding="{Binding FilteredChats.Count}" Value="0">
                           <Setter Property="Visibility" Value="Visible"/>
                         </DataTrigger>
                       </Style.Triggers>
@@ -310,12 +654,12 @@
                   </StackPanel.Style>
                   <TextBlock Text="&#xE8BD;" FontFamily="Segoe MDL2 Assets" FontSize="26"
                              Foreground="{StaticResource R23MutedBrush}" HorizontalAlignment="Center"/>
-                  <TextBlock Text="{DynamicResource Telegram.Empty.Chats}" Style="{StaticResource R23SecondaryText}"
+                  <TextBlock Text="{DynamicResource Telegram.ChatList.Empty}" Style="{StaticResource R23SecondaryText}"
                              TextAlignment="Center" TextWrapping="Wrap" Margin="0,8,0,0"/>
                 </StackPanel>
               </Grid>
 
-              <Border Grid.Row="2" Margin="0,0,0,8">
+              <Border Grid.Row="3" Margin="0,0,0,8">
                 <Border.Style>
                   <Style TargetType="Border" BasedOn="{StaticResource R24SectionRule}">
                     <Setter Property="Visibility" Value="Collapsed"/>
@@ -328,7 +672,7 @@
                 </Border.Style>
               </Border>
 
-              <Grid Grid.Row="3" MaxHeight="245">
+              <Grid Grid.Row="4" MaxHeight="245">
                 <Grid.Style>
                   <Style TargetType="Grid">
                     <Setter Property="Visibility" Value="Collapsed"/>
@@ -377,7 +721,19 @@
                                    FontWeight="SemiBold" VerticalAlignment="Center"/>
                         <TextBlock Grid.Column="2" Text="{Binding UnreadCount}" FontSize="10.5"
                                    Foreground="{StaticResource R23MutedBrush}" Margin="7,0,0,0"
-                                   VerticalAlignment="Center"/>
+                                   ToolTip="{DynamicResource R5.Telegram.UnreadTooltip}"
+                                   VerticalAlignment="Center">
+                          <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                              <Setter Property="Visibility" Value="Visible"/>
+                              <Style.Triggers>
+                                <DataTrigger Binding="{Binding UnreadCount}" Value="0">
+                                  <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                              </Style.Triggers>
+                            </Style>
+                          </TextBlock.Style>
+                        </TextBlock>
                       </Grid>
                     </DataTemplate>
                   </ListBox.ItemTemplate>
@@ -387,7 +743,7 @@
           </Border>
 
           <!-- Media workspace -->
-          <Border Grid.Column="4" Style="{StaticResource R24WorkspacePanel}" Padding="14">
+          <Border x:Name="TelegramMediaSurface" Grid.Column="4" Style="{StaticResource TelegramFlatSurfaceStyle}" Padding="11">
             <Grid>
               <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -398,16 +754,23 @@
 
               <Grid>
                 <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto"/>
                   <ColumnDefinition Width="*"/>
                   <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <StackPanel>
+                <Button x:Name="TelegramBackToChatsButton" Grid.Column="0"
+                        Content="{DynamicResource Telegram.Responsive.BackToChats}"
+                        Click="TelegramBackToChats_OnClick" Visibility="Collapsed"
+                        Style="{StaticResource R23ToolbarButton}" VerticalAlignment="Center"
+                        Padding="7,5" FontSize="11" Margin="0,0,8,0"
+                        ToolTip="{DynamicResource Telegram.Responsive.BackToChats}"/>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
                   <TextBlock Text="{Binding CurrentContextTitle}" Style="{StaticResource R23SectionHeading}"
                              TextTrimming="CharacterEllipsis"/>
                   <TextBlock Text="{Binding CurrentContextPath}" Style="{StaticResource R23SecondaryText}"
                              FontSize="11" TextTrimming="CharacterEllipsis" Margin="0,3,0,0"/>
                 </StackPanel>
-                <Button Grid.Column="1" Style="{StaticResource R23ToolbarButton}"
+                <Button Grid.Column="2" Style="{StaticResource R23ToolbarButton}"
                         Content="↻" Command="{Binding LoadMediaCommand}"
                         ToolTip="{DynamicResource Action.Refresh}" VerticalAlignment="Center"/>
               </Grid>
@@ -430,44 +793,201 @@
                 </Grid>
               </Border>
 
+              <!-- P4.15.2 / P3: only filter already loaded media, never
+                   start extra TDLib requests or reset the active playback. -->
               <Grid Grid.Row="2">
-                <ListBox ItemsSource="{Binding Media}" SelectedItem="{Binding SelectedMedia, Mode=TwoWay}"
+                <Grid.RowDefinitions>
+                  <RowDefinition Height="Auto"/>
+                  <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <Grid Grid.Row="0" Margin="0,0,0,7">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                  </Grid.ColumnDefinitions>
+                  <WrapPanel>
+                    <RadioButton GroupName="TelegramMediaScope" Content="{DynamicResource Telegram.MediaList.All}"
+                                 Style="{StaticResource TelegramChatFilterChipStyle}"
+                                 IsChecked="{Binding IsAllMediaFilter, Mode=TwoWay}"/>
+                    <RadioButton GroupName="TelegramMediaScope" Content="{DynamicResource Telegram.MediaList.Video}"
+                                 Style="{StaticResource TelegramChatFilterChipStyle}"
+                                 IsChecked="{Binding IsVideoMediaFilter, Mode=TwoWay}"/>
+                    <RadioButton GroupName="TelegramMediaScope" Content="{DynamicResource Telegram.MediaList.Archives}"
+                                 Style="{StaticResource TelegramChatFilterChipStyle}"
+                                 IsChecked="{Binding IsArchiveMediaFilter, Mode=TwoWay}"/>
+                    <RadioButton GroupName="TelegramMediaScope" Content="{DynamicResource Telegram.MediaList.Subtitles}"
+                                 Style="{StaticResource TelegramChatFilterChipStyle}"
+                                 IsChecked="{Binding IsSubtitleMediaFilter, Mode=TwoWay}"/>
+                    <RadioButton GroupName="TelegramMediaScope" Content="{DynamicResource Telegram.MediaList.Audio}"
+                                 Style="{StaticResource TelegramChatFilterChipStyle}"
+                                 IsChecked="{Binding IsAudioMediaFilter, Mode=TwoWay}"/>
+                    <RadioButton GroupName="TelegramMediaScope" Content="{DynamicResource Telegram.MediaList.Documents}"
+                                 Style="{StaticResource TelegramChatFilterChipStyle}"
+                                 IsChecked="{Binding IsDocumentMediaFilter, Mode=TwoWay}"/>
+                  </WrapPanel>
+                  <TextBlock Grid.Column="1" Text="{Binding FilteredMediaCountText}"
+                             FontSize="10.5" Foreground="{StaticResource R23MutedBrush}"
+                             VerticalAlignment="Center" Margin="8,0,0,5"/>
+                </Grid>
+                <ListBox Grid.Row="1" x:Name="TelegramMediaList"
+                         ItemsSource="{Binding FilteredMedia}"
+                         SelectedItem="{Binding SelectedMedia, Mode=OneWay}"
+                         SelectionChanged="TelegramMediaList_OnSelectionChanged"
+                         ItemContainerStyle="{StaticResource TelegramMediaListItemStyle}"
+                         VirtualizingStackPanel.IsVirtualizing="True"
+                         VirtualizingStackPanel.VirtualizationMode="Recycling"
+                         ScrollViewer.CanContentScroll="True"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                   <ListBox.ItemTemplate>
                     <DataTemplate>
-                      <Grid Margin="4,7">
+                      <Grid MinHeight="47" Margin="0,1">
                         <Grid.ColumnDefinitions>
-                          <ColumnDefinition Width="38"/>
+                          <ColumnDefinition Width="39"/>
                           <ColumnDefinition Width="*"/>
                           <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <Border Width="30" Height="30" CornerRadius="8"
-                                Background="#102332" BorderBrush="#24485E" BorderThickness="1"
-                                VerticalAlignment="Top">
-                          <TextBlock Text="▶" FontSize="11" Foreground="{StaticResource R23CyanBrush}"
-                                     HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <Border Width="31" Height="31" CornerRadius="9"
+                                Background="#143047" BorderBrush="#2C5168" BorderThickness="1"
+                                VerticalAlignment="Center">
+                          <!-- Deterministic vector media symbols instead of font-dependent glyphs. -->
+                          <Path Width="19" Height="19" Stretch="Uniform" HorizontalAlignment="Center"
+                                VerticalAlignment="Center" StrokeLineJoin="Round" StrokeStartLineCap="Round"
+                                StrokeEndLineCap="Round">
+                            <Path.Style>
+                              <Style TargetType="Path">
+                                <Setter Property="Stroke" Value="#55CBEC"/>
+                                <Setter Property="StrokeThickness" Value="1.55"/>
+                                <Setter Property="Fill" Value="Transparent"/>
+                                <Setter Property="Data" Value="M4,2 L12,2 17,7 17,18 4,18 Z M12,2 L12,7 17,7 M7,11 L14,11 M7,14 L14,14"/>
+                                <Style.Triggers>
+                                  <DataTrigger Binding="{Binding MediaCategory}" Value="video">
+                                    <Setter Property="Data" Value="M5,3 L17,10 5,17 Z"/>
+                                    <Setter Property="Fill" Value="#55CBEC"/>
+                                    <Setter Property="StrokeThickness" Value="0"/>
+                                  </DataTrigger>
+                                  <DataTrigger Binding="{Binding MediaCategory}" Value="archive">
+                                    <Setter Property="Data" Value="M2,6 L7,6 9,8 18,8 18,17 2,17 Z M2,6 L2,4 8,4 10,6"/>
+                                  </DataTrigger>
+                                  <DataTrigger Binding="{Binding MediaCategory}" Value="subtitle">
+                                    <Setter Property="Data" Value="M3,4 L17,4 M3,8 L17,8 M3,12 L13,12 M3,16 L10,16"/>
+                                  </DataTrigger>
+                                  <DataTrigger Binding="{Binding MediaCategory}" Value="audio">
+                                    <Setter Property="Data" Value="M2,8 L6,8 11,4 11,16 6,12 2,12 Z M14,6 Q19,10 14,14"/>
+                                  </DataTrigger>
+                                </Style.Triggers>
+                              </Style>
+                            </Path.Style>
+                          </Path>
                         </Border>
-                        <StackPanel Grid.Column="1">
-                          <TextBlock Text="{Binding DisplayTitle}" FontWeight="SemiBold"
-                                     TextTrimming="CharacterEllipsis" FontSize="13.5"/>
-                          <TextBlock Text="{Binding MetaLabel}" FontSize="11.5"
-                                     Foreground="{StaticResource R23MutedBrush}" Margin="0,3,0,0"/>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                          <TextBlock Text="{Binding DisplayTitle}" FontSize="12.5"
+                                     FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                                     ToolTip="{Binding FileName}"/>
+                          <WrapPanel Margin="0,3,0,0">
+                            <TextBlock FontSize="10.5" Foreground="{StaticResource R23MutedBrush}">
+                              <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                  <Setter Property="Text" Value="{DynamicResource Telegram.MediaList.Type.document}"/>
+                                  <Style.Triggers>
+                                    <DataTrigger Binding="{Binding MediaCategory}" Value="video">
+                                      <Setter Property="Text" Value="{DynamicResource Telegram.MediaList.Type.video}"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding MediaCategory}" Value="archive">
+                                      <Setter Property="Text" Value="{DynamicResource Telegram.MediaList.Type.archive}"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding MediaCategory}" Value="subtitle">
+                                      <Setter Property="Text" Value="{DynamicResource Telegram.MediaList.Type.subtitle}"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding MediaCategory}" Value="audio">
+                                      <Setter Property="Text" Value="{DynamicResource Telegram.MediaList.Type.audio}"/>
+                                    </DataTrigger>
+                                  </Style.Triggers>
+                                </Style>
+                              </TextBlock.Style>
+                            </TextBlock>
+                            <TextBlock Text=" · " FontSize="10.5" Foreground="{StaticResource R23MutedBrush}"/>
+                            <TextBlock Text="{Binding MediaSizeLabel}" FontSize="10.5"
+                                       Foreground="{StaticResource R23MutedBrush}"/>
+                            <TextBlock Text="{Binding DurationLabel}" FontSize="10.5" Margin="7,0,0,0"
+                                       Foreground="{StaticResource R23MutedBrush}"/>
+                            <TextBlock Text="{Binding ArchivePartCount}" FontSize="10.5" Margin="7,0,0,0"
+                                       Foreground="{StaticResource R23MutedBrush}">
+                              <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                  <Setter Property="Visibility" Value="Collapsed"/>
+                                  <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasArchivePartCount}" Value="True">
+                                      <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                  </Style.Triggers>
+                                </Style>
+                              </TextBlock.Style>
+                            </TextBlock>
+                            <TextBlock Text="{DynamicResource Telegram.MediaList.PartsShort}"
+                                       FontSize="10.5" Margin="3,0,0,0"
+                                       Foreground="{StaticResource R23MutedBrush}">
+                              <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                  <Setter Property="Visibility" Value="Collapsed"/>
+                                  <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasArchivePartCount}" Value="True">
+                                      <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                  </Style.Triggers>
+                                </Style>
+                              </TextBlock.Style>
+                            </TextBlock>
+                          </WrapPanel>
+                          <TextBlock FontSize="10.5" Margin="0,3,0,0"
+                                     TextTrimming="CharacterEllipsis">
+                            <TextBlock.Style>
+                              <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Setter Property="Foreground" Value="#F5BA6A"/>
+                                <Style.Triggers>
+                                  <!-- Verified status is conveyed by metadata; no duplicate third line. -->
+                                  <DataTrigger Binding="{Binding PartStatusCode}" Value="ready">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Setter Property="Text" Value="{DynamicResource Telegram.MediaList.Status.ready}"/>
+                                  </DataTrigger>
+                                  <!-- Unverified final-piece markers remain in the model, but are not a user-facing warning. -->
+                                  <DataTrigger Binding="{Binding PartStatusCode}" Value="unverified">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                  </DataTrigger>
+                                  <DataTrigger Binding="{Binding PartStatusCode}" Value="missing">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                    <Setter Property="Foreground" Value="#FF928D"/>
+                                    <Setter Property="Text" Value="{DynamicResource Telegram.MediaList.Status.missing}"/>
+                                  </DataTrigger>
+                                  <DataTrigger Binding="{Binding PartStatusCode}" Value="ambiguous">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                    <Setter Property="Text" Value="{DynamicResource Telegram.MediaList.Status.ambiguous}"/>
+                                  </DataTrigger>
+                                  <DataTrigger Binding="{Binding PartStatusCode}" Value="standalone">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                    <Setter Property="Text" Value="{DynamicResource Telegram.MediaList.Status.standalone}"/>
+                                  </DataTrigger>
+                                </Style.Triggers>
+                              </Style>
+                            </TextBlock.Style>
+                          </TextBlock>
                         </StackPanel>
-                        <StackPanel Grid.Column="2" Margin="10,0,0,0" HorizontalAlignment="Right">
-                          <TextBlock Text="{Binding DateLabel}" FontSize="10.5"
-                                     Foreground="{StaticResource R23MutedBrush}" HorizontalAlignment="Right"/>
-                        </StackPanel>
+                        <TextBlock Grid.Column="2" Text="{Binding DateLabel}" FontSize="10"
+                                   Foreground="{StaticResource R23MutedBrush}"
+                                   Margin="10,4,0,0" HorizontalAlignment="Right"
+                                   VerticalAlignment="Top"/>
                       </Grid>
                     </DataTemplate>
                   </ListBox.ItemTemplate>
                 </ListBox>
 
-                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="360">
+                <StackPanel Grid.Row="1" VerticalAlignment="Center"
+                            HorizontalAlignment="Center" MaxWidth="330">
                   <StackPanel.Style>
                     <Style TargetType="StackPanel">
                       <Setter Property="Visibility" Value="Collapsed"/>
                       <Style.Triggers>
-                        <DataTrigger Binding="{Binding Media.Count}" Value="0">
+                        <DataTrigger Binding="{Binding FilteredMedia.Count}" Value="0">
                           <Setter Property="Visibility" Value="Visible"/>
                         </DataTrigger>
                       </Style.Triggers>
@@ -478,41 +998,124 @@
                                Foreground="{StaticResource R23CyanBrush}"
                                HorizontalAlignment="Center" VerticalAlignment="Center"/>
                   </Border>
-                  <TextBlock Text="{DynamicResource Telegram.Empty.Media.Title}"
-                             FontWeight="SemiBold" FontSize="15" TextAlignment="Center"
+                  <TextBlock Text="{DynamicResource Telegram.MediaList.EmptyTitle}"
+                             FontWeight="SemiBold" FontSize="14" TextAlignment="Center"
                              Margin="0,12,0,5"/>
-                  <TextBlock Text="{DynamicResource Telegram.Empty.Media.Help}"
+                  <TextBlock Text="{DynamicResource Telegram.MediaList.EmptyHelp}"
                              Style="{StaticResource R23SecondaryText}" TextAlignment="Center"
                              TextWrapping="Wrap"/>
                 </StackPanel>
               </Grid>
 
-              <Grid Grid.Row="3" Margin="0,10,0,0">
-                <Grid.ColumnDefinitions>
-                  <ColumnDefinition Width="*"/>
-                  <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <StackPanel VerticalAlignment="Center">
+              <!-- P3: one persistent, explicit selected-file action deck.
+                   The selected name stays visible if a filter hides its row. -->
+              <Border Grid.Row="3" Margin="0,7,0,0" BorderBrush="#284257"
+                      BorderThickness="0,1,0,0" Padding="0,10,0,0">
+                <StackPanel>
+                  <TextBlock Text="{Binding SelectedMediaName}"
+                             FontWeight="SemiBold" FontSize="12.5"
+                             Foreground="{StaticResource R23TextBrush}"
+                             TextTrimming="CharacterEllipsis"
+                             ToolTip="{Binding SelectedMediaDiagnostic}"/>
+                  <TextBlock Text="{Binding SelectedMediaSummary}"
+                             Style="{StaticResource R23SecondaryText}"
+                             FontSize="10.5" TextWrapping="Wrap" Margin="0,3,0,0"/>
                   <TextBlock Text="{Binding StatusText, Converter={StaticResource UserFacingTextConverter}}"
-                             Style="{StaticResource R23SecondaryText}" TextWrapping="Wrap"
-                             TextTrimming="CharacterEllipsis"/>
-                  <ProgressBar Height="3" Maximum="100" Value="{Binding DownloadPercent, Mode=OneWay}"
+                             Style="{StaticResource R23SecondaryText}"
+                             FontSize="10.5" TextTrimming="CharacterEllipsis"
+                             ToolTip="{Binding StatusText}" Margin="0,6,0,0"/>
+                  <ProgressBar Height="2" Maximum="100" Value="{Binding DownloadPercent, Mode=OneWay}"
                                Margin="0,6,0,0"/>
+                  <Grid Margin="0,10,0,0">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*"/>
+                      <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Button Content="{DynamicResource R5.Telegram.LoadOlder}"
+                            Command="{Binding LoadMoreMediaCommand}"
+                            HorizontalAlignment="Left" VerticalAlignment="Center"
+                            Padding="5,3" MinHeight="25" FontSize="10.5">
+                      <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource R23ToolbarButton}">
+                          <Setter Property="Visibility" Value="Collapsed"/>
+                          <Style.Triggers>
+                            <DataTrigger Binding="{Binding CanLoadMoreMedia}" Value="True">
+                              <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                          </Style.Triggers>
+                        </Style>
+                      </Button.Style>
+                    </Button>
+                    <WrapPanel Grid.Column="1" HorizontalAlignment="Right"
+                               Margin="8,0,0,0">
+                      <Button Style="{StaticResource R23ToolbarPrimaryButton}"
+                              Content="{Binding OpenActionText, Converter={StaticResource LocalizedTextConverter}}"
+                              Command="{Binding DownloadAndOpenCommand}"
+                              IsEnabled="{Binding CanOpenSelectedMedia}"
+                              MinHeight="32" Padding="12,5" FontSize="11"
+                              Margin="0,0,5,5"/>
+                      <Button Style="{StaticResource R23ToolbarButton}"
+                              Content="{DynamicResource R5.Telegram.AttachSubtitle}"
+                              Command="{Binding AttachSelectedSubtitleCommand}"
+                              IsEnabled="{Binding CanAttachSelectedSubtitle}"
+                              MinHeight="32" Padding="9,5" FontSize="11"
+                              Margin="0,0,5,5"/>
+                      <Button Style="{StaticResource R23ToolbarButton}"
+                              Content="{DynamicResource Telegram.MediaList.CacheDownload}"
+                              Command="{Binding CacheSelectedMediaCommand}"
+                              IsEnabled="{Binding CanCacheSelectedMedia}"
+                              ToolTip="{DynamicResource Telegram.MediaList.CacheDownloadHelp}"
+                              MinHeight="32" Padding="9,5" FontSize="11"
+                              Margin="0,0,5,5"/>
+                      <Menu VerticalAlignment="Center" Background="Transparent"
+                            BorderThickness="0" Padding="0" Margin="0,0,0,5">
+                        <MenuItem Header="⋯" FontSize="17" Padding="8,3"
+                                  ToolTip="{DynamicResource R5.Telegram.MoreActions}">
+                          <MenuItem Header="{DynamicResource R23.Telegram.OpenFolder}"
+                                    Command="{Binding OpenTelegramFolderCommand}"/>
+                          <MenuItem Header="{DynamicResource R23.Telegram.Repair}"
+                                    Command="{Binding RepairArchivePartsCommand}"
+                                    IsEnabled="{Binding CanRepairSelectedArchive}"/>
+                        </MenuItem>
+                      </Menu>
+                    </WrapPanel>
+                  </Grid>
+                  <WrapPanel Margin="0,3,0,0">
+                    <Button Content="{DynamicResource R5.Telegram.StopDownload}"
+                            Command="{Binding StopTransferCommand}"
+                            IsEnabled="{Binding CanStopTransfer}"
+                            ToolTip="{DynamicResource R5.Telegram.StopTooltip}"
+                            Padding="5,2" MinHeight="22" FontSize="10" Margin="0,0,5,0">
+                      <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource R23ToolbarButton}">
+                          <Setter Property="Visibility" Value="Collapsed"/>
+                          <Style.Triggers>
+                            <DataTrigger Binding="{Binding CanStopTransfer}" Value="True">
+                              <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                          </Style.Triggers>
+                        </Style>
+                      </Button.Style>
+                    </Button>
+                    <Button Content="{DynamicResource R5.Telegram.ResumeDownload}"
+                            Command="{Binding ResumeTransferCommand}"
+                            IsEnabled="{Binding CanResumeTransfer}"
+                            ToolTip="{DynamicResource Telegram.MediaList.ResumeTransferHelp}"
+                            Padding="5,2" MinHeight="22" FontSize="10">
+                      <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource R23ToolbarButton}">
+                          <Setter Property="Visibility" Value="Collapsed"/>
+                          <Style.Triggers>
+                            <DataTrigger Binding="{Binding CanResumeTransfer}" Value="True">
+                              <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                          </Style.Triggers>
+                        </Style>
+                      </Button.Style>
+                    </Button>
+                  </WrapPanel>
                 </StackPanel>
-                <Border Grid.Column="1" Style="{StaticResource R24CommandDeck}" Margin="12,0,0,0">
-                  <StackPanel Orientation="Horizontal">
-                    <Button Style="{StaticResource R23ToolbarPrimaryButton}"
-                            Content="{Binding OpenActionText, Converter={StaticResource LocalizedTextConverter}}"
-                            Command="{Binding DownloadAndOpenCommand}" Margin="0,0,5,0"/>
-                    <Button Style="{StaticResource R23ToolbarButton}"
-                            Content="{DynamicResource R23.Telegram.OpenFolder}"
-                            Command="{Binding OpenTelegramFolderCommand}"/>
-                    <Button Style="{StaticResource R23ToolbarButton}"
-                            Content="{DynamicResource R23.Telegram.Repair}"
-                            Command="{Binding RepairArchivePartsCommand}" Margin="4,0,0,0"/>
-                  </StackPanel>
-                </Border>
-              </Grid>
+              </Border>
             </Grid>
           </Border>
         </Grid>

@@ -1,0 +1,419 @@
+<UserControl x:Class="AltyaziDB.Player.App.Views.Pages.TelegramHubView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{StaticResource R23AppBrush}"
+             Foreground="{StaticResource R23TextBrush}"
+             FontFamily="Segoe UI Variable Text, Segoe UI"
+             FontSize="14"
+             Loaded="OnTelegramHubLoaded"
+             IsVisibleChanged="OnTelegramHubVisibilityChanged">
+  <UserControl.Resources>
+    <!-- The common Button template centers content; Hub cards need a full-width presenter. -->
+    <Style x:Key="TelegramHubRowButton" TargetType="{x:Type Button}"
+           BasedOn="{StaticResource R23ToolbarButton}">
+      <Setter Property="HorizontalAlignment" Value="Stretch"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Setter Property="MinHeight" Value="49"/>
+      <Setter Property="Padding" Value="12,9"/>
+      <Setter Property="Margin" Value="0,0,0,5"/>
+      <Setter Property="Background" Value="#12293B"/>
+      <Setter Property="BorderBrush" Value="#29465A"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="{x:Type Button}">
+            <Border x:Name="RowSurface" Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    CornerRadius="8" Padding="{TemplateBinding Padding}">
+              <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                                Content="{TemplateBinding Content}"
+                                ContentTemplate="{TemplateBinding ContentTemplate}"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="RowSurface" Property="Background" Value="#1A3A50"/>
+                <Setter TargetName="RowSurface" Property="BorderBrush" Value="#40748E"/>
+              </Trigger>
+              <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                <Setter TargetName="RowSurface" Property="BorderBrush" Value="#79C8E7"/>
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Opacity" Value="0.5"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="TelegramHubPanel" TargetType="{x:Type Border}"
+           BasedOn="{StaticResource R24WorkspacePanel}">
+      <Setter Property="Background" Value="#102130"/>
+      <Setter Property="BorderBrush" Value="#294258"/>
+      <Setter Property="Padding" Value="14"/>
+      <Setter Property="CornerRadius" Value="10"/>
+    </Style>
+  </UserControl.Resources>
+  <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Margin="18,17,20,22">
+      <Grid Margin="0,0,0,14">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        <StackPanel>
+          <TextBlock Text="{DynamicResource Telegram.Hub.PageTitle}"
+                     Style="{StaticResource R23PageHeading}"/>
+        </StackPanel>
+        <Button Grid.Column="1" Content="{DynamicResource Telegram.Hub.OpenTelegram}"
+                Command="{Binding ShowTelegramCommand}" VerticalAlignment="Center"
+                Style="{StaticResource R23ToolbarPrimaryButton}" Margin="10,0,0,0"/>
+      </Grid>
+      <!-- The data sections are hidden when Telegram is disconnected, not merely disabled. -->
+      <Border Margin="0,0,0,12">
+        <Border.Style>
+          <Style TargetType="Border" BasedOn="{StaticResource TelegramHubPanel}">
+            <Setter Property="Visibility" Value="Collapsed"/>
+            <Style.Triggers>
+              <DataTrigger Binding="{Binding Telegram.IsReady}" Value="False">
+                <Setter Property="Visibility" Value="Visible"/>
+              </DataTrigger>
+            </Style.Triggers>
+          </Style>
+        </Border.Style>
+        <StackPanel>
+          <TextBlock Text="{DynamicResource Telegram.Hub.NoAccount}"
+                     FontWeight="SemiBold" Foreground="{StaticResource R23CyanBrush}"/>
+          <TextBlock Text="{DynamicResource Telegram.Hub.ConnectHint}"
+                     Style="{StaticResource R23SecondaryText}" TextWrapping="Wrap" Margin="0,6,0,12"/>
+          <Button Content="{DynamicResource Telegram.Hub.OpenTelegram}"
+                  Command="{Binding ShowTelegramCommand}"
+                  Style="{StaticResource R23ToolbarButton}" HorizontalAlignment="Left"/>
+        </StackPanel>
+      </Border>
+      <StackPanel>
+        <StackPanel.Style>
+          <Style TargetType="StackPanel">
+            <Setter Property="Visibility" Value="Collapsed"/>
+            <Style.Triggers>
+              <DataTrigger Binding="{Binding Telegram.IsReady}" Value="True">
+                <Setter Property="Visibility" Value="Visible"/>
+              </DataTrigger>
+            </Style.Triggers>
+          </Style>
+        </StackPanel.Style>
+        <Border Style="{StaticResource TelegramHubPanel}" Margin="0,0,0,12">
+          <StackPanel>
+            <TextBlock Text="{DynamicResource Telegram.Hub.ContinueTitle}"
+                         ToolTip="{DynamicResource Telegram.Hub.ContinueHelp}"
+                       Style="{StaticResource R23SectionHeading}"/>
+            <ItemsControl ItemsSource="{Binding TelegramContinueWatching}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Button Style="{StaticResource TelegramHubRowButton}"
+                          Click="ResumeTelegram_Click"
+                          ToolTip="{Binding Title}"
+                          AutomationProperties.HelpText="{DynamicResource Telegram.Hub.Resume}">
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="30"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                      </Grid.ColumnDefinitions>
+                      <TextBlock Text="▶" FontSize="14" Foreground="{StaticResource R23CyanBrush}"
+                                 VerticalAlignment="Center"/>
+                      <StackPanel Grid.Column="1">
+                        <TextBlock Text="{Binding Title}" FontSize="12.5" FontWeight="SemiBold"
+                                   TextTrimming="CharacterEllipsis"/>
+                        <ProgressBar Maximum="100" Value="{Binding ProgressPercent, Mode=OneWay}"
+                                     Height="3" Margin="0,6,8,0"/>
+                      </StackPanel>
+                      <TextBlock Grid.Column="2" Text="{Binding ProgressPercentText}"
+                                 FontSize="11" Foreground="{StaticResource R23MutedBrush}"
+                                 VerticalAlignment="Center"/>
+                    </Grid>
+                  </Button>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Text="{DynamicResource Telegram.Hub.ContinueEmpty}"
+                       TextWrapping="Wrap">
+              <TextBlock.Style>
+                <Style TargetType="TextBlock" BasedOn="{StaticResource R23SecondaryText}">
+                  <Setter Property="Visibility" Value="Collapsed"/>
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding TelegramContinueWatching.Count}" Value="0">
+                      <Setter Property="Visibility" Value="Visible"/>
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </TextBlock.Style>
+            </TextBlock>
+          </StackPanel>
+        </Border>
+        <Grid x:Name="TelegramHubColumns">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+          </Grid.RowDefinitions>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition x:Name="TelegramHubLeftColumn" Width="*"/>
+            <ColumnDefinition x:Name="TelegramHubGapColumn" Width="12"/>
+            <ColumnDefinition x:Name="TelegramHubRightColumn" Width="*"/>
+          </Grid.ColumnDefinitions>
+          <Border Grid.Column="0" Style="{StaticResource TelegramHubPanel}" Margin="0,0,0,12">
+            <StackPanel>
+              <TextBlock Text="{DynamicResource Telegram.Hub.StarredTitle}"
+                         ToolTip="{DynamicResource Telegram.Hub.StarredHelp}"
+                         Style="{StaticResource R23SectionHeading}"/>
+              <ListBox ItemsSource="{Binding Telegram.FavoriteChats}" MaxHeight="340"
+                       BorderThickness="0" Background="Transparent"
+                       VirtualizingStackPanel.IsVirtualizing="True"
+                       VirtualizingStackPanel.VirtualizationMode="Recycling"
+                       ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                <ListBox.ItemContainerStyle>
+                  <Style TargetType="ListBoxItem">
+                    <Setter Property="Padding" Value="0"/>
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                  </Style>
+                </ListBox.ItemContainerStyle>
+                <ListBox.ItemTemplate>
+                  <DataTemplate>
+                    <Button Style="{StaticResource TelegramHubRowButton}"
+                            Click="OpenStarredChat_Click" ToolTip="{Binding Title}"
+                            AutomationProperties.HelpText="{DynamicResource Telegram.Hub.OpenChat}">
+                      <Grid>
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="27"/>
+                          <ColumnDefinition Width="*"/>
+                          <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="★" Foreground="#F6D878"
+                                   VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Text="{Binding Title}"
+                                   FontWeight="SemiBold" FontSize="12.5"
+                                   TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="2" Text="›"
+                                   Foreground="{StaticResource R23MutedBrush}" VerticalAlignment="Center"/>
+                      </Grid>
+                    </Button>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+              <TextBlock Text="{DynamicResource Telegram.Hub.StarredEmpty}"
+                         TextWrapping="Wrap">
+                <TextBlock.Style>
+                  <Style TargetType="TextBlock" BasedOn="{StaticResource R23SecondaryText}">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding Telegram.FavoriteChats.Count}" Value="0">
+                        <Setter Property="Visibility" Value="Visible"/>
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </TextBlock.Style>
+              </TextBlock>
+            </StackPanel>
+          </Border>
+          <Border x:Name="TelegramHubOpenedPanel" Grid.Column="2"
+                  Style="{StaticResource TelegramHubPanel}" Margin="0,0,0,12">
+            <StackPanel>
+              <TextBlock Text="{DynamicResource Telegram.Hub.OpenedTitle}"
+                         ToolTip="{DynamicResource Telegram.Hub.OpenedHelp}"
+                         Style="{StaticResource R23SectionHeading}"/>
+              <ItemsControl ItemsSource="{Binding TelegramRecentlyOpened}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <Button Style="{StaticResource TelegramHubRowButton}"
+                            Click="OpenRecentlyPlayed_Click" ToolTip="{Binding Title}"
+                            AutomationProperties.HelpText="{DynamicResource Telegram.Hub.Open}">
+                      <Grid>
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="27"/>
+                          <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="▶" Foreground="{StaticResource R23CyanBrush}"
+                                   VerticalAlignment="Center"/>
+                        <StackPanel Grid.Column="1">
+                          <TextBlock Text="{Binding Title}" FontSize="12.5"
+                                     FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                          <TextBlock Text="{Binding LastOpenedUtc.LocalDateTime, StringFormat={}{0:dd.MM.yyyy HH:mm}}"
+                                     FontSize="10.5" Foreground="{StaticResource R23MutedBrush}"/>
+                        </StackPanel>
+                      </Grid>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <TextBlock Text="{DynamicResource Telegram.Hub.OpenedEmpty}"
+                         TextWrapping="Wrap">
+                <TextBlock.Style>
+                  <Style TargetType="TextBlock" BasedOn="{StaticResource R23SecondaryText}">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding TelegramRecentlyOpened.Count}" Value="0">
+                        <Setter Property="Visibility" Value="Visible"/>
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </TextBlock.Style>
+              </TextBlock>
+            </StackPanel>
+          </Border>
+        </Grid>
+        <!-- Fresh media from favorites is intentionally separate from opened/history lists. -->
+        <Border Style="{StaticResource TelegramHubPanel}" Margin="0,0,0,12">
+          <StackPanel>
+            <DockPanel LastChildFill="True">
+              <Button DockPanel.Dock="Right"
+                      Content="{DynamicResource Telegram.Hub.FeedRefresh}"
+                      Click="RefreshFavoriteFeed_Click"
+                      Padding="12,5" Margin="12,0,0,0">
+                <Button.Style>
+                  <Style TargetType="Button" BasedOn="{StaticResource R23ToolbarButton}">
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding Telegram.FavoriteFeedIsLoading}" Value="True">
+                        <Setter Property="IsEnabled" Value="False"/>
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </Button.Style>
+              </Button>
+              <TextBlock Text="{DynamicResource Telegram.Hub.FeedTitle}"
+                         Style="{StaticResource R23SectionHeading}"
+                         VerticalAlignment="Center"/>
+            </DockPanel>
+            <TextBlock Text="{DynamicResource Telegram.Hub.FeedHelp}"
+                       Style="{StaticResource R23SecondaryText}" TextWrapping="Wrap"
+                       Margin="0,4,0,8"/>
+            <ScrollViewer MaxHeight="310" VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+              <ItemsControl ItemsSource="{Binding Telegram.FavoriteRecentMedia}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <Button Style="{StaticResource TelegramHubRowButton}"
+                            Click="OpenFavoriteMedia_Click" ToolTip="{Binding FileName}"
+                            AutomationProperties.HelpText="{DynamicResource Telegram.Hub.Open}">
+                      <Grid>
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="28"/>
+                          <ColumnDefinition Width="*"/>
+                          <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{Binding MediaIcon}" Foreground="{StaticResource R23CyanBrush}"
+                                   VerticalAlignment="Center"/>
+                        <StackPanel Grid.Column="1">
+                          <TextBlock Text="{Binding FileName}" FontSize="12.5"
+                                     FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                          <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding ChatTitle}" FontSize="10.5"
+                                       Foreground="{StaticResource R23MutedBrush}"
+                                       TextTrimming="CharacterEllipsis" MaxWidth="260"/>
+                            <TextBlock Text="  ·  " Foreground="{StaticResource R23MutedBrush}"/>
+                            <TextBlock Text="{Binding DateLabel}" FontSize="10.5"
+                                       Foreground="{StaticResource R23MutedBrush}"/>
+                          </StackPanel>
+                        </StackPanel>
+                        <TextBlock Grid.Column="2" Text="{Binding MediaSizeLabel}" FontSize="10.5"
+                                   Foreground="{StaticResource R23MutedBrush}" Margin="8,0,0,0"
+                                   VerticalAlignment="Center"/>
+                      </Grid>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+            <TextBlock Text="{DynamicResource Telegram.Hub.FeedLoading}"
+                       Margin="0,5,0,0">
+              <TextBlock.Style>
+                <Style TargetType="TextBlock" BasedOn="{StaticResource R23SecondaryText}">
+                  <Setter Property="Visibility" Value="Collapsed"/>
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding Telegram.FavoriteFeedIsLoading}" Value="True">
+                      <Setter Property="Visibility" Value="Visible"/>
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </TextBlock.Style>
+            </TextBlock>
+            <TextBlock Text="{DynamicResource Telegram.Hub.FeedEmpty}"
+                       TextWrapping="Wrap">
+              <TextBlock.Style>
+                <Style TargetType="TextBlock" BasedOn="{StaticResource R23SecondaryText}">
+                  <Setter Property="Visibility" Value="Collapsed"/>
+                  <Style.Triggers>
+                    <MultiDataTrigger>
+                      <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding Telegram.FavoriteRecentMedia.Count}" Value="0"/>
+                        <Condition Binding="{Binding Telegram.FavoriteFeedIsLoading}" Value="False"/>
+                      </MultiDataTrigger.Conditions>
+                      <Setter Property="Visibility" Value="Visible"/>
+                    </MultiDataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </TextBlock.Style>
+            </TextBlock>
+          </StackPanel>
+        </Border>
+        <Border Style="{StaticResource TelegramHubPanel}">
+          <StackPanel>
+            <TextBlock Text="{DynamicResource Telegram.Hub.SeenTitle}"
+                         ToolTip="{DynamicResource Telegram.Hub.SeenHelp}"
+                       Style="{StaticResource R23SectionHeading}"/>
+            <ScrollViewer MaxHeight="300" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <ItemsControl x:Name="TelegramHubSeenItems"
+                          Loaded="TelegramHubSeenItems_OnLoaded"
+                          ItemsSource="{Binding Telegram.RecentMedia}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <UniformGrid Columns="2"/>
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Button Style="{StaticResource TelegramHubRowButton}"
+                          Click="OpenSessionMedia_Click"
+                          ToolTip="{Binding FileName}"
+                          AutomationProperties.HelpText="{DynamicResource Telegram.Hub.Open}">
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="30"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                      </Grid.ColumnDefinitions>
+                      <TextBlock Text="{Binding MediaIcon}" Foreground="{StaticResource R23CyanBrush}"
+                                 VerticalAlignment="Center"/>
+                      <StackPanel Grid.Column="1">
+                        <TextBlock Text="{Binding FileName}" FontWeight="SemiBold"
+                                   FontSize="12.5" TextTrimming="CharacterEllipsis"/>
+                        <TextBlock Text="{Binding ChatTitle}" FontSize="10.5"
+                                   Foreground="{StaticResource R23MutedBrush}" TextTrimming="CharacterEllipsis"/>
+                      </StackPanel>
+                      <TextBlock Grid.Column="2" Text="{Binding MediaSizeLabel}" FontSize="10.5"
+                                 Foreground="{StaticResource R23MutedBrush}" Margin="7,0,0,0"
+                                 VerticalAlignment="Center"/>
+                    </Grid>
+                  </Button>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            </ScrollViewer>
+            <TextBlock Text="{DynamicResource Telegram.Hub.SeenEmpty}"
+                       TextWrapping="Wrap">
+              <TextBlock.Style>
+                <Style TargetType="TextBlock" BasedOn="{StaticResource R23SecondaryText}">
+                  <Setter Property="Visibility" Value="Collapsed"/>
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding Telegram.RecentMedia.Count}" Value="0">
+                      <Setter Property="Visibility" Value="Visible"/>
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </TextBlock.Style>
+            </TextBlock>
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Globalization;
+using System.IO.Compression;
 using System.Text.Json;
 using AltyaziDB.Player.Core.Interfaces;
 using AltyaziDB.Player.Core.Models;
@@ -15,6 +16,8 @@ public sealed class TdJsonTelegramService : ITelegramService
     private readonly ConcurrentDictionary<int, TelegramFileSnapshot> _fileStates = new();
     private readonly ConcurrentDictionary<int, AsyncPulse> _filePulses = new();
     private readonly ConcurrentDictionary<int, SemaphoreSlim> _rangeRequestGates = new();
+    // User-requested stops must not be undone by a subsequent libmpv seek.
+    private readonly ConcurrentDictionary<int, byte> _stoppedTransfers = new();
     private readonly ConcurrentDictionary<int, RemoteOpenRequest> _streamRequests = new();
     private readonly ConcurrentDictionary<string, RemoteOpenRequest> _archiveStreamRequests = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, TelegramArchiveCacheSession> _archiveCacheSessions = new(StringComparer.Ordinal);
@@ -49,6 +52,18 @@ public sealed class TdJsonTelegramService : ITelegramService
     public TelegramAuthorizationSnapshot Authorization { get; private set; }
     public IReadOnlyList<TelegramChatFolderItem> ChatFolders => _chatFolders;
 
+    public async Task<long?> GetCurrentUserIdAsync(CancellationToken cancellationToken = default)
+    {
+        EnsureReady();
+        // TDLib getMe identifies the actually authorized user, not a stale
+        // phone number, cached chat title, or machine-local session directory.
+        var me = await RequestAsync(
+            new Dictionary<string, object?> { ["@type"] = "getMe" },
+            cancellationToken, TimeSpan.FromSeconds(15)).ConfigureAwait(false);
+        var id = ReadInt64(me, "id");
+        return id > 0 ? id : null;
+    }
+
     public async Task StartAsync(TelegramClientConfiguration configuration, CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
@@ -70,6 +85,133 @@ public sealed class TdJsonTelegramService : ITelegramService
         var state = await RequestAsync(new Dictionary<string, object?> { ["@type"] = "getAuthorizationState" }, cancellationToken)
             .ConfigureAwait(false);
         await ProcessAuthorizationStateAsync(state, cancellationToken).ConfigureAwait(false);
+    }
+
+    private readonly SemaphoreSlim _cacheOptimizationGate = new(1, 1);
+
+    public async Task<TelegramCacheUsage> GetCacheUsageAsync(
+        CancellationToken cancellationToken = default)
+    {
+        EnsureReady();
+        var result = await RequestAsync(new Dictionary<string, object?>
+        {
+            ["@type"] = "getStorageStatisticsFast"
+        }, cancellationToken, TimeSpan.FromSeconds(30)).ConfigureAwait(false);
+        var directory = _configuration?.FilesDirectory ?? string.Empty;
+        return new TelegramCacheUsage(
+            Math.Max(0L, ReadInt64(result, "files_size")),
+            Math.Max(0, ReadInt32(result, "file_count")),
+            Math.Max(0L, ReadInt64(result, "database_size")),
+            GetArchiveTemporarySize(directory),
+            directory);
+    }
+
+    public async Task<TelegramCacheUsage> OptimizeCacheAsync(
+        long targetBytes, bool manual, CancellationToken cancellationToken = default)
+    {
+        EnsureReady();
+        if (targetBytes < 0 || targetBytes > 2L * 1024 * 1024 * 1024 * 1024)
+            throw new ArgumentOutOfRangeException(nameof(targetBytes));
+        await _cacheOptimizationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            // TDLib is the only authority allowed to remove downloaded Telegram
+            // files. Its databases, encryption keys, and active archive sessions
+            // are never deleted by a filesystem sweep.
+            _ = await RequestAsync(new Dictionary<string, object?>
+            {
+                ["@type"] = "optimizeStorage",
+                ["size"] = targetBytes,
+                ["ttl"] = -1,
+                ["count"] = -1,
+                // Preserve recently used chunks during automatic maintenance.
+                ["immunity_delay"] = manual ? 0 : 3600,
+                ["file_types"] = Array.Empty<object>(),
+                ["chat_ids"] = Array.Empty<long>(),
+                ["exclude_chat_ids"] = Array.Empty<long>(),
+                ["return_deleted_file_statistics"] = false,
+                ["chat_limit"] = 0
+            }, cancellationToken, TimeSpan.FromMinutes(3)).ConfigureAwait(false);
+            CleanupOrphanedArchiveCache();
+            _logger.Info($"Telegram önbellek bakımı: manuel={manual}, hedefBayt={targetBytes}");
+            return await GetCacheUsageAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _cacheOptimizationGate.Release();
+        }
+    }
+
+    private static long GetArchiveTemporarySize(string filesDirectory)
+    {
+        if (string.IsNullOrWhiteSpace(filesDirectory)) return 0;
+        var root = Path.Combine(filesDirectory, "archive-stream-cache");
+        if (!Directory.Exists(root)) return 0;
+        long sum = 0;
+        try
+        {
+            foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
+            {
+                try { sum = checked(sum + new FileInfo(file).Length); }
+                catch (IOException) { }
+                catch (UnauthorizedAccessException) { }
+                catch (OverflowException) { return long.MaxValue; }
+            }
+        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
+        return sum;
+    }
+
+    private void CleanupOrphanedArchiveCache()
+    {
+        var filesDirectory = _configuration?.FilesDirectory;
+        if (string.IsNullOrWhiteSpace(filesDirectory)) return;
+        var root = Path.Combine(filesDirectory, "archive-stream-cache");
+        if (!Directory.Exists(root)) return;
+        // Crash leftovers only. Never touch directories owned by a currently
+        // running stream, nor recent directories other instances may use.
+        var active = _archiveCacheSessions.Values
+            .Select(session => Path.GetFullPath(session.SessionDirectory))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            foreach (var folder in Directory.EnumerateDirectories(root))
+            {
+                try
+                {
+                    var full = Path.GetFullPath(folder);
+                    if (active.Contains(full) ||
+                        Directory.GetLastWriteTimeUtc(full) > DateTime.UtcNow.AddDays(-1) ||
+                        !IsOrphanedArchiveFolderSafeToRemove(full))
+                        continue;
+                    Directory.Delete(full, recursive: true);
+                }
+                catch (IOException) { }
+                catch (UnauthorizedAccessException) { }
+            }
+        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
+    }
+
+    private static bool IsOrphanedArchiveFolderSafeToRemove(string folder)
+    {
+        // Protect folders still being written by another ADB Player instance,
+        // including ones older than a day whose directory timestamp is stale.
+        var threshold = DateTime.UtcNow.AddDays(-1);
+        try
+        {
+            foreach (var file in Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories))
+            {
+                if (File.GetLastWriteTimeUtc(file) > threshold) return false;
+                using var exclusive = new FileStream(file, FileMode.Open,
+                    FileAccess.Read, FileShare.None);
+            }
+            return true;
+        }
+        catch (IOException) { return false; }
+        catch (UnauthorizedAccessException) { return false; }
     }
 
     public Task SubmitPhoneNumberAsync(string phoneNumber, CancellationToken cancellationToken = default) =>
@@ -231,55 +373,195 @@ public sealed class TdJsonTelegramService : ITelegramService
     public async Task<IReadOnlyList<TelegramMediaItem>> GetChatMediaAsync(
         long chatId,
         string? query = null,
-        int limit = 100,
+        int limit = 300,
         CancellationToken cancellationToken = default,
         int? forumTopicId = null)
     {
         EnsureReady();
-        limit = Math.Clamp(limit, 1, 100);
+        // TDLib searchChatMessages returns at most 100 *and may return fewer*.
+        // A single request cannot enumerate a Telegram group/topic history.
+        limit = Math.Clamp(limit, 1, 2500);
         var messages = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
-        foreach (var filter in new[] { "searchMessagesFilterVideo", "searchMessagesFilterDocument", "searchMessagesFilterAnimation", "searchMessagesFilterAudio" })
+        if (forumTopicId is > 0)
         {
+            // Dedicated forum topic history avoids search-index gaps where
+            // Telegram .7z.001/.002 messages used to disappear from the UI.
             try
             {
+                var history = await TelegramForumTopicHistoryPager.ReadAsync(
+                    (cursor, take, token) => RequestAsync(new Dictionary<string, object?>
+                    {
+                        ["@type"] = "getForumTopicHistory",
+                        ["chat_id"] = chatId.ToString(CultureInfo.InvariantCulture),
+                        ["forum_topic_id"] = forumTopicId.Value,
+                        ["from_message_id"] = cursor.ToString(CultureInfo.InvariantCulture),
+                        ["offset"] = 0,
+                        ["limit"] = take
+                    }, token),
+                    limit, cancellationToken).ConfigureAwait(false);
+                // Signed chat IDs and deduplication are common to both
+                // topic history and search-index responses.
+                TelegramForumMessageMerge.Add(messages, history);
+                _logger.Info($"Telegram konu geçmişi: topic={forumTopicId.Value}, mesaj={messages.Count}");
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                _logger.Warning($"Telegram konu geçmişi okunamadı; arama yedeğine geçiliyor: {exception.Message}");
+            }
+        }
+        // Fetch all forum documents/videos without media-type filtering
+        // so .001/.002 and .z01/.zip cannot disappear independently.
+        string?[] filters = forumTopicId is > 0
+            ? [null]
+            : ["searchMessagesFilterVideo", "searchMessagesFilterDocument",
+               "searchMessagesFilterAnimation", "searchMessagesFilterAudio"];
+        // Always merge topic history with search results. TDLib may return
+        // an incomplete history page despite remaining messages, and search
+        // may know other documents. Use chat ID + message ID for deduplication.
+        var historyMessageCount = messages.Count;
+        foreach (var filter in filters)
+        {
+            long cursor = 0;
+            var seen = new HashSet<long>();
+            var fetched = 0;
+            try
+            {
+                // Each media type is paginated independently, otherwise many
+                // videos can hide all documents when the final page is capped.
+                while (fetched < limit)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var take = Math.Min(100, limit - fetched);
+                    var response = await RequestAsync(new Dictionary<string, object?>
+                    {
+                        ["@type"] = "searchChatMessages",
+                        ["chat_id"] = chatId.ToString(CultureInfo.InvariantCulture),
+                        ["topic_id"] = forumTopicId is > 0
+                            ? new Dictionary<string, object?>
+                            {
+                                ["@type"] = "messageTopicForum",
+                                ["forum_topic_id"] = forumTopicId.Value
+                            }
+                            : null,
+                        ["query"] = forumTopicId is > 0 ? string.Empty : query?.Trim() ?? string.Empty,
+                        ["sender_id"] = null,
+                        ["from_message_id"] = cursor.ToString(CultureInfo.InvariantCulture),
+                        ["offset"] = 0,
+                        ["limit"] = take,
+                        ["filter"] = filter is null ? null :
+                            new Dictionary<string, object?> { ["@type"] = filter }
+                    }, cancellationToken).ConfigureAwait(false);
+
+                    if (!response.TryGetProperty("messages", out var batch) ||
+                        batch.ValueKind != JsonValueKind.Array ||
+                        batch.GetArrayLength() == 0) break;
+
+                    long oldest = long.MaxValue;
+                    var advanced = 0;
+                    foreach (var message in batch.EnumerateArray())
+                    {
+                        var id = ReadInt64(message, "id");
+                        if (id <= 0) continue;
+                        oldest = Math.Min(oldest, id);
+                        if (!seen.Add(id)) continue;
+                        var resultChatId = ReadInt64(message, "chat_id");
+                        if (resultChatId == 0) continue;
+                        messages[$"{resultChatId}:{id}"] = message.Clone();
+                        advanced++;
+                    }
+
+                    if (oldest == long.MaxValue || advanced == 0 ||
+                        (cursor > 0 && oldest >= cursor)) break;
+                    fetched += advanced;
+                    cursor = oldest;
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                // A filter failure must not hide results from the other filters.
+                _logger.Warning($"Telegram medya sayfalaması kullanılamadı ({filter}): {exception.Message}");
+            }
+        }
+
+        _logger.Info($"Telegram medya birlestirme: topic={forumTopicId}, gecmis={historyMessageCount}, toplam={messages.Count}");
+
+        // Some Telegram servers do not support the media-type filter together
+        // with forum topic_id. Use a paged unfiltered topic search rather than
+        // reporting an existing topic as empty.
+        if (messages.Count == 0 && forumTopicId is > 0)
+        {
+            long cursor = 0;
+            for (var page = 0; page < Math.Min(25, (limit + 99) / 100); page++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
                 var response = await RequestAsync(new Dictionary<string, object?>
                 {
                     ["@type"] = "searchChatMessages",
                     ["chat_id"] = chatId.ToString(CultureInfo.InvariantCulture),
-                    ["topic_id"] = forumTopicId is > 0
-                        ? new Dictionary<string, object?>
-                        {
-                            ["@type"] = "messageTopicForum",
-                            ["forum_topic_id"] = forumTopicId.Value
-                        }
-                        : null,
-                    ["query"] = query?.Trim() ?? string.Empty,
+                    ["topic_id"] = new Dictionary<string, object?>
+                    {
+                        ["@type"] = "messageTopicForum",
+                        ["forum_topic_id"] = forumTopicId.Value
+                    },
+                    ["query"] = forumTopicId is > 0 ? string.Empty : query?.Trim() ?? string.Empty,
                     ["sender_id"] = null,
-                    ["from_message_id"] = "0",
+                    ["from_message_id"] = cursor.ToString(CultureInfo.InvariantCulture),
                     ["offset"] = 0,
-                    ["limit"] = limit,
-                    ["filter"] = new Dictionary<string, object?> { ["@type"] = filter }
+                    ["limit"] = Math.Min(100, limit),
+                    ["filter"] = null
                 }, cancellationToken).ConfigureAwait(false);
+                if (!response.TryGetProperty("messages", out var batch) ||
+                    batch.ValueKind != JsonValueKind.Array ||
+                    batch.GetArrayLength() == 0) break;
                 AddMessages(messages, response);
-            }
-            catch (Exception exception)
-            {
-                _logger.Warning($"Telegram sohbet filtresi kullanılamadı ({filter}): {exception.Message}");
+                var ids = batch.EnumerateArray().Select(m => ReadInt64(m, "id"))
+                    .Where(id => id > 0).ToArray();
+                if (ids.Length == 0) break;
+                var oldest = ids.Min();
+                if (cursor > 0 && oldest >= cursor) break;
+                cursor = oldest;
+                if (messages.Count >= limit) break;
             }
         }
 
+        // Historical fallback for chats where server-side filters are
+        // unavailable. Do not replace a partial filtered result with chat text.
         if (messages.Count == 0 && forumTopicId is null)
         {
-            var history = await RequestAsync(new Dictionary<string, object?>
+            long cursor = 0;
+            for (var page = 0; page < Math.Min(25, (limit + 99) / 100); page++)
             {
-                ["@type"] = "getChatHistory",
-                ["chat_id"] = chatId.ToString(CultureInfo.InvariantCulture),
-                ["from_message_id"] = "0",
-                ["offset"] = 0,
-                ["limit"] = limit,
-                ["only_local"] = false
-            }, cancellationToken).ConfigureAwait(false);
-            AddMessages(messages, history);
+                cancellationToken.ThrowIfCancellationRequested();
+                var history = await RequestAsync(new Dictionary<string, object?>
+                {
+                    ["@type"] = "getChatHistory",
+                    ["chat_id"] = chatId.ToString(CultureInfo.InvariantCulture),
+                    ["from_message_id"] = cursor.ToString(CultureInfo.InvariantCulture),
+                    ["offset"] = 0,
+                    ["limit"] = 100,
+                    ["only_local"] = false
+                }, cancellationToken).ConfigureAwait(false);
+                if (!history.TryGetProperty("messages", out var batch) ||
+                    batch.ValueKind != JsonValueKind.Array ||
+                    batch.GetArrayLength() == 0) break;
+
+                AddMessages(messages, history);
+                var ids = batch.EnumerateArray().Select(m => ReadInt64(m, "id"))
+                    .Where(id => id > 0).ToArray();
+                if (ids.Length == 0) break;
+                var oldest = ids.Min();
+                if (cursor > 0 && oldest >= cursor) break;
+                cursor = oldest;
+                if (messages.Count >= limit) break;
+            }
         }
 
         var title = await GetChatTitleAsync(chatId, cancellationToken).ConfigureAwait(false);
@@ -288,9 +570,23 @@ public sealed class TdJsonTelegramService : ITelegramService
             .Where(item => item is not null)
             .Select(item => item!)
             .OrderByDescending(item => item.Date)
+            .ThenByDescending(item => item.MessageId)
             .Take(limit)
             .ToArray();
-        return TelegramArchiveSetDetector.Group(parsed);
+        // Multipart grouping MUST happen before applying the search phrase:
+        // captions can differ between .001/.002 and .z01/.zip messages.
+        // Filtering physical messages first loses a required part.
+        var grouped = TelegramArchiveSetDetector.Group(parsed);
+        _logger.Info($"Telegram dosya listesi: topic={forumTopicId}, mesaj={messages.Count}, ek={parsed.Length}, kart={grouped.Count}");
+        if (string.IsNullOrWhiteSpace(query)) return grouped;
+        var wanted = query.Trim();
+        return grouped.Where(item =>
+            item.FileName.Contains(wanted, StringComparison.OrdinalIgnoreCase) ||
+            item.Caption.Contains(wanted, StringComparison.OrdinalIgnoreCase) ||
+            (item.ArchiveParts?.Any(part =>
+                part.FileName.Contains(wanted, StringComparison.OrdinalIgnoreCase) ||
+                part.Caption.Contains(wanted, StringComparison.OrdinalIgnoreCase)) == true))
+            .ToArray();
     }
 
     public async Task<IReadOnlyList<TelegramMediaItem>> SearchMediaAsync(string query, int limit = 100, CancellationToken cancellationToken = default)
@@ -333,6 +629,83 @@ public sealed class TdJsonTelegramService : ITelegramService
             if (results.Count >= limit) break;
         }
         return TelegramArchiveSetDetector.Group(results);
+    }
+
+    private static int[] MediaTransferFileIds(TelegramMediaItem media) =>
+        (media.ArchiveParts is { Count: > 0 }
+            ? media.ArchiveParts.Select(part => part.FileId)
+            : [media.FileId])
+        .Where(id => id > 0)
+        .Distinct()
+        .ToArray();
+
+    private void ThrowIfTransferStopped(int fileId)
+    {
+        if (_stoppedTransfers.ContainsKey(fileId))
+            throw new OperationCanceledException("Telegram indirmesi kullanici tarafindan durduruldu.");
+    }
+
+    public async Task StopMediaTransferAsync(
+        TelegramMediaItem media, CancellationToken cancellationToken = default)
+    {
+        EnsureReady();
+        ArgumentNullException.ThrowIfNull(media);
+        var ids = MediaTransferFileIds(media);
+        foreach (var id in ids)
+        {
+            _stoppedTransfers.TryAdd(id, 0);
+            if (_downloads.TryRemove(id, out var waiter))
+                waiter.TrySetCanceled();
+            _filePulses.GetOrAdd(id, _ => new AsyncPulse()).Pulse();
+        }
+
+        // A progressive compressed archive has an independent extraction
+        // worker. Dispose its cache session when the user stops the transfer,
+        // otherwise that worker could continue reading TDLib file ranges.
+        if (media.IsArchiveSet)
+        {
+            var cachePrefix = $"cache:{media.ChatId}:{media.ArchiveFormat}:{media.ArchiveBaseName}:";
+            foreach (var key in _archiveCacheSessions.Keys
+                .Where(key => key.StartsWith(cachePrefix, StringComparison.Ordinal)).ToArray())
+            {
+                if (_archiveCacheSessions.TryRemove(key, out var session))
+                {
+                    await session.DisposeAsync().ConfigureAwait(false);
+                    _archiveStreamRequests.TryRemove(key, out _);
+                }
+            }
+        }
+
+        var failures = new List<Exception>();
+        foreach (var id in ids)
+        {
+            try
+            {
+                await RequestVoidAsync(new Dictionary<string, object?>
+                {
+                    ["@type"] = "cancelDownloadFile",
+                    ["file_id"] = id,
+                    ["only_if_pending"] = false
+                }, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception error)
+            {
+                failures.Add(error);
+                _logger.Warning($"Telegram aktarimi durdurulamadi (file={id}): {error.Message}");
+            }
+        }
+        if (failures.Count > 0)
+            throw new AggregateException("Telegram aktarimini durdurma komutu tamamlanamadi.", failures);
+    }
+
+    public void ResumeMediaTransfer(TelegramMediaItem media)
+    {
+        ArgumentNullException.ThrowIfNull(media);
+        foreach (var id in MediaTransferFileIds(media))
+        {
+            _stoppedTransfers.TryRemove(id, out _);
+            _filePulses.GetOrAdd(id, _ => new AsyncPulse()).Pulse();
+        }
     }
 
     public async Task<string> DownloadMediaAsync(TelegramMediaItem media, CancellationToken cancellationToken = default)
@@ -432,10 +805,66 @@ public sealed class TdJsonTelegramService : ITelegramService
                     : "Arşiv parçalarından biri eksik. Parçaları düzenleyin.");
 
         var map = CreateArchiveMap(archive);
-        return archive.ArchiveFormat == TelegramArchiveFormat.SplitZip
+        if (archive.ArchiveFormat is TelegramArchiveFormat.RawSplit or TelegramArchiveFormat.GenericSplit)
+        {
+            var name = archive.ArchiveBaseName ?? archive.FileName;
+            if (archive.ArchiveFormat == TelegramArchiveFormat.GenericSplit)
+            {
+                // NAME.001/.002 does not reveal the original format. Inspect
+                // its actual bytes, not captions, before choosing a reader.
+                var signature = await map.ReadExactAsync(
+                    0, (int)Math.Min(8L, map.Length), cancellationToken).ConfigureAwait(false);
+                if (signature.Length >= 4 && signature[0] == 'P' && signature[1] == 'K' &&
+                    ((signature[2] == 3 && signature[3] == 4) ||
+                     (signature[2] == 5 && signature[3] == 6)))
+                {
+                    _logger.Info($"Telegram generic split: concatenated ZIP Store/Deflate · {name}");
+                    return await SplitZipArchiveReader.InspectConcatenatedAsync(map, cancellationToken)
+                        .ConfigureAwait(false);
+                }
+                if (signature.Length >= 6 &&
+                    signature[0] == 0x37 && signature[1] == 0x7A &&
+                    signature[2] == 0xBC && signature[3] == 0xAF &&
+                    signature[4] == 0x27 && signature[5] == 0x1C)
+                {
+                    _logger.Info($"Telegram generic split: 7z archive · {name}");
+                    return await TelegramArchiveStreamingEngine.InspectAsync(
+                        map, TelegramArchiveFormat.GenericSplit, cancellationToken).ConfigureAwait(false);
+                }
+                if (signature.Length >= 4 && signature[0] == 'R' && signature[1] == 'a' &&
+                    signature[2] == 'r' && signature[3] == '!')
+                {
+                    _logger.Info($"Telegram generic split: RAR archive · {name}");
+                    return await TelegramArchiveStreamingEngine.InspectAsync(
+                        map, TelegramArchiveFormat.GenericSplit, cancellationToken).ConfigureAwait(false);
+                }
+                // Raw media remains a direct, gapless Range stream. libmpv
+                // probes formats from bytes even when the uploader removed
+                // the .mkv/.mp4 suffix from the split file's base name.
+                if (signature.Length >= 4 &&
+                    signature[0] == 0x1A && signature[1] == 0x45 &&
+                    signature[2] == 0xDF && signature[3] == 0xA3)
+                    name += ".mkv";
+                else if (signature.Length >= 8 &&
+                         signature[4] == 'f' && signature[5] == 't' &&
+                         signature[6] == 'y' && signature[7] == 'p')
+                    name += ".mp4";
+                _logger.Info($"Telegram generic split: raw media · {name}");
+            }
+            return new TelegramArchiveInspection(
+                archive.ArchiveFormat,
+                [new TelegramArchiveEntry(name, map.Length, map.Length, 0, 0, false, true)],
+                true,
+                "Dosya parçaları sırayla, tamamının indirilmesi beklenmeden açılabilir.");
+        }
+        var inspection = archive.ArchiveFormat == TelegramArchiveFormat.SplitZip
             ? await SplitZipArchiveReader.InspectAsync(map, cancellationToken).ConfigureAwait(false)
             : await TelegramArchiveStreamingEngine.InspectAsync(map, archive.ArchiveFormat, cancellationToken)
                 .ConfigureAwait(false);
+        _logger.Info($"Telegram arşiv okuma yolu: format={archive.ArchiveFormat}, " +
+            $"direkt={inspection.Entries.Count(entry => entry.UsesDirectRange)}, " +
+            $"tamponlu={inspection.Entries.Count(entry => entry.IsPlayable && !entry.UsesDirectRange)}");
+        return inspection;
     }
 
     public async Task<RemoteOpenRequest> CreateArchiveStreamRequestAsync(
@@ -543,6 +972,90 @@ public sealed class TdJsonTelegramService : ITelegramService
         });
     }
 
+
+    /// <summary>
+    /// Fetches only the selected subtitle entry's compressed bytes from TDLib.
+    /// No DownloadMediaAsync and no entire Telegram ZIP are required. The tiny
+    /// extracted subtitle is kept locally because libmpv needs a real file for
+    /// subtitle sync and ASS parsing.
+    /// </summary>
+    public async Task<string> ExtractArchiveSubtitleAsync(
+        TelegramMediaItem archive,
+        TelegramArchiveEntry entry,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureReady();
+        ArgumentNullException.ThrowIfNull(archive);
+        ArgumentNullException.ThrowIfNull(entry);
+        if (archive.ArchiveFormat is not (TelegramArchiveFormat.SplitZip or TelegramArchiveFormat.GenericSplit) ||
+            archive.ArchiveParts is not { Count: > 0 } ||
+            !archive.ArchiveSetComplete || archive.ArchiveSetAmbiguous)
+            throw new InvalidDataException("Altyazı için geçerli bir ZIP kaynağı seçin.");
+        var extension = Path.GetExtension(entry.Name);
+        if (!new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                { ".srt", ".ass", ".ssa", ".vtt", ".sub", ".idx", ".sup" }.Contains(extension))
+            throw new InvalidDataException("Arşiv girdisi desteklenen bir altyazı değil.");
+        const long maximumSubtitleBytes = 128L * 1024 * 1024;
+        if (entry.IsEncrypted || entry.UncompressedSize <= 0 ||
+            entry.UncompressedSize > maximumSubtitleBytes ||
+            entry.CompressedSize <= 0 ||
+            entry.CompressionMethod is not (0 or 8))
+            throw new InvalidDataException("Şifreli, boş veya desteklenmeyen ZIP altyazısı.");
+        if (entry.CompressionMethod == 0 && entry.CompressedSize != entry.UncompressedSize)
+            throw new InvalidDataException("ZIP altyazı boyutu tutarsız.");
+
+        var map = CreateArchiveMap(archive);
+        if (archive.ArchiveFormat == TelegramArchiveFormat.GenericSplit)
+        {
+            var magic = await map.ReadExactAsync(0, (int)Math.Min(4L, map.Length), cancellationToken)
+                .ConfigureAwait(false);
+            if (magic.Length < 4 || magic[0] != 'P' || magic[1] != 'K')
+                throw new InvalidDataException("Altyazı çıkarma için bir ZIP dosyası gereklidir.");
+        }
+        if (entry.DataOffset < 0 || entry.DataOffset > map.Length - entry.CompressedSize)
+            throw new InvalidDataException("ZIP içindeki altyazı byte aralığı geçersiz.");
+
+        var fileName = Path.GetFileName(entry.Name.Replace('\\', '/'));
+        var folder = Path.Combine(
+            _configuration?.FilesDirectory ?? Path.GetTempPath(),
+            "archive-subtitle-cache", Guid.NewGuid().ToString("N"));
+        var outputPath = Path.Combine(folder, fileName);
+        Directory.CreateDirectory(folder);
+        try
+        {
+            using var compressed = new TelegramArchiveReadStream(
+                entry.CompressedSize,
+                (offset, count, token) => map.ReadExactAsync(
+                    checked(entry.DataOffset + offset), count, token),
+                cancellationToken);
+            using Stream decoded = entry.CompressionMethod == 8
+                ? new DeflateStream(compressed, CompressionMode.Decompress, leaveOpen: true)
+                : compressed;
+
+            await using var output = new FileStream(
+                outputPath, FileMode.CreateNew, FileAccess.Write, FileShare.None,
+                64 * 1024, FileOptions.Asynchronous | FileOptions.SequentialScan);
+            var buffer = new byte[64 * 1024];
+            long written = 0;
+            int read;
+            while ((read = await decoded.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) != 0)
+            {
+                written += read;
+                if (written > entry.UncompressedSize || written > maximumSubtitleBytes)
+                    throw new InvalidDataException("ZIP altyazısı güvenli çözme sınırını aşıyor.");
+                await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
+            }
+            if (written != entry.UncompressedSize)
+                throw new InvalidDataException("ZIP altyazısı eksik çözüldü.");
+            return outputPath;
+        }
+        catch
+        {
+            try { Directory.Delete(folder, recursive: true); } catch { }
+            throw;
+        }
+    }
+
     private SplitArchiveVolumeMap CreateArchiveMap(TelegramMediaItem archive) => new(
         archive.ArchiveParts ?? throw new InvalidOperationException("Arşiv parçaları bulunamadı."),
         (part, offset, count, token) => ReadStreamRangeAsync(part.FileId, part.Size, offset, count, token));
@@ -574,6 +1087,7 @@ public sealed class TdJsonTelegramService : ITelegramService
         int count,
         CancellationToken cancellationToken)
     {
+        ThrowIfTransferStopped(fileId);
         if (fileSize <= 0 || offset < 0 || offset >= fileSize || count < 0)
             throw new EndOfStreamException("Telegram dosyasından istenen byte aralığı geçersiz.");
         count = (int)Math.Min(count, fileSize - offset);
@@ -585,6 +1099,7 @@ public sealed class TdJsonTelegramService : ITelegramService
         while (DateTimeOffset.UtcNow < deadline)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            ThrowIfTransferStopped(fileId);
             var waitForUpdate = pulse.Next;
             var now = DateTimeOffset.UtcNow;
             if (_fileStates.TryGetValue(fileId, out var current))
@@ -712,6 +1227,7 @@ public sealed class TdJsonTelegramService : ITelegramService
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            ThrowIfTransferStopped(fileId);
             // Mesaj nesnesindeki local durumu eski bir indirmenin prefix bilgisini
             // tasiyabilir. Dosya temizlenmis olsa bile bu eski deger erken donuse
             // neden oluyordu. Bekleyen her eksik parca TDLib'ye yeniden bildirilir.
@@ -758,7 +1274,15 @@ public sealed class TdJsonTelegramService : ITelegramService
                     }
                 }
             }
-            return new(chatId, title, type, ReadInt32(response, "unread_count"), order);
+            return new TelegramChatItem(chatId, title, type,
+                ReadInt32(response, "unread_count"), order)
+            {
+                // Telegram channels and groups share chatTypeSupergroup.
+                // The is_channel flag is the authoritative TDLib distinction.
+                IsChannel = type == "chatTypeSupergroup" &&
+                            typeElement.ValueKind == JsonValueKind.Object &&
+                            ReadBool(typeElement, "is_channel")
+            };
         }
         catch (Exception exception)
         {
@@ -777,12 +1301,7 @@ public sealed class TdJsonTelegramService : ITelegramService
     private static void AddMessages(IDictionary<string, JsonElement> target, JsonElement response)
     {
         if (!response.TryGetProperty("messages", out var messages) || messages.ValueKind != JsonValueKind.Array) return;
-        foreach (var message in messages.EnumerateArray())
-        {
-            var chatId = ReadInt64(message, "chat_id");
-            var messageId = ReadInt64(message, "id");
-            if (chatId != 0 && messageId != 0) target[$"{chatId}:{messageId}"] = message.Clone();
-        }
+        TelegramForumMessageMerge.Add(target, messages.EnumerateArray());
     }
 
     private TelegramMediaItem? ParseMedia(JsonElement message, string chatTitle)
@@ -813,14 +1332,7 @@ public sealed class TdJsonTelegramService : ITelegramService
             case "messageDocument" when content.TryGetProperty("document", out media) && media.TryGetProperty("document", out file):
                 name = ReadString(media, "file_name", "telegram-dosya");
                 mime = ReadString(media, "mime_type", "application/octet-stream");
-                if (TelegramArchiveSetDetector.IsArchivePartFileName(name))
-                    kind = TelegramMediaKind.ArchivePart;
-                else if (IsAudioDocument(name, mime))
-                    kind = TelegramMediaKind.Audio;
-                else if (IsPlayableDocument(name, mime))
-                    kind = TelegramMediaKind.Document;
-                else
-                    return null;
+                kind = ClassifyDocumentKind(name, mime);
                 duration = 0;
                 break;
             case "messageAudio" when content.TryGetProperty("audio", out media) && media.TryGetProperty("audio", out file):
@@ -856,6 +1368,16 @@ public sealed class TdJsonTelegramService : ITelegramService
             fileInfo.IsCompleted);
     }
 
+    // Never use Telegram message captions to identify or exclude documents.
+    // Files such as Film.mkv.001 are legitimate Telegram attachments even
+    // when not recognized by a normal video MIME/extension.
+    private static TelegramMediaKind ClassifyDocumentKind(string name, string mime) =>
+        TelegramArchiveSetDetector.IsArchivePartFileName(name) ? TelegramMediaKind.ArchivePart :
+        IsAudioDocument(name, mime) ? TelegramMediaKind.Audio :
+        IsSubtitleDocument(name) ? TelegramMediaKind.Subtitle :
+        IsPlayableDocument(name, mime) ? TelegramMediaKind.Video :
+        TelegramMediaKind.Document;
+
     private static bool IsAudioDocument(string name, string mime)
     {
         if (mime.StartsWith("audio/", StringComparison.OrdinalIgnoreCase))
@@ -868,6 +1390,15 @@ public sealed class TdJsonTelegramService : ITelegramService
             ".dtshd", ".thd", ".truehd", ".m4a", ".ogg", ".opus", ".wav"
         }.Contains(extension, StringComparer.OrdinalIgnoreCase);
     }
+
+    private static bool IsSubtitleDocument(string name) =>
+        ArchiveMediaAttachmentExtensions.Contains(Path.GetExtension(name));
+
+    private static readonly HashSet<string> ArchiveMediaAttachmentExtensions =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".srt", ".ass", ".ssa", ".vtt", ".sub", ".idx", ".sup"
+        };
 
     private static bool IsPlayableDocument(string name, string mime)
     {
@@ -1184,6 +1715,7 @@ public sealed class TdJsonTelegramService : ITelegramService
                 await session.DisposeAsync().ConfigureAwait(false);
             _archiveCacheSessions.Clear();
             foreach (var gate in _rangeRequestGates.Values) gate.Dispose();
+            // Do not dispose the lightweight optimizer gate while a late UI cache task may release it.
             _native?.Dispose();
             _lifetime.Dispose();
         }

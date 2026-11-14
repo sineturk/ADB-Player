@@ -6,6 +6,8 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using AltyaziDB.Player.Addons;
 using AltyaziDB.Player.Addons.Models;
 using AltyaziDB.Player.AudioSync.Abstractions;
@@ -78,11 +80,16 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private readonly AppPaths _paths;
     private readonly PlayerSettings _settings;
     private readonly SemaphoreSlim _resumeSaveGate = new(1, 1);
+    private int _continueWatchingRefreshGeneration;
     private readonly SemaphoreSlim _playbackInitGate = new(1, 1);
     private readonly SemaphoreSlim _cloudSyncGate = new(1, 1);
     private readonly MediaArtworkService _mediaArtwork;
 
     private PlaybackSnapshot _snapshot = PlaybackSnapshot.Empty;
+    private LocalAudioVisualMetadata _audioVisualMetadata = LocalAudioVisualMetadata.Empty;
+    private ImageSource? _audioCoverImage;
+    private CancellationTokenSource? _audioVisualCts;
+    private int _audioVisualGeneration;
     private string _statusMessage = "Bir kaynak seçin.";
     private bool _isReady;
     private bool _isMediaCenterVisible = true;
@@ -90,6 +97,10 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private MediaTrack? _selectedAudioTrack;
     private MediaTrack? _selectedSubtitleTrack;
     private MediaTrack? _selectedSecondarySubtitleTrack;
+    // Sub-delay applies globally inside mpv, so remember it per selected
+    // subtitle track and restore when switching. Never leak to another track.
+    private readonly Dictionary<long, double> _primarySubtitleTrackDelays = new();
+    private readonly Dictionary<long, double> _secondarySubtitleTrackDelays = new();
     private long? _selectedSecondarySubtitleTrackId;
     private string _goToTimeText = string.Empty;
     private PlaylistItem? _selectedPlaylistItem;
@@ -119,6 +130,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private int _selectedSidebarIndex;
     private bool _resumeAfterExternalAudioSelection;
     private string? _currentPlaybackSource;
+    private bool _videoFillMode;
     private IReadOnlyDictionary<string, string>? _currentPlaybackHeaders;
     private VideoEnhancementOption? _selectedVideoEnhancement;
     private VideoProfileOption? _selectedVideoProfile;
@@ -211,6 +223,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         _settings = _settingsService.LoadAsync().GetAwaiter().GetResult();
         _settings.RecentSources ??= new List<RecentSourceEntry>();
         _settings.MediaAttachmentStates ??= new List<SavedMediaAttachmentState>();
+        _settings.TelegramResumeSourceOwners ??= new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
         if (!_settings.MediaCenterSidebarPreferenceSet)
         {
             // Rev10.6: video playback starts distraction-free. The user can
@@ -266,9 +279,14 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             SaveSettingsAsync,
             OpenRemoteSourceAsync,
             AttachRemoteAudioAsync,
+            AttachTelegramLocalAudioPath,
+            AttachTelegramSubtitlePath,
+            () => HasMedia,
+            () => $"{Snapshot.Title} {Path.GetFileName(_currentPlaybackSource ?? Snapshot.Source)}",
             dialogs,
             logger,
-            paths);
+            paths,
+            () => Snapshot.IsIdle);
         Torrent = new TorrentPanelViewModel(
             torrentService,
             _settings,
@@ -276,7 +294,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             OpenTorrentPlaybackSourceAsync,
             dialogs,
             logger,
-            paths);
+            paths,
+            secretStore);
         Connections = new ConnectionsPanelViewModel(
             externalConnectionService,
             OpenExternalReleaseAsync,
@@ -291,7 +310,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             OpenExternalReleaseAsync,
             dialogs,
             logger,
-            paths);
+            paths,
+            mediaMetadataService);
         Addons.PortablePreferencesChanged += AddonsOnPortablePreferencesChanged;
         Library.CloudCollectionsChanged += CloudCollectionsOnChanged;
         Addons.CloudCollectionsChanged += CloudCollectionsOnChanged;
@@ -310,7 +330,11 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             Telegram.ReloadCredentialsAsync,
             Subtitles.ReloadApiConfigurationAsync,
             logger);
+        CloudCache = new CloudCachePanelViewModel(
+            _settings, paths, SaveSettingsAsync, () => !Snapshot.IsIdle,
+            dialogs, logger);
         Account = new AccountPanelViewModel(cloudAccountService, mediaMetadataService, logger);
+        Account.CloudAuthReady += AccountOnCloudAuthReady;
         Account.CloudSessionReady += AccountOnCloudSessionReady;
 
         AudioTracks = new ObservableCollection<MediaTrack>();
@@ -325,6 +349,15 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         HistoryItems = new ObservableCollection<HistoryItem>(
             RecentSources.Select(CreateHistoryItem));
         ContinueWatching = new ObservableCollection<ContinueWatchingItem>();
+        TelegramContinueWatching = new ObservableCollection<ContinueWatchingItem>();
+        TelegramRecentlyOpened = new ObservableCollection<RecentSourceEntry>();
+        // The Telegram VM restores its session asynchronously in its
+        // constructor. Subscribe only after our UI collections exist.
+        Telegram.PropertyChanged += TelegramOnPropertyChanged;
+        RefreshTelegramRecentlyOpened();
+        if (Telegram.IsReady && Telegram.CurrentAccountId is > 0)
+            TelegramOnPropertyChanged(Telegram,
+                new System.ComponentModel.PropertyChangedEventArgs(nameof(TelegramPanelViewModel.CurrentAccountId)));
         SpeedOptions = new[] { 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0, 4.0 };
         VideoProfileOptions = CreateVideoProfileOptions();
         _selectedVideoProfile = VideoProfileOptions.FirstOrDefault(option =>
@@ -361,6 +394,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         ResyncSubtitleCommand = new AsyncRelayCommand(ResyncExternalSubtitleAsync);
         AudioDelayDecreaseCommand = new RelayCommand(() => AdjustManualAudioDelay(-0.05));
         AudioDelayIncreaseCommand = new RelayCommand(() => AdjustManualAudioDelay(0.05));
+        AudioDelayResetCommand = new RelayCommand(ResetManualAudioDelay);
         PlayPauseCommand = new RelayCommand(() => SafePlaybackAction(_playback.TogglePause));
         SeekBackwardCommand = new RelayCommand(() => SeekRelative(-SeekShortSeconds));
         SeekForwardCommand = new RelayCommand(() => SeekRelative(SeekShortSeconds));
@@ -396,12 +430,14 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         ResetShortcutsCommand = new RelayCommand(ResetShortcuts);
         OpenLogFolderCommand = new RelayCommand(() => OpenFolder(_paths.LogDirectory, "Tanılama klasörü açılamadı."));
         OpenScreenshotFolderCommand = new RelayCommand(() => OpenFolder(_paths.ScreenshotDirectory, "Ekran görüntüsü klasörü açılamadı."));
+        OpenTorrentDownloadFolderCommand = new RelayCommand(() => OpenFolder(TorrentDownloadDirectory, LocalizationManager.Get("Settings.TorrentStorage.Error")));
         ShowMediaCenterCommand = new RelayCommand(ShowMediaCenter);
         ShowSourcesCommand = new RelayCommand(() => SelectedSidebarIndex = 0);
         ShowDiscoverCommand = new RelayCommand(() => SelectedSidebarIndex = 1);
         ShowLibraryCommand = new RelayCommand(() => SelectedSidebarIndex = 2);
         ShowPlaylistCommand = new RelayCommand(() => SelectedSidebarIndex = 3);
         ShowTelegramCommand = new RelayCommand(() => SelectedSidebarIndex = 5);
+        ShowTelegramHubCommand = new RelayCommand(() => SelectedSidebarIndex = 13);
         ShowAddonsCommand = new RelayCommand(() => SelectedSidebarIndex = 7);
         ShowTorrentCommand = new RelayCommand(() => SelectedSidebarIndex = 8);
         ShowSettingsCommand = new RelayCommand(() => SelectedSidebarIndex = 10);
@@ -431,6 +467,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     public ObservableCollection<RecentSourceEntry> RecentSources { get; }
     public ObservableCollection<HistoryItem> HistoryItems { get; }
     public ObservableCollection<ContinueWatchingItem> ContinueWatching { get; }
+    public ObservableCollection<ContinueWatchingItem> TelegramContinueWatching { get; }
+    public ObservableCollection<RecentSourceEntry> TelegramRecentlyOpened { get; }
     public IReadOnlyList<double> SpeedOptions { get; }
     public IReadOnlyList<VideoProfileOption> VideoProfileOptions { get; }
     public IReadOnlyList<VideoEnhancementOption> VideoEnhancementOptions { get; }
@@ -450,6 +488,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     public AddonsPanelViewModel Addons { get; }
     public UpdatePanelViewModel Updates { get; }
     public ApiSettingsPanelViewModel ApiSettings { get; }
+    public CloudCachePanelViewModel CloudCache { get; }
     public AccountPanelViewModel Account { get; }
 
     public ICommand OpenFileCommand { get; }
@@ -463,6 +502,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     public ICommand ResyncSubtitleCommand { get; }
     public ICommand AudioDelayDecreaseCommand { get; }
     public ICommand AudioDelayIncreaseCommand { get; }
+    public ICommand AudioDelayResetCommand { get; }
     public ICommand PlayPauseCommand { get; }
     public ICommand SeekBackwardCommand { get; }
     public ICommand SeekForwardCommand { get; }
@@ -498,12 +538,112 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     public ICommand ResetShortcutsCommand { get; }
     public ICommand OpenLogFolderCommand { get; }
     public ICommand OpenScreenshotFolderCommand { get; }
+    public ICommand OpenTorrentDownloadFolderCommand { get; }
+    public string TorrentDownloadDirectory =>
+        string.IsNullOrWhiteSpace(_settings.TorrentDownloadDirectory)
+            ? _paths.TorrentCacheDirectory
+            : _settings.TorrentDownloadDirectory;
+
+    private string _torrentStorageStatus = string.Empty;
+    public string TorrentStorageStatus
+    {
+        get => _torrentStorageStatus;
+        private set => SetProperty(ref _torrentStorageStatus, value);
+    }
+
+    public string TorrentStorageFreeSpace
+    {
+        get
+        {
+            try
+            {
+                var root = Path.GetPathRoot(TorrentDownloadDirectory);
+                if (string.IsNullOrEmpty(root)) return string.Empty;
+                var drive = new DriveInfo(root);
+                return drive.IsReady
+                    ? string.Format(CultureInfo.CurrentCulture,
+                        LocalizationManager.Get("Settings.TorrentStorage.Free"),
+                        drive.AvailableFreeSpace / 1073741824d)
+                    : string.Empty;
+            }
+            catch (Exception) { return string.Empty; }
+        }
+    }
+
+    // Download folder changes never move or delete existing data.
+    // Torrent engines capture their target at InitializeAsync. Restart Player
+    // after a change to avoid rewriting a live torrent's paths.
+    public void SetTorrentDownloadDirectory(string? selectedFolder)
+    {
+        if (string.IsNullOrWhiteSpace(selectedFolder)) return;
+        try
+        {
+            var full = Path.GetFullPath(selectedFolder.Trim());
+            var root = Path.GetPathRoot(full);
+            if (!Path.IsPathFullyQualified(full) ||
+                string.IsNullOrEmpty(root) ||
+                string.Equals(full.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+                    root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+                    StringComparison.OrdinalIgnoreCase))
+                throw new IOException("Unsafe download folder.");
+
+            // Reject Windows/system/application executable directories.
+            var systemDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+            var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+            var applicationDirectory = AppContext.BaseDirectory;
+            if (IsWithinDirectory(full, systemDirectory) ||
+                IsWithinDirectory(full, programFiles) ||
+                IsWithinDirectory(full, applicationDirectory))
+                throw new IOException("Protected download folder.");
+
+            Directory.CreateDirectory(full);
+            var probe = Path.Combine(full, ".adb-write-test-" + Guid.NewGuid().ToString("N"));
+            using (new FileStream(probe, FileMode.CreateNew, FileAccess.Write, FileShare.None,
+                       1, FileOptions.DeleteOnClose)) { }
+
+            if (string.Equals(full, TorrentDownloadDirectory, StringComparison.OrdinalIgnoreCase))
+                return;
+            _settings.TorrentDownloadDirectory =
+                string.Equals(full, _paths.TorrentCacheDirectory, StringComparison.OrdinalIgnoreCase)
+                    ? string.Empty : full;
+            OnPropertyChanged(nameof(TorrentDownloadDirectory));
+            OnPropertyChanged(nameof(TorrentStorageFreeSpace));
+            TorrentStorageStatus = LocalizationManager.Get("Settings.TorrentStorage.Restart");
+            _ = SaveSettingsAsync();
+        }
+        catch (Exception exception) when (exception is ArgumentException or NotSupportedException
+            or IOException or UnauthorizedAccessException)
+        {
+            TorrentStorageStatus = LocalizationManager.Get("Settings.TorrentStorage.Error");
+        }
+    }
+
+    public void RestoreTorrentDownloadDirectory()
+    {
+        _settings.TorrentDownloadDirectory = string.Empty;
+        OnPropertyChanged(nameof(TorrentDownloadDirectory));
+        OnPropertyChanged(nameof(TorrentStorageFreeSpace));
+        TorrentStorageStatus = LocalizationManager.Get("Settings.TorrentStorage.Restart");
+        _ = SaveSettingsAsync();
+    }
+
+    private static bool IsWithinDirectory(string candidate, string? directory)
+    {
+        if (string.IsNullOrWhiteSpace(directory)) return false;
+        var parent = Path.GetFullPath(directory).TrimEnd(Path.DirectorySeparatorChar) +
+                     Path.DirectorySeparatorChar;
+        return candidate.StartsWith(parent, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(candidate, parent.TrimEnd(Path.DirectorySeparatorChar),
+                StringComparison.OrdinalIgnoreCase);
+    }
+
     public ICommand ShowMediaCenterCommand { get; }
     public ICommand ShowSourcesCommand { get; }
     public ICommand ShowDiscoverCommand { get; }
     public ICommand ShowLibraryCommand { get; }
     public ICommand ShowPlaylistCommand { get; }
     public ICommand ShowTelegramCommand { get; }
+    public ICommand ShowTelegramHubCommand { get; }
     public ICommand ShowAddonsCommand { get; }
     public ICommand ShowTorrentCommand { get; }
     public ICommand ShowSettingsCommand { get; }
@@ -644,6 +784,24 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     public string ShortcutFullscreen { get => _settings.ShortcutFullscreen; set => SetShortcut(_settings.ShortcutFullscreen, value, nameof(ShortcutFullscreen), v => _settings.ShortcutFullscreen = v); }
     public string ShortcutMiniPlayer { get => _settings.ShortcutMiniPlayer; set => SetShortcut(_settings.ShortcutMiniPlayer, value, nameof(ShortcutMiniPlayer), v => _settings.ShortcutMiniPlayer = v); }
     public string ShortcutPlaylist { get => _settings.ShortcutPlaylist; set => SetShortcut(_settings.ShortcutPlaylist, value, nameof(ShortcutPlaylist), v => _settings.ShortcutPlaylist = v); }
+    public string ShortcutSubtitleDelayDecrease { get => _settings.ShortcutSubtitleDelayDecrease; set => SetShortcut(_settings.ShortcutSubtitleDelayDecrease, value, nameof(ShortcutSubtitleDelayDecrease), v => _settings.ShortcutSubtitleDelayDecrease = v); }
+    public string ShortcutSubtitleDelayIncrease { get => _settings.ShortcutSubtitleDelayIncrease; set => SetShortcut(_settings.ShortcutSubtitleDelayIncrease, value, nameof(ShortcutSubtitleDelayIncrease), v => _settings.ShortcutSubtitleDelayIncrease = v); }
+    public string ShortcutAudioDelayDecrease { get => _settings.ShortcutAudioDelayDecrease; set => SetShortcut(_settings.ShortcutAudioDelayDecrease, value, nameof(ShortcutAudioDelayDecrease), v => _settings.ShortcutAudioDelayDecrease = v); }
+    public string ShortcutAudioDelayIncrease { get => _settings.ShortcutAudioDelayIncrease; set => SetShortcut(_settings.ShortcutAudioDelayIncrease, value, nameof(ShortcutAudioDelayIncrease), v => _settings.ShortcutAudioDelayIncrease = v); }
+    public string ShortcutSpeedIncrease { get => _settings.ShortcutSpeedIncrease; set => SetShortcut(_settings.ShortcutSpeedIncrease, value, nameof(ShortcutSpeedIncrease), v => _settings.ShortcutSpeedIncrease = v); }
+    public string ShortcutSpeedDecrease { get => _settings.ShortcutSpeedDecrease; set => SetShortcut(_settings.ShortcutSpeedDecrease, value, nameof(ShortcutSpeedDecrease), v => _settings.ShortcutSpeedDecrease = v); }
+    public string ShortcutSpeedReset { get => _settings.ShortcutSpeedReset; set => SetShortcut(_settings.ShortcutSpeedReset, value, nameof(ShortcutSpeedReset), v => _settings.ShortcutSpeedReset = v); }
+    public string ShortcutNextMedia { get => _settings.ShortcutNextMedia; set => SetShortcut(_settings.ShortcutNextMedia, value, nameof(ShortcutNextMedia), v => _settings.ShortcutNextMedia = v); }
+    public string ShortcutCycleAudioTrack { get => _settings.ShortcutCycleAudioTrack; set => SetShortcut(_settings.ShortcutCycleAudioTrack, value, nameof(ShortcutCycleAudioTrack), v => _settings.ShortcutCycleAudioTrack = v); }
+    public string ShortcutCycleSubtitleTrack { get => _settings.ShortcutCycleSubtitleTrack; set => SetShortcut(_settings.ShortcutCycleSubtitleTrack, value, nameof(ShortcutCycleSubtitleTrack), v => _settings.ShortcutCycleSubtitleTrack = v); }
+    public string ShortcutMute { get => _settings.ShortcutMute; set => SetShortcut(_settings.ShortcutMute, value, nameof(ShortcutMute), v => _settings.ShortcutMute = v); }
+    public string ShortcutVolumeIncrease { get => _settings.ShortcutVolumeIncrease; set => SetShortcut(_settings.ShortcutVolumeIncrease, value, nameof(ShortcutVolumeIncrease), v => _settings.ShortcutVolumeIncrease = v); }
+    public string ShortcutVolumeDecrease { get => _settings.ShortcutVolumeDecrease; set => SetShortcut(_settings.ShortcutVolumeDecrease, value, nameof(ShortcutVolumeDecrease), v => _settings.ShortcutVolumeDecrease = v); }
+    public string ShortcutScreenshotAlternate { get => _settings.ShortcutScreenshotAlternate; set => SetShortcut(_settings.ShortcutScreenshotAlternate, value, nameof(ShortcutScreenshotAlternate), v => _settings.ShortcutScreenshotAlternate = v); }
+    public string ShortcutSubtitleDelayDecreaseAlternate { get => _settings.ShortcutSubtitleDelayDecreaseAlternate; set => SetShortcut(_settings.ShortcutSubtitleDelayDecreaseAlternate, value, nameof(ShortcutSubtitleDelayDecreaseAlternate), v => _settings.ShortcutSubtitleDelayDecreaseAlternate = v); }
+    public string ShortcutSubtitleDelayIncreaseAlternate { get => _settings.ShortcutSubtitleDelayIncreaseAlternate; set => SetShortcut(_settings.ShortcutSubtitleDelayIncreaseAlternate, value, nameof(ShortcutSubtitleDelayIncreaseAlternate), v => _settings.ShortcutSubtitleDelayIncreaseAlternate = v); }
+    public string ShortcutAudioDelayDecreaseAlternate { get => _settings.ShortcutAudioDelayDecreaseAlternate; set => SetShortcut(_settings.ShortcutAudioDelayDecreaseAlternate, value, nameof(ShortcutAudioDelayDecreaseAlternate), v => _settings.ShortcutAudioDelayDecreaseAlternate = v); }
+    public string ShortcutAudioDelayIncreaseAlternate { get => _settings.ShortcutAudioDelayIncreaseAlternate; set => SetShortcut(_settings.ShortcutAudioDelayIncreaseAlternate, value, nameof(ShortcutAudioDelayIncreaseAlternate), v => _settings.ShortcutAudioDelayIncreaseAlternate = v); }
 
     public LanguageOption SelectedLanguage
     {
@@ -669,15 +827,16 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         get => _selectedSidebarIndex;
         set
         {
-            var normalized = Math.Clamp(value, 0, 12);
+            var normalized = Math.Clamp(value, 0, 13);
             if (!SetProperty(ref _selectedSidebarIndex, normalized))
             {
                 return;
             }
 
-            if (normalized == 0)
+            if (normalized is 0 or 13)
             {
                 _ = RefreshContinueWatchingAsync();
+                if (normalized == 13) RefreshTelegramRecentlyOpened();
             }
             else if (normalized == 1)
             {
@@ -705,10 +864,19 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         get => _snapshot;
         private set
         {
+            var previousSource = _snapshot.Source;
             if (!SetProperty(ref _snapshot, value))
-            {
                 return;
-            }
+
+            if (!string.Equals(previousSource, value.Source, StringComparison.OrdinalIgnoreCase))
+                _ = LoadAudioVisualMetadataAsync(value.Source);
+
+            OnPropertyChanged(nameof(IsAudioOnly));
+            OnPropertyChanged(nameof(IsAudioOnlyPlaying));
+            OnPropertyChanged(nameof(AudioOnlyTitle));
+            OnPropertyChanged(nameof(AudioOnlyCodecLabel));
+            OnPropertyChanged(nameof(AudioOnlyQualityLabel));
+            OnPropertyChanged(nameof(AudioOnlyPlaybackStatusKey));
 
             OnPropertyChanged(nameof(PositionSeconds));
             OnPropertyChanged(nameof(DurationSeconds));
@@ -799,6 +967,9 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     }
 
     public bool IsSubtitleSyncVisible => _hasSubtitleSyncSession;
+
+    // Manual timing must also work for embedded tracks, not only external auto-sync sessions.
+    public bool CanAdjustSubtitleDelay => SelectedSubtitleTrack is { IsDisabled: false };
 
     public string SubtitleSyncActionText
     {
@@ -937,6 +1108,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     }
 
     public bool HasExternalAudio => !string.IsNullOrWhiteSpace(_externalAudioSource);
+    public double ManualAudioDelaySeconds => _manualAudioDelaySeconds;
 
     public string AudioSyncActionText
     {
@@ -999,9 +1171,9 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
                 return "—";
             }
 
-            if (_audioSyncApplicationKind == AudioSyncApplicationKind.None &&
-                _audioSyncResult is not { CanApplyLive: true } &&
-                Math.Abs(_manualAudioDelaySeconds) < 0.0005)
+            // When an external audio track is attached but no correction is needed,
+            // show a useful zero offset instead of the placeholder dash.
+            if (!HasExternalAudio)
             {
                 return "—";
             }
@@ -1268,6 +1440,43 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     public string PlayPauseText => Snapshot.IsPaused ? "▶" : "Ⅱ";
     public bool IsBuffering => Snapshot.IsBuffering;
     public bool HasMedia => !string.IsNullOrWhiteSpace(Snapshot.Source);
+
+    // The decoder determines whether this is an audio-only source, not the
+    // presence of an MP3 extension alone (Telegram and HTTP audio also work).
+    public bool IsAudioOnly => AudioOnlyVisualPolicy.ShouldShow(Snapshot, IsMediaCenterVisible);
+    public bool IsAudioOnlyPlaying => IsAudioOnly && !Snapshot.IsPaused && !Snapshot.IsBuffering;
+    public ImageSource? AudioOnlyCover => _audioCoverImage;
+    public bool HasAudioOnlyCover => _audioCoverImage is not null;
+    public string AudioOnlyTitle
+    {
+        get
+        {
+            if (!string.IsNullOrWhiteSpace(_audioVisualMetadata.Title))
+                return _audioVisualMetadata.Title;
+            var currentTitle = Snapshot.Title?.Trim();
+            if (!string.IsNullOrWhiteSpace(currentTitle) &&
+                !string.Equals(currentTitle, "AltyazıDB Player", StringComparison.OrdinalIgnoreCase))
+                return currentTitle;
+            return string.IsNullOrWhiteSpace(Snapshot.Source)
+                ? "ADB Player" : CreateDisplayTitle(Snapshot.Source);
+        }
+    }
+    public string AudioOnlySubtitle => string.Join(" · ",
+        new[] { _audioVisualMetadata.Artist, _audioVisualMetadata.Album }
+            .Where(value => !string.IsNullOrWhiteSpace(value)));
+
+    public string AudioOnlyCodecLabel =>
+        AudioOnlyVisualPolicy.CodecLabel(Snapshot.AudioCodecName, Snapshot.Source);
+
+    public string AudioOnlyQualityLabel => AudioOnlyVisualPolicy.QualityLabel(
+        Snapshot, LocalizationManager.Get("Player.AudioOnly.Mono"),
+        LocalizationManager.Get("Player.AudioOnly.Stereo"));
+
+    public string AudioOnlyPlaybackStatusKey => Snapshot.IsBuffering
+        ? "Player.AudioOnly.Buffering"
+        : Snapshot.IsPaused
+            ? "Player.AudioOnly.Paused"
+            : "Player.AudioOnly.Playing";
     public string PlaylistSummary => Playlist.Count == 0 ? LocalizationManager.Get("Tab.Playlist") : $"{Playlist.Count}";
 
 
@@ -1405,12 +1614,12 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     public double PrimarySubtitleDelaySeconds
     {
         get => _settings.PrimarySubtitleDelaySeconds;
-        set { var v = Math.Clamp(value, -120, 120); if (Math.Abs(_settings.PrimarySubtitleDelaySeconds-v)<0.0001) return; _settings.PrimarySubtitleDelaySeconds=v; OnPropertyChanged(); OnPropertyChanged(nameof(PrimarySubtitleDelayText)); if (IsReady) SafePlaybackAction(() => _playback.SetSubtitleDelay(v)); _ = SaveSettingsAsync(); }
+        set { var v = Math.Clamp(value, -120, 120); if (Math.Abs(_settings.PrimarySubtitleDelaySeconds-v)<0.0001) return; _settings.PrimarySubtitleDelaySeconds=v; if (_selectedSubtitleTrack is { IsDisabled: false } track) _primarySubtitleTrackDelays[track.Id] = v; OnPropertyChanged(); OnPropertyChanged(nameof(PrimarySubtitleDelayText)); if (IsReady) SafePlaybackAction(() => _playback.SetSubtitleDelay(v)); }
     }
     public double SecondarySubtitleDelaySeconds
     {
         get => _settings.SecondarySubtitleDelaySeconds;
-        set { var v = Math.Clamp(value, -120, 120); if (Math.Abs(_settings.SecondarySubtitleDelaySeconds-v)<0.0001) return; _settings.SecondarySubtitleDelaySeconds=v; OnPropertyChanged(); OnPropertyChanged(nameof(SecondarySubtitleDelayText)); if (IsReady) SafePlaybackAction(() => _playback.SetSubtitleDelay(v, true)); _ = SaveSettingsAsync(); }
+        set { var v = Math.Clamp(value, -120, 120); if (Math.Abs(_settings.SecondarySubtitleDelaySeconds-v)<0.0001) return; _settings.SecondarySubtitleDelaySeconds=v; if (_selectedSecondarySubtitleTrack is { IsDisabled: false } track) _secondarySubtitleTrackDelays[track.Id] = v; OnPropertyChanged(); OnPropertyChanged(nameof(SecondarySubtitleDelayText)); if (IsReady) SafePlaybackAction(() => _playback.SetSubtitleDelay(v, true)); }
     }
     public string PrimarySubtitleDelayText => $"{PrimarySubtitleDelaySeconds:+0.00;-0.00;0.00} sn";
     public string SecondarySubtitleDelayText => $"{SecondarySubtitleDelaySeconds:+0.00;-0.00;0.00} sn";
@@ -1492,7 +1701,12 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
                 return;
             }
 
+            OnPropertyChanged(nameof(CanAdjustSubtitleDelay));
             SafePlaybackAction(() => _playback.SelectSubtitleTrack(value.IsDisabled ? null : value.Id));
+            // Each subtitle track starts at 0 unless the user adjusted *that
+            // same track*. This is not a cache deletion or subtitle rewrite.
+            PrimarySubtitleDelaySeconds = value.IsDisabled ? 0 :
+                _primarySubtitleTrackDelays.GetValueOrDefault(value.Id);
         }
     }
 
@@ -1511,6 +1725,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             }
             _selectedSecondarySubtitleTrackId = id;
             SafePlaybackAction(() => _playback.SelectSecondarySubtitleTrack(id));
+            SecondarySubtitleDelaySeconds = id.HasValue
+                ? _secondarySubtitleTrackDelays.GetValueOrDefault(id.Value) : 0;
         }
     }
 
@@ -1638,7 +1854,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
     public Task OpenPathAsync(string path)
     {
-        if (AutoAddFolderVideos && File.Exists(path) && VideoExtensions.Contains(Path.GetExtension(path)))
+        if (AutoAddFolderVideos && File.Exists(path) && LocalAudioFilePolicy.IsPlayable(path, VideoExtensions))
         {
             return OpenFileWithFolderPlaylistAsync(path, replacePlaylist: true);
         }
@@ -1647,13 +1863,13 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
     public async Task OpenFilesAsync(IEnumerable<string> paths, bool replacePlaylist)
     {
-        var sources = ExpandVideoSources(paths)
+        var sources = ExpandPlayableMediaSources(paths)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
         if (sources.Length == 0)
         {
-            StatusMessage = "Desteklenen video dosyası bulunamadı.";
+            StatusMessage = LocalizationManager.Get("Player.NoSupportedMediaFiles");
             return;
         }
 
@@ -1756,7 +1972,25 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
     private Task OpenPersistentSourceAsync(string source)
     {
+        // Localhost Range URLs cannot survive application restarts. Telegram
+        // stores stable media IDs; rebuild the stream via TDLib before seeking.
+        if (TelegramHubSourcePolicy.IsPersistentTelegramSource(source))
+        {
+            if (!IsCurrentTelegramOwner(source))
+            {
+                StatusMessage = LocalizationManager.Get("Telegram.Hub.NoAccount");
+                return Task.CompletedTask;
+            }
+            return Telegram.OpenPersistentAsync(source);
+        }
+
         if (Uri.TryCreate(source, UriKind.Absolute, out var uri) &&
+            uri.Scheme.Equals("rclone", StringComparison.OrdinalIgnoreCase))
+        {
+            return Sources.OpenPersistentCloudMediaAsync(source);
+        }
+
+        if (Uri.TryCreate(source, UriKind.Absolute, out uri) &&
             (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
         {
             return Sources.OpenUrlAsync(source);
@@ -1844,6 +2078,30 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         SafePlaybackAction(() => _playback.AddAudio(path));
         SetExternalAudioForSync(path, null);
         StatusMessage = $"Harici ses eklendi: {CreateDisplayTitle(path)}";
+    }
+
+    private void AttachTelegramLocalAudioPath(string path)
+    {
+        AttachAudioPath(path);
+        ReturnToPlayerAfterTelegramAttachment();
+    }
+
+    private void AttachTelegramSubtitlePath(string path)
+    {
+        AttachSubtitlePath(path);
+        ReturnToPlayerAfterTelegramAttachment();
+    }
+
+    private void ReturnToPlayerAfterTelegramAttachment()
+    {
+        if (HasMedia)
+        {
+            SelectedSidebarIndex = 3;
+            IsMediaCenterVisible = false;
+            if (_resumeAfterExternalAudioSelection && Snapshot.IsPaused)
+                SafePlaybackAction(_playback.TogglePause);
+        }
+        _resumeAfterExternalAudioSelection = false;
     }
 
     private Task AttachRemoteAudioAsync(RemoteOpenRequest request)
@@ -2622,6 +2880,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private void AdjustManualAudioDelay(double deltaSeconds)
     {
         _manualAudioDelaySeconds = Math.Clamp(_manualAudioDelaySeconds + deltaSeconds, -10, 10);
+        OnPropertyChanged(nameof(ManualAudioDelaySeconds));
         if (_audioSyncApplicationKind == AudioSyncApplicationKind.Progressive)
         {
             UpdateProgressiveAudioSync(Snapshot.PositionSeconds, force: true, userSeek: false);
@@ -2644,6 +2903,17 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         }
         AudioSyncStatus = $"Ses gecikmesi elle ayarlandı: {AudioSyncOffsetText}.";
         PersistCurrentMediaAttachmentState();
+    }
+
+    private void ResetManualAudioDelay()
+    {
+        if (Math.Abs(_manualAudioDelaySeconds) < 0.0005)
+        {
+            AdjustManualAudioDelay(0);
+            return;
+        }
+
+        AdjustManualAudioDelay(-_manualAudioDelaySeconds);
     }
 
     private string GetAudioSyncPhaseText()
@@ -2884,6 +3154,13 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         try { cts.Cancel(); } catch { }
     }
 
+    public void SetVideoFillMode(bool fill)
+    {
+        _videoFillMode = fill;
+        if (IsReady) SafePlaybackAction(() => _playback.SetVideoFill(fill));
+        StatusMessage = LocalizationManager.Get(fill ? "Player.VideoLayout.Fill" : "Player.VideoLayout.Fit");
+    }
+
     public void SeekTo(double seconds)
     {
         if (!IsReady || Snapshot.DurationSeconds <= 0)
@@ -3034,6 +3311,24 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         return false;
     }
 
+    private void ResetManualSubtitleDelayForNewMedia()
+    {
+        _primarySubtitleTrackDelays.Clear();
+        _secondarySubtitleTrackDelays.Clear();
+        _settings.PrimarySubtitleDelaySeconds = 0;
+        _settings.SecondarySubtitleDelaySeconds = 0;
+        OnPropertyChanged(nameof(PrimarySubtitleDelaySeconds));
+        OnPropertyChanged(nameof(SecondarySubtitleDelaySeconds));
+        OnPropertyChanged(nameof(PrimarySubtitleDelayText));
+        OnPropertyChanged(nameof(SecondarySubtitleDelayText));
+
+        if (IsReady)
+        {
+            SafePlaybackAction(() => _playback.SetSubtitleDelay(0));
+            SafePlaybackAction(() => _playback.SetSubtitleDelay(0, true));
+        }
+    }
+
     private void ApplySubtitlePresentationSettings()
     {
         SafePlaybackAction(() => _playback.SetSubtitleDelay(_settings.PrimarySubtitleDelaySeconds));
@@ -3058,8 +3353,12 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         string[] siblings;
         try
         {
+            var requestedAudio = LocalAudioFilePolicy.IsAudio(fullPath);
             siblings = Directory.EnumerateFiles(directory, "*.*", SearchOption.TopDirectoryOnly)
-                .Where(candidate => VideoExtensions.Contains(Path.GetExtension(candidate)))
+                // Keep audio albums and video episodes in separate queues.
+                .Where(candidate => requestedAudio
+                    ? LocalAudioFilePolicy.IsAudio(candidate)
+                    : VideoExtensions.Contains(Path.GetExtension(candidate)))
                 .OrderBy(NaturalSortKey, StringComparer.CurrentCultureIgnoreCase)
                 .ThenBy(candidate => candidate, StringComparer.CurrentCultureIgnoreCase)
                 .ToArray();
@@ -3096,7 +3395,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
         _settings.LastOpenedDirectory = Path.GetDirectoryName(selected[0]);
         await SaveSettingsAsync().ConfigureAwait(true);
-        if (AutoAddFolderVideos && selected.Count == 1)
+        if (AutoAddFolderVideos && selected.Count == 1 &&
+            LocalAudioFilePolicy.IsPlayable(selected[0], VideoExtensions))
         {
             await OpenFileWithFolderPlaylistAsync(selected[0], replacePlaylist: true).ConfigureAwait(true);
         }
@@ -3106,23 +3406,40 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         }
     }
 
-    private Task OpenUrlAsync()
+    private async Task OpenUrlAsync()
     {
+        // Both the Home hero and top toolbar must open a real URL entry
+        // action; switching to Home alone made the controls look inert.
+        var url = _dialogs.PromptForUrl();
+        if (string.IsNullOrWhiteSpace(url)) return;
         ShowMediaCenter();
-        Sources.ShowConnectionsHome();
-        StatusMessage = "Web bağlantısını Medya Merkezi alanına yapıştırın.";
-        return Task.CompletedTask;
+        await Sources.OpenUrlAsync(url).ConfigureAwait(true);
     }
 
-    private Task AttachSubtitleAsync()
+    private async Task AttachSubtitleAsync()
     {
         var selected = _dialogs.PickSubtitle(_settings.LastOpenedDirectory);
-        if (!string.IsNullOrWhiteSpace(selected))
+        if (string.IsNullOrWhiteSpace(selected)) return;
+        try
         {
+            if (ArchiveMediaAttachmentHelper.IsZip(selected))
+            {
+                StatusMessage = "ZIP içindeki altyazılar inceleniyor…";
+                var extracted = await ArchiveMediaAttachmentHelper.SelectAndExtractAsync(
+                    selected, _paths.RemoteCacheDirectory, _dialogs,
+                    subtitleOnly: true).ConfigureAwait(true);
+                foreach (var attachment in extracted)
+                    AttachSubtitlePath(attachment.FilePath);
+                if (extracted.Count == 0) StatusMessage = "Arşivden altyazı seçimi iptal edildi.";
+                return;
+            }
             AttachSubtitlePath(selected);
         }
-
-        return Task.CompletedTask;
+        catch (Exception exception)
+        {
+            _logger.Error("ZIP içinden altyazı eklenemedi.", exception);
+            _dialogs.ShowError($"ZIP içinden altyazı eklenemedi.\n\n{exception.Message}");
+        }
     }
 
     private async Task AttachSecondarySubtitleAsync()
@@ -3139,6 +3456,14 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         {
             _settings.LastOpenedDirectory = Path.GetDirectoryName(selected);
             await SaveSettingsAsync().ConfigureAwait(true);
+            if (ArchiveMediaAttachmentHelper.IsZip(selected))
+            {
+                var extracted = await ArchiveMediaAttachmentHelper.SelectAndExtractAsync(
+                    selected, _paths.RemoteCacheDirectory, _dialogs, subtitleOnly: true)
+                    .ConfigureAwait(true);
+                if (extracted.Count == 0) return;
+                selected = extracted[0].FilePath;
+            }
             var existingIds = SecondarySubtitleTracks.Where(track => !track.IsDisabled).Select(track => track.Id).ToHashSet();
             SafePlaybackAction(() => _playback.AddSubtitle(selected, select: false));
             await Task.Delay(120).ConfigureAwait(true);
@@ -3171,6 +3496,21 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         {
             _settings.LastOpenedDirectory = Path.GetDirectoryName(selected);
             await SaveSettingsAsync().ConfigureAwait(true);
+            if (ArchiveMediaAttachmentHelper.IsZip(selected))
+            {
+                StatusMessage = "ZIP içindeki ses ve altyazılar inceleniyor…";
+                var extracted = await ArchiveMediaAttachmentHelper.SelectAndExtractAsync(
+                    selected, _paths.RemoteCacheDirectory, _dialogs).ConfigureAwait(true);
+                foreach (var attachment in extracted)
+                {
+                    if (attachment.Kind == ArchiveAttachmentKind.Audio)
+                        AttachAudioPath(attachment.FilePath);
+                    else
+                        AttachSubtitlePath(attachment.FilePath);
+                }
+                if (extracted.Count == 0) StatusMessage = "ZIP içinden dosya seçimi iptal edildi.";
+                return;
+            }
             if (ArchiveAudioHelper.IsSupportedArchive(selected))
             {
                 StatusMessage = "Ses arşivi inceleniyor…";
@@ -3252,7 +3592,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             request.HttpHeaders,
             request.PersistentSource,
             addRecent: true,
-            recentTitle: request.DisplayName).ConfigureAwait(true);
+            recentTitle: request.DisplayName,
+            propagateErrors: true).ConfigureAwait(true);
     }
 
     private async Task OpenSourceAsync(
@@ -3260,7 +3601,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         IReadOnlyDictionary<string, string>? httpHeaders = null,
         string? resumeKey = null,
         bool addRecent = true,
-        string? recentTitle = null)
+        string? recentTitle = null,
+        bool propagateErrors = false)
     {
         if (File.Exists(source))
         {
@@ -3275,6 +3617,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         if (!await EnsurePlaybackReadyAsync().ConfigureAwait(true))
         {
             IsMediaCenterVisible = true;
+            if (propagateErrors)
+                throw new InvalidOperationException("Oynatıcı henüz hazır değil. Yerel video ile tekrar deneyin.");
             return;
         }
 
@@ -3284,12 +3628,18 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             await PersistResumeAsync().ConfigureAwait(true);
             ResetAudioSyncForNewMedia();
             ResetSubtitleSyncForNewMedia();
+            ResetManualSubtitleDelayForNewMedia();
             SelectedSidebarIndex = 3;
             IsMediaCenterVisible = false;
             var identitySource = string.IsNullOrWhiteSpace(resumeKey) ? source : resumeKey;
             var resume = _settings.RememberPlaybackPosition
                 ? await _resumeStore.GetAsync(identitySource).ConfigureAwait(true)
                 : null;
+            // Never seek into another account's saved position, even if a
+            // Telegram chat/message numeric ID happens to match.
+            if (TelegramHubSourcePolicy.IsPersistentTelegramSource(identitySource) &&
+                !IsCurrentTelegramOwner(identitySource))
+                resume = null;
 
             Subtitles.UpdateCurrentMedia(identitySource, 0);
             StatusMessage = "Video açılıyor…";
@@ -3303,6 +3653,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             ApplyCurrentAudioDeviceAndDelay();
             ApplyVideoProfileForCurrentSource();
             ApplyVideoEqualizer();
+            // Re-apply the user-selected fit/fill choice after a media switch.
+            SafePlaybackAction(() => _playback.SetVideoFill(_videoFillMode));
             _currentResumeKey = identitySource;
             var restoredAttachments = await RestoreSavedMediaAttachmentsAsync(identitySource).ConfigureAwait(true);
             if (addRecent) TouchRecentSource(identitySource, recentTitle);
@@ -3321,6 +3673,9 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             IsMediaCenterVisible = true;
             _logger.Error($"Kaynak açılamadı: {SafeLogSource(source)}", exception);
             StatusMessage = "Kaynak açılamadı.";
+            // Remote SourcePanel owns its own user-facing error and must not
+            // report a false "Açılıyor" after the playback engine rejected it.
+            if (propagateErrors) throw;
             _dialogs.ShowError($"Video açılamadı.\n\n{exception.Message}");
         }
     }
@@ -3347,12 +3702,89 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         return source;
     }
 
+    private async Task LoadAudioVisualMetadataAsync(string? source)
+    {
+        _audioVisualCts?.Cancel();
+        _audioVisualCts?.Dispose();
+        _audioVisualCts = null;
+        var generation = ++_audioVisualGeneration;
+        _audioVisualMetadata = LocalAudioVisualMetadata.Empty;
+        _audioCoverImage = null;
+        NotifyAudioVisualChanged();
+
+        if (string.IsNullOrWhiteSpace(source) || !LocalAudioFilePolicy.IsAudio(source) ||
+            !File.Exists(source))
+            return;
+
+        var cts = new CancellationTokenSource();
+        _audioVisualCts = cts;
+        try
+        {
+            var token = cts.Token;
+            var tags = await Task.Run(
+                () => LocalAudioVisualMetadataReader.Read(source, token), token)
+                .ConfigureAwait(true);
+            if (cts.IsCancellationRequested || _disposed || generation != _audioVisualGeneration ||
+                !string.Equals(Snapshot.Source, source, StringComparison.OrdinalIgnoreCase))
+                return;
+
+            ImageSource? cover = null;
+            if (tags.CoverBytes is { Length: > 0 } imageBytes)
+            {
+                try
+                {
+                    using var stream = new MemoryStream(imageBytes, writable: false);
+                    var bitmap = new BitmapImage();
+                    bitmap.BeginInit();
+                    bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                    bitmap.DecodePixelWidth = 440;
+                    bitmap.StreamSource = stream;
+                    bitmap.EndInit();
+                    bitmap.Freeze();
+                    cover = bitmap;
+                }
+                catch (Exception exception) when (exception is IOException or
+                         ArgumentException or NotSupportedException or InvalidOperationException)
+                {
+                    // Corrupt album art must never stop the audio or video decoder.
+                }
+            }
+            _audioVisualMetadata = tags;
+            _audioCoverImage = cover;
+            NotifyAudioVisualChanged();
+        }
+        catch (OperationCanceledException) when (cts.IsCancellationRequested)
+        {
+            // Rapid track switches can safely cancel tag reads.
+        }
+        catch (Exception exception)
+        {
+            _logger.Warning($"Yerel ses etiketi okunamadı: {exception.GetType().Name}");
+        }
+    }
+
+    private void NotifyAudioVisualChanged()
+    {
+        OnPropertyChanged(nameof(AudioOnlyTitle));
+        OnPropertyChanged(nameof(AudioOnlySubtitle));
+        OnPropertyChanged(nameof(AudioOnlyCover));
+        OnPropertyChanged(nameof(HasAudioOnlyCover));
+    }
+
     private void PlaybackOnSnapshotChanged(object? sender, PlaybackSnapshot snapshot)
     {
         System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
         {
             var previousProgressivePosition = _progressiveLastPositionSeconds;
+            var wasIdle = Snapshot.IsIdle;
             Snapshot = snapshot;
+            if (snapshot.IsIdle != wasIdle)
+                Telegram.NotifyPlaybackCacheAvailabilityChanged();
+            if (snapshot.IsIdle && !wasIdle)
+                _ = Telegram.ApplyAutomaticCacheCleanupAsync();
+            // The torrent viewer retains the file until playback is finished.
+            // Smart Handoff can then transfer without two clients writing it.
+            Torrent.NotifyPlayerSnapshot(snapshot.Source, snapshot.IsIdle);
             if (_audioSyncApplicationKind == AudioSyncApplicationKind.Progressive)
             {
                 var userSeek = !double.IsNaN(previousProgressivePosition) &&
@@ -3419,6 +3851,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
                 }
                 OnPropertyChanged(nameof(SelectedAudioTrack));
                 OnPropertyChanged(nameof(SelectedSubtitleTrack));
+                OnPropertyChanged(nameof(CanAdjustSubtitleDelay));
                 OnPropertyChanged(nameof(SelectedSecondarySubtitleTrack));
             }
             finally
@@ -3454,6 +3887,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
     private void PlaybackOnPlaybackEnded(object? sender, EventArgs e)
     {
+        System.Windows.Application.Current.Dispatcher.InvokeAsync(
+            () => Torrent.NotifyPlaybackEnded());
         if (!AutoPlayNext)
         {
             return;
@@ -3472,6 +3907,9 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         var title = string.IsNullOrWhiteSpace(displayTitle) ? CreateDisplayTitle(source) : displayTitle.Trim();
         var isLocal = File.Exists(source);
         var entry = new RecentSourceEntry(source, title, DateTimeOffset.UtcNow, isLocal);
+        if (TelegramHubSourcePolicy.IsPersistentTelegramSource(source) &&
+            Telegram.IsReady && Telegram.CurrentAccountId is long ownerId && ownerId > 0)
+            _settings.TelegramResumeSourceOwners[source] = ownerId;
 
         var existing = _settings.RecentSources.FirstOrDefault(item =>
             string.Equals(item.Source, source, StringComparison.OrdinalIgnoreCase));
@@ -3491,6 +3929,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         {
             RecentSources.Add(item);
         }
+        RefreshTelegramRecentlyOpened();
 
         HistoryItems.Clear();
         foreach (var item in RecentSources)
@@ -3516,7 +3955,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
         _historyArtworkCts?.Cancel();
         _historyArtworkCts?.Dispose();
-        _historyArtworkCts = new CancellationTokenSource(TimeSpan.FromSeconds(12));
+        _historyArtworkCts = new CancellationTokenSource(TimeSpan.FromSeconds(28));
         var cancellationToken = _historyArtworkCts.Token;
 
         try
@@ -3667,31 +4106,117 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         });
     }
 
-    private async Task RefreshContinueWatchingAsync()
+    private bool IsCurrentTelegramOwner(string source) =>
+        Telegram.IsReady && Telegram.CurrentAccountId is long id && id > 0 &&
+        _settings.TelegramResumeSourceOwners.TryGetValue(source, out var owner) &&
+        owner == id;
+
+    private async void TelegramOnPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
+        if (_disposed || e.PropertyName is not (nameof(TelegramPanelViewModel.IsReady)
+            or nameof(TelegramPanelViewModel.CurrentAccountId))) return;
+
         try
         {
+            // Logout immediately removes private cards; an asynchronous store
+            // fetch cannot be allowed to keep the previous user's titles visible.
+            if (!Telegram.IsReady || Telegram.CurrentAccountId is not > 0)
+            {
+                foreach (var visible in ContinueWatching
+                             .Where(item => TelegramHubSourcePolicy.IsPersistentTelegramSource(item.Source))
+                             .ToArray())
+                    ContinueWatching.Remove(visible);
+                TelegramContinueWatching.Clear();
+                TelegramRecentlyOpened.Clear();
+            }
+            // Identity resolves asynchronously after authorizationStateReady.
+            // Never expose legacy or other-account items on a generic Ready event.
+            if (e.PropertyName == nameof(TelegramPanelViewModel.CurrentAccountId) &&
+                Telegram.CurrentAccountId is > 0)
+                await BindLegacyTelegramResumeOwnerAsync().ConfigureAwait(true);
+
+            RefreshTelegramRecentlyOpened();
+            await RefreshContinueWatchingAsync().ConfigureAwait(true);
+        }
+        catch (Exception exception)
+        {
+            _logger.Warning($"Telegram izleme kapsamı yenilenemedi: {exception.Message}");
+        }
+    }
+
+    private async Task BindLegacyTelegramResumeOwnerAsync()
+    {
+        var accountId = Telegram.CurrentAccountId;
+        if (accountId is not > 0 || _settings.TelegramLegacyResumeOwnershipMigrated)
+            return;
+
+        // P5 stored no account provenance. Make at most one device-local
+        // migration for the first verified TDLib account; never silently
+        // claim these legacy entries for subsequent signed-in accounts.
+        var stored = await _resumeStore.GetAllAsync().ConfigureAwait(true);
+        if (!Telegram.IsReady || Telegram.CurrentAccountId != accountId) return;
+        foreach (var source in stored.Select(x => x.Source)
+                     .Concat(_settings.RecentSources.Select(x => x.Source))
+                     .Where(TelegramHubSourcePolicy.IsPersistentTelegramSource)
+                     .Distinct(StringComparer.OrdinalIgnoreCase))
+            _settings.TelegramResumeSourceOwners.TryAdd(source, accountId.Value);
+
+        _settings.TelegramLegacyResumeOwnershipMigrated = true;
+        await SaveSettingsAsync().ConfigureAwait(true);
+    }
+
+    // P5 Hub tracks only actually opened, stable Telegram identities. A
+    // session-discovered Telegram attachment never enters this collection.
+    private void RefreshTelegramRecentlyOpened()
+    {
+        var recent = TelegramHubSourcePolicy.RecentlyOpened(RecentSources);
+        TelegramRecentlyOpened.Clear();
+        foreach (var item in recent.Where(item => IsCurrentTelegramOwner(item.Source)))
+            TelegramRecentlyOpened.Add(item);
+    }
+
+    private async Task RefreshContinueWatchingAsync()
+    {
+        var refreshGeneration = Interlocked.Increment(ref _continueWatchingRefreshGeneration);
+        try
+        {
+            var dispatcher = System.Windows.Application.Current?.Dispatcher;
+            if (dispatcher is null) return;
+            // ObservableCollection belongs to the UI thread. Take a stable
+            // account-name snapshot before processing resume entries off-thread.
+            var connectedCloudRemotes = await dispatcher.InvokeAsync(() =>
+                Sources.CloudAccounts
+                    .Select(account => account.RemoteName)
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase));
             var resumes = await _resumeStore.GetAllAsync().ConfigureAwait(false);
             var recentBySource = _settings.RecentSources
                 .GroupBy(item => item.Source, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
 
+            var verifiedTelegramAccount = Telegram.IsReady ? Telegram.CurrentAccountId : null;
+            var telegramItems = UnifiedContinueWatchingPolicy.TelegramForAccount(
+                    resumes, _settings.TelegramResumeSourceOwners,
+                    verifiedTelegramAccount, Telegram.IsReady)
+                .Select(resume =>
+                {
+                    var title = recentBySource.TryGetValue(resume.Source, out var record) &&
+                                !string.IsNullOrWhiteSpace(record.Title)
+                        ? record.Title
+                        : LocalizationManager.Get("Telegram.Hub.UnknownMedia");
+                    return new ContinueWatchingItem(resume.Source, title,
+                        resume.PositionSeconds, resume.DurationSeconds,
+                        resume.UpdatedAtUtc, false);
+                }).ToArray();
+
             var items = new List<ContinueWatchingItem>();
-            foreach (var resume in resumes
-                         .Where(item => item.PositionSeconds >= 5 && item.DurationSeconds > 0 && item.DurationSeconds - item.PositionSeconds >= 45)
-                         .OrderByDescending(item => item.UpdatedAtUtc)
-                         .Take(10))
+            foreach (var resume in UnifiedContinueWatchingPolicy.OtherSources(
+                         resumes, File.Exists,
+                         isConnectedCloudSource: source =>
+                             Uri.TryCreate(source, UriKind.Absolute, out var uri) &&
+                             uri.Scheme.Equals("rclone", StringComparison.OrdinalIgnoreCase) &&
+                             connectedCloudRemotes.Contains(Uri.UnescapeDataString(uri.Host))))
             {
                 var isLocal = File.Exists(resume.Source);
-                if (!isLocal)
-                {
-                    if (!Uri.TryCreate(resume.Source, UriKind.Absolute, out var remoteUri) ||
-                        (remoteUri.Scheme != Uri.UriSchemeHttp && remoteUri.Scheme != Uri.UriSchemeHttps))
-                    {
-                        continue;
-                    }
-                }
-
                 var title = recentBySource.TryGetValue(resume.Source, out var recent) &&
                             !string.IsNullOrWhiteSpace(recent.Title)
                     ? recent.Title
@@ -3702,27 +4227,66 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
                     continue;
                 }
 
+                // P1: parse episode identity once from the real release/title. A source
+                // remains the unique playback target even when episodes share a series.
+                var identity = BuildResumeIdentity(resume.Source, title, isLocal);
                 items.Add(new ContinueWatchingItem(
                     resume.Source,
                     title,
                     resume.PositionSeconds,
                     resume.DurationSeconds,
                     resume.UpdatedAtUtc,
-                    isLocal));
+                    isLocal,
+                    SeriesTitle: identity.IsSeries && identity.Season is not null && identity.Episode is not null
+                        ? identity.Title
+                        : null,
+                    Season: identity.Season,
+                    Episode: identity.Episode,
+                    Year: identity.Year));
             }
 
-            var dispatcher = System.Windows.Application.Current?.Dispatcher;
-            if (dispatcher is null) return;
-
+            // One Home rail for usable local/HTTP and verified-account Telegram
+            // resume entries. Session-discovered files never enter this list.
             await dispatcher.InvokeAsync(() =>
             {
+                if (_disposed || refreshGeneration != Volatile.Read(ref _continueWatchingRefreshGeneration))
+                    return;
+                // An account may sign out or change during the resume-store read.
+                // Recheck identity on the UI dispatcher before publishing any
+                // Telegram title or saved position to Home or Hub.
+                var visibleTelegram = verifiedTelegramAccount is > 0 &&
+                                      Telegram.IsReady &&
+                                      Telegram.CurrentAccountId == verifiedTelegramAccount
+                    ? telegramItems
+                    : Array.Empty<ContinueWatchingItem>();
+                var unified = items.Concat(visibleTelegram)
+                    .GroupBy(item => item.Source, StringComparer.OrdinalIgnoreCase)
+                    .Select(group => group.OrderByDescending(item => item.UpdatedAtUtc).First())
+                    .OrderByDescending(item => item.UpdatedAtUtc).Take(20).ToArray();
                 ContinueWatching.Clear();
-                foreach (var item in items) ContinueWatching.Add(item);
+                foreach (var item in unified)
+                {
+                    // Disconnecting an account during an async refresh must not
+                    // leave another account's cloud file visible on Home.
+                    if (item.Source.StartsWith("rclone://", StringComparison.OrdinalIgnoreCase) &&
+                        !Sources.IsConnectedCloudSource(item.Source))
+                        continue;
+                    ContinueWatching.Add(item);
+                }
+                TelegramContinueWatching.Clear();
+                foreach (var item in visibleTelegram) TelegramContinueWatching.Add(item);
             });
 
-            // Home never waits for metadata. Artwork arrives afterwards from
-            // local cache or one batched Internal API request.
-            _ = EnrichContinueWatchingArtworkAsync(items);
+            // Home never waits for metadata. Enrich exactly what passed the
+            // verified-account publication gate, including Telegram resumes.
+            // Previously only "items" (local/cloud) was passed, so Telegram
+            // entries could never receive posters even when ADB Cloud matched.
+            var visibleForArtwork = await dispatcher.InvokeAsync(() =>
+                _disposed || refreshGeneration != Volatile.Read(ref _continueWatchingRefreshGeneration)
+                    ? Array.Empty<ContinueWatchingItem>()
+                    : ContinueWatching.ToArray());
+            if (visibleForArtwork.Length > 0)
+                _ = EnrichContinueWatchingArtworkAsync(visibleForArtwork);
         }
         catch (Exception exception)
         {
@@ -3738,7 +4302,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
         _continueWatchingArtworkCts?.Cancel();
         _continueWatchingArtworkCts?.Dispose();
-        _continueWatchingArtworkCts = new CancellationTokenSource(TimeSpan.FromSeconds(12));
+        _continueWatchingArtworkCts = new CancellationTokenSource(TimeSpan.FromSeconds(28));
         var cancellationToken = _continueWatchingArtworkCts.Token;
 
         try
@@ -3757,18 +4321,25 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
             foreach (var item in work)
             {
+                // Do not trust older shared/legacy cache entries: they were persisted
+                // without media type, release identity or confidence checks.
                 if (cache.TryGetValue(item.CacheKey, out var cached)
-                    && cached.ExpiresAtUtc > DateTimeOffset.UtcNow
-                    && (!string.IsNullOrWhiteSpace(cached.PosterUrl)
-                        || !string.IsNullOrWhiteSpace(cached.BackdropUrl)))
+                    && cached.VerifiedForHome
+                    && cached.ExpiresAtUtc > DateTimeOffset.UtcNow)
                 {
-                    await ApplyContinueWatchingArtworkAsync(
-                            item.Item.Source,
-                            cached.Title,
-                            cached.PosterUrl,
-                            cached.BackdropUrl,
-                            cancellationToken)
-                        .ConfigureAwait(false);
+                    var poster = ContinueWatchingArtworkPolicy.SafeArtworkUrl(cached.PosterUrl);
+                    var backdrop = ContinueWatchingArtworkPolicy.SafeArtworkUrl(cached.BackdropUrl);
+                    if (poster is not null || backdrop is not null)
+                    {
+                        await ApplyContinueWatchingArtworkAsync(
+                                item.Item.Source,
+                                cached.Title,
+                                poster,
+                                backdrop,
+                                cancellationToken)
+                            .ConfigureAwait(false);
+                    }
+                    // Verified empty artwork means a temporary negative cache result.
                 }
                 else
                 {
@@ -3785,6 +4356,15 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
                     cancellationToken)
                 .ConfigureAwait(false);
 
+            // Authentication errors are actionable, but do not log media URLs
+            // or session tokens. No negative cache is written for API failures.
+            if (results.Count > 0 && results.All(item => !item.Success))
+            {
+                var error = results.FirstOrDefault(item => !string.IsNullOrWhiteSpace(item.Error))?.Error
+                            ?? "Metadata API unavailable";
+                _logger.Warning($"ADB poster metadata servisi: {error}");
+            }
+
             var cacheUpdates = new List<KeyValuePair<string, SharedMediaArtworkEntry>>();
             for (var index = 0; index < misses.Count && index < results.Count; index++)
             {
@@ -3792,32 +4372,36 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
                 var result = results[index];
                 var media = result.Media;
-                if (!result.Success
-                    || !result.Matched
-                    || media is null
-                    || (string.IsNullOrWhiteSpace(media.PosterUrl)
-                        && string.IsNullOrWhiteSpace(media.BackdropUrl)))
-                {
+                if (!ContinueWatchingArtworkPolicy.IsTrusted(misses[index].Identity, result)
+                    || media is null)
                     continue;
-                }
 
-                var cached = new SharedMediaArtworkEntry(
+                var poster = ContinueWatchingArtworkPolicy.SafeArtworkUrl(media.PosterUrl);
+                var backdrop = ContinueWatchingArtworkPolicy.SafeArtworkUrl(media.BackdropUrl);
+                var hasArtwork = poster is not null || backdrop is not null;
+
+                // Valid metadata without artwork is cached briefly; a wrong or
+                // low-confidence match is never displayed or permanently cached.
+                var verified = new SharedMediaArtworkEntry(
                     media.Title,
-                    media.PosterUrl,
-                    media.BackdropUrl,
-                    DateTimeOffset.UtcNow.AddDays(30));
-
+                    poster,
+                    backdrop,
+                    hasArtwork ? DateTimeOffset.UtcNow.AddDays(30) : DateTimeOffset.UtcNow.AddHours(6),
+                    VerifiedForHome: true);
                 cacheUpdates.Add(new KeyValuePair<string, SharedMediaArtworkEntry>(
                     misses[index].CacheKey,
-                    cached));
+                    verified));
 
-                await ApplyContinueWatchingArtworkAsync(
-                        misses[index].Item.Source,
-                        media.Title,
-                        media.PosterUrl,
-                        media.BackdropUrl,
-                        cancellationToken)
-                    .ConfigureAwait(false);
+                if (hasArtwork)
+                {
+                    await ApplyContinueWatchingArtworkAsync(
+                            misses[index].Item.Source,
+                            media.Title,
+                            poster,
+                            backdrop,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                }
             }
 
             if (cacheUpdates.Count > 0)
@@ -3840,18 +4424,43 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
     private MediaIdentity BuildContinueWatchingIdentity(ContinueWatchingItem item)
     {
-        var releaseName = item.IsLocal
-            ? Path.GetFileName(item.Source)
-            : item.Title;
+        var parsed = BuildResumeIdentity(item.Source, item.Title, item.IsLocal);
+        // Artwork may update Title while retaining the original parsed episode.
+        // Do not lose season/episode or collapse identities after metadata refresh.
+        return item.HasEpisode && !string.IsNullOrWhiteSpace(item.SeriesTitle)
+            ? parsed with
+            {
+                Title = item.SeriesTitle,
+                ContentType = "series",
+                Season = item.Season,
+                Episode = item.Episode,
+                Year = item.Year
+            }
+            : parsed;
+    }
 
-        var parsed = _releaseParser.Parse(releaseName, item.Title);
-        var title = string.IsNullOrWhiteSpace(parsed.Title)
-            ? item.Title.Trim()
-            : parsed.Title.Trim();
+    private MediaIdentity BuildResumeIdentity(string source, string title, bool isLocal)
+    {
+        var releaseName = isLocal ? Path.GetFileName(source) : title;
+        if (!isLocal && Uri.TryCreate(source, UriKind.Absolute, out var uri)
+            && uri.Scheme is "http" or "https")
+        {
+            // Only treat a URL path as a release when it really looks like media.
+            // Share IDs and signed URLs are not release names or metadata titles.
+            var fileName = Uri.UnescapeDataString(Path.GetFileName(uri.AbsolutePath));
+            if (!string.IsNullOrWhiteSpace(fileName) &&
+                (VideoExtensions.Contains(Path.GetExtension(fileName))
+                 || Regex.IsMatch(fileName, @"\bS\d{1,2}[._ -]*E\d{1,3}\b",
+                     RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)))
+            {
+                releaseName = fileName;
+            }
+        }
 
+        var parsed = _releaseParser.Parse(releaseName, title);
         return parsed with
         {
-            Title = title,
+            Title = string.IsNullOrWhiteSpace(parsed.Title) ? title.Trim() : parsed.Title.Trim(),
             ReleaseName = releaseName
         };
     }
@@ -4013,6 +4622,10 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             directUri.Scheme is "http" or "https")
         {
             await OpenSourceArgumentAsync(directUri.AbsoluteUri).ConfigureAwait(true);
+            // Only after playback successfully opens: a direct stream has no
+            // torrent metadata, so it cannot be rechecked or seeded in qB.
+            // Record a safe display title, never the signed/credentialed URL.
+            Torrent.NotifyDirectSourceOpened(SelectedAddonTitle(stream));
             return;
         }
 
@@ -4031,6 +4644,15 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         {
             var displayName = Uri.EscapeDataString(SelectedAddonTitle(stream));
             magnetUri = $"magnet:?xt=urn:btih:{stream.InfoHash}&dn={displayName}";
+            // Preserve the tracker hints supplied by the Stremio stream's
+            // sources array. A hash-only magnet otherwise depends entirely on
+            // DHT discovery, which can stall when cold or network-restricted.
+            // URLs may contain private passkeys: never log this magnet.
+            if (stream.TrackerUrls is { Count: > 0 })
+            {
+                magnetUri += string.Concat(stream.TrackerUrls.Take(24)
+                    .Select(tracker => "&tr=" + Uri.EscapeDataString(tracker)));
+            }
         }
 
         SelectedSidebarIndex = 8;
@@ -4114,13 +4736,13 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         return source;
     }
 
-    private static IEnumerable<string> ExpandVideoSources(IEnumerable<string> paths)
+    private static IEnumerable<string> ExpandPlayableMediaSources(IEnumerable<string> paths)
     {
         foreach (var path in paths.Where(path => !string.IsNullOrWhiteSpace(path)))
         {
             if (File.Exists(path))
             {
-                if (VideoExtensions.Contains(Path.GetExtension(path)))
+                if (LocalAudioFilePolicy.IsPlayable(path, VideoExtensions))
                 {
                     yield return Path.GetFullPath(path);
                 }
@@ -4137,7 +4759,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             try
             {
                 files = Directory.EnumerateFiles(path, "*.*", SearchOption.AllDirectories)
-                    .Where(file => VideoExtensions.Contains(Path.GetExtension(file)))
+                    .Where(file => LocalAudioFilePolicy.IsPlayable(file, VideoExtensions))
                     .OrderBy(file => file, StringComparer.CurrentCultureIgnoreCase)
                     .ToArray();
             }
@@ -5131,17 +5753,54 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         SelectedSidebarIndex = 1;
     }
 
+    // Neon Auth is sufficient for the existing authenticated metadata API.
+    // Poster refresh must not depend on the separate Cloud Core bootstrap/playlist sync.
+    private async void AccountOnCloudAuthReady(object? sender, EventArgs e)
+    {
+        if (!Account.IsSignedIn || _disposed)
+            return;
+
+        try
+        {
+            // The shared metadata service serializes its requests. Prioritize the
+            // visible Home rail, then history and library, without racing three
+            // short timeouts or waiting for profile/playlist synchronization.
+            await EnrichContinueWatchingArtworkAsync(ContinueWatching.ToArray())
+                .ConfigureAwait(true);
+            if (!Account.IsSignedIn || _disposed) return;
+            await EnrichHistoryArtworkAsync(HistoryItems.ToArray())
+                .ConfigureAwait(true);
+            if (!Account.IsSignedIn || _disposed) return;
+            await Library.RefreshArtworkAsync(retryMisses: true)
+                .ConfigureAwait(true);
+        }
+        catch (Exception exception)
+        {
+            _logger.Warning($"ADB Cloud oturum sonrası poster yenilemesi başarısız: {exception.Message}");
+        }
+    }
+
     private async void AccountOnCloudSessionReady(object? sender, EventArgs e)
     {
-        _ = Library.RefreshCloudListsAsync();
-        _ = Addons.RefreshCloudCollectionsAsync();
-        _ = Account.RefreshCollectionSummaryAsync();
-        await InitializeCloudPlaylistSessionAsync().ConfigureAwait(true);
-        _ = InitializeCloudPreferencesAsync();
-        _ = InitializeCloudSyncAsync();
-        _ = EnrichContinueWatchingArtworkAsync(ContinueWatching.ToArray());
-        _ = EnrichHistoryArtworkAsync(HistoryItems.ToArray());
-        _ = Library.RefreshArtworkAsync(retryMisses: true);
+        if (!Account.IsSignedIn || _disposed)
+            return;
+
+        // Even when a profile/playlist sync fails, the already authenticated
+        // artwork tasks continue independently; no Premium entitlement gate.
+        try
+        {
+            Addons.RefreshLocalizedMetadataAfterLogin();
+            _ = Library.RefreshCloudListsAsync();
+            _ = Addons.RefreshCloudCollectionsAsync();
+            _ = Account.RefreshCollectionSummaryAsync();
+            await InitializeCloudPlaylistSessionAsync().ConfigureAwait(true);
+            _ = InitializeCloudPreferencesAsync();
+            _ = InitializeCloudSyncAsync();
+        }
+        catch (Exception exception)
+        {
+            _logger.Warning($"ADB Cloud oturum sonrası eşitleme başarısız: {exception.Message}");
+        }
     }
 
     private async void CloudCollectionsOnChanged(object? sender, EventArgs e)
@@ -5747,6 +6406,24 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             PlayerShortcutAction.Fullscreen => _settings.ShortcutFullscreen,
             PlayerShortcutAction.MiniPlayer => _settings.ShortcutMiniPlayer,
             PlayerShortcutAction.Playlist => _settings.ShortcutPlaylist,
+            PlayerShortcutAction.SubtitleDelayDecrease => _settings.ShortcutSubtitleDelayDecrease,
+            PlayerShortcutAction.SubtitleDelayIncrease => _settings.ShortcutSubtitleDelayIncrease,
+            PlayerShortcutAction.AudioDelayDecrease => _settings.ShortcutAudioDelayDecrease,
+            PlayerShortcutAction.AudioDelayIncrease => _settings.ShortcutAudioDelayIncrease,
+            PlayerShortcutAction.SpeedIncrease => _settings.ShortcutSpeedIncrease,
+            PlayerShortcutAction.SpeedDecrease => _settings.ShortcutSpeedDecrease,
+            PlayerShortcutAction.SpeedReset => _settings.ShortcutSpeedReset,
+            PlayerShortcutAction.NextMedia => _settings.ShortcutNextMedia,
+            PlayerShortcutAction.CycleAudioTrack => _settings.ShortcutCycleAudioTrack,
+            PlayerShortcutAction.CycleSubtitleTrack => _settings.ShortcutCycleSubtitleTrack,
+            PlayerShortcutAction.Mute => _settings.ShortcutMute,
+            PlayerShortcutAction.VolumeIncrease => _settings.ShortcutVolumeIncrease,
+            PlayerShortcutAction.VolumeDecrease => _settings.ShortcutVolumeDecrease,
+            PlayerShortcutAction.ScreenshotAlternate => _settings.ShortcutScreenshotAlternate,
+            PlayerShortcutAction.SubtitleDelayDecreaseAlternate => _settings.ShortcutSubtitleDelayDecreaseAlternate,
+            PlayerShortcutAction.SubtitleDelayIncreaseAlternate => _settings.ShortcutSubtitleDelayIncreaseAlternate,
+            PlayerShortcutAction.AudioDelayDecreaseAlternate => _settings.ShortcutAudioDelayDecreaseAlternate,
+            PlayerShortcutAction.AudioDelayIncreaseAlternate => _settings.ShortcutAudioDelayIncreaseAlternate,
             _ => string.Empty
         };
         return TryParseShortcut(configured, out var configuredKey, out var configuredModifiers) &&
@@ -5819,13 +6496,34 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         _settings.ShortcutFullscreen = "F";
         _settings.ShortcutMiniPlayer = "M";
         _settings.ShortcutPlaylist = "P";
+        _settings.ShortcutSubtitleDelayDecrease = "Z";
+        _settings.ShortcutSubtitleDelayIncrease = "X";
+        _settings.ShortcutAudioDelayDecrease = "Shift+Z";
+        _settings.ShortcutAudioDelayIncrease = "Shift+X";
+        _settings.ShortcutSpeedIncrease = "OemPlus";
+        _settings.ShortcutSpeedDecrease = "OemMinus";
+        _settings.ShortcutSpeedReset = "Ctrl+D0";
+        _settings.ShortcutNextMedia = "N";
+        _settings.ShortcutCycleAudioTrack = "B";
+        _settings.ShortcutCycleSubtitleTrack = "V";
+        _settings.ShortcutMute = "Ctrl+M";
+        _settings.ShortcutVolumeIncrease = "Ctrl+Up";
+        _settings.ShortcutVolumeDecrease = "Ctrl+Down";
+        _settings.ShortcutScreenshotAlternate = "Shift+S";
+        _settings.ShortcutSubtitleDelayDecreaseAlternate = "G";
+        _settings.ShortcutSubtitleDelayIncreaseAlternate = "H";
+        _settings.ShortcutAudioDelayDecreaseAlternate = "J";
+        _settings.ShortcutAudioDelayIncreaseAlternate = "K";
         foreach (var property in new[]
         {
             nameof(ShortcutPlayPause), nameof(ShortcutSeekBackward), nameof(ShortcutSeekForward),
             nameof(ShortcutSeekBackwardMedium), nameof(ShortcutSeekForwardMedium),
             nameof(ShortcutSeekBackwardLong), nameof(ShortcutSeekForwardLong), nameof(ShortcutScreenshot),
             nameof(ShortcutFrameBackward), nameof(ShortcutFrameForward), nameof(ShortcutFullscreen),
-            nameof(ShortcutMiniPlayer), nameof(ShortcutPlaylist)
+            nameof(ShortcutMiniPlayer), nameof(ShortcutPlaylist),
+            nameof(ShortcutSubtitleDelayDecrease), nameof(ShortcutSubtitleDelayIncrease),
+            nameof(ShortcutAudioDelayDecrease), nameof(ShortcutAudioDelayIncrease),
+            nameof(ShortcutSpeedIncrease),             nameof(ShortcutSpeedDecrease),             nameof(ShortcutSpeedReset),             nameof(ShortcutNextMedia),             nameof(ShortcutCycleAudioTrack),             nameof(ShortcutCycleSubtitleTrack),             nameof(ShortcutMute),             nameof(ShortcutVolumeIncrease),             nameof(ShortcutVolumeDecrease),             nameof(ShortcutScreenshotAlternate),             nameof(ShortcutSubtitleDelayDecreaseAlternate),             nameof(ShortcutSubtitleDelayIncreaseAlternate),             nameof(ShortcutAudioDelayDecreaseAlternate),             nameof(ShortcutAudioDelayIncreaseAlternate)
         }) OnPropertyChanged(property);
         _ = SaveSettingsAsync();
         StatusMessage = "Klavye kısayolları varsayılanlara döndürüldü.";
@@ -6163,10 +6861,13 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         Account.RefreshLocalization();
         OnPropertyChanged(nameof(CloudPlaylistCountText));
         OnPropertyChanged(nameof(CloudPreferencesLastSyncText));
+        OnPropertyChanged(nameof(TorrentStorageFreeSpace));
         NotifyAudioSyncDiagnosticsChanged();
         OnPropertyChanged(nameof(SubtitleSyncProgressSummaryText));
         OnPropertyChanged(nameof(SubtitleSyncStageText));
         OnPropertyChanged(nameof(SubtitleSyncStatus));
+        if (SelectedSidebarIndex == 13)
+            _ = RefreshContinueWatchingAsync(); // Local-only title fallback updates with UI language.
     }
 
     public async ValueTask DisposeAsync()
@@ -6183,6 +6884,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         await PersistResumeAsync(waitForTurn: true).ConfigureAwait(false);
         await SaveSettingsAsync().ConfigureAwait(false);
 
+        Telegram.PropertyChanged -= TelegramOnPropertyChanged;
+        Account.CloudAuthReady -= AccountOnCloudAuthReady;
         Account.CloudSessionReady -= AccountOnCloudSessionReady;
         Library.CloudCollectionsChanged -= CloudCollectionsOnChanged;
         Addons.CloudCollectionsChanged -= CloudCollectionsOnChanged;
@@ -6209,6 +6912,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         _cloudPreferencesSyncCts?.Dispose();
         _continueWatchingArtworkCts?.Cancel();
         _continueWatchingArtworkCts?.Dispose();
+        _audioVisualCts?.Cancel();
+        _audioVisualCts?.Dispose();
         _historyArtworkCts?.Cancel();
         _historyArtworkCts?.Dispose();
         _mediaArtwork.Dispose();

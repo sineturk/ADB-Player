@@ -67,6 +67,9 @@ public sealed class AccountPanelViewModel : ObservableObject
         _ = RestoreSessionAsync();
     }
 
+    // Authenticated metadata artwork only needs Neon Auth. It must not wait
+    // for profile/device/playlist Core initialization or future Membership gates.
+    public event EventHandler? CloudAuthReady;
     public event EventHandler? CloudSessionReady;
 
     public bool IsConfigured => _service.IsConfigured;
@@ -218,6 +221,9 @@ public sealed class AccountPanelViewModel : ObservableObject
             var snapshot = await _service.RestoreSessionAsync().ConfigureAwait(true);
             ApplySnapshot(snapshot);
 
+            if (snapshot is not null)
+                CloudAuthReady?.Invoke(this, EventArgs.Empty);
+
             if (snapshot is null)
             {
                 ApplyCoreSnapshot(null);
@@ -257,6 +263,7 @@ public sealed class AccountPanelViewModel : ObservableObject
 
             ApplySnapshot(result.Snapshot);
             Password = string.Empty;
+            CloudAuthReady?.Invoke(this, EventArgs.Empty);
             await BootstrapCloudCoreAsync(result.Snapshot).ConfigureAwait(true);
         }
         finally
@@ -282,6 +289,7 @@ public sealed class AccountPanelViewModel : ObservableObject
 
             ApplySnapshot(result.Snapshot);
             Password = string.Empty;
+            CloudAuthReady?.Invoke(this, EventArgs.Empty);
             await BootstrapCloudCoreAsync(result.Snapshot).ConfigureAwait(true);
         }
         finally

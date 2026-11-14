@@ -106,6 +106,11 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine
                 SetOption("keep-open", "yes");
                 SetOption("idle", "yes");
                 SetOption("force-window", "no");
+                // P4.15.5a: render album art in the managed AudioOnlySurface.
+                // MPV's default embedded-first otherwise promotes APIC art to a
+                // video track and hides the custom audio panel. This setting
+                // has no effect on actual video tracks.
+                SetOption("audio-display", "no");
                 SetOption("vo", "gpu-next");
                 SetOption("gpu-api", "d3d11");
                 SetOption("hwdec", "auto-safe");
@@ -180,6 +185,10 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine
         SetAudioDelay(0);
         ClearAudioTempoCorrection();
         ExecuteCommand("loadfile", source, "replace");
+        // Returning to the media center pauses the old source. mpv carries
+        // pause across loadfile; start each NEW source automatically.
+        // Do not unpause on later buffering or snapshot events.
+        Pause(false);
         _logger.Info($"Kaynak açılıyor: {SafeLogSource(source)} · HTTP başlıkları: {(httpHeaders?.Count ?? 0)}");
         return Task.CompletedTask;
     }
@@ -422,6 +431,13 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine
             $"Video profili uygulandı: {settings.ProfileCode} · deband={(settings.DebandEnabled ? "on" : "off")} · tone={settings.ToneMapping} · target={colorspaceHint}/{settings.TargetTrc} · d3d11={outputCsp}/{outputFormat}");
     }
 
+    public void SetVideoFill(bool fill)
+    {
+        EnsureInitialized();
+        CheckAndReport(MpvNative.SetPropertyDouble(_context, "panscan", fill ? 1.0 : 0.0),
+            "Video screen fit mode could not be changed");
+    }
+
     public void SetVideoEqualizer(double brightness, double contrast, double saturation, double gamma)
     {
         EnsureInitialized();
@@ -647,6 +663,12 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine
                     : Path.GetFileName(_currentSource);
             }
 
+            var audioCodecName = MpvNative.GetString(_context, "audio-codec-name");
+            var sampleRate = MpvNative.GetInt64(_context, "audio-params/samplerate");
+            var channels = MpvNative.GetInt64(_context, "audio-params/channel-count");
+            var bitrate = MpvNative.GetDouble(_context, "audio-bitrate");
+            // Do not guess quality fields if MPV has not supplied them yet.
+            // PCM output format is not the original file's bit depth.
             var snapshot = new PlaybackSnapshot(
                 _currentSource,
                 string.IsNullOrWhiteSpace(title) ? "AltyazıDB Player" : title,
@@ -658,7 +680,12 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine
                 MpvNative.GetFlag(_context, "core-idle", true),
                 MpvNative.GetFlag(_context, "paused-for-cache", false),
                 !string.IsNullOrWhiteSpace(MpvNative.GetString(_context, "video-format")),
-                !string.IsNullOrWhiteSpace(MpvNative.GetString(_context, "audio-codec-name")));
+                !string.IsNullOrWhiteSpace(audioCodecName),
+                string.IsNullOrWhiteSpace(audioCodecName) ? null : audioCodecName,
+                sampleRate is > 0 and <= 768000 ? (int)sampleRate : null,
+                channels is > 0 and <= 32 ? (int)channels : null,
+                double.IsFinite(bitrate) && bitrate >= 1000 && bitrate <= 100000000
+                    ? (int)Math.Round(bitrate / 1000d) : null);
 
             lock (_stateGate)
             {
